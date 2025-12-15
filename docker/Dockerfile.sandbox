@@ -1,0 +1,32 @@
+# AgentFarm Sandbox Image
+# Minimal Python image for safe code execution
+
+FROM python:3.11-slim
+
+# Security: Run as non-root user
+RUN useradd -m -s /bin/bash sandbox && \
+    mkdir -p /workspace && \
+    chown sandbox:sandbox /workspace
+
+# Install common development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install common Python packages for code execution
+RUN pip install --no-cache-dir \
+    pytest \
+    ruff \
+    httpx \
+    pydantic \
+    aiofiles
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to non-root user
+USER sandbox
+
+# Default command
+CMD ["python", "--version"]
