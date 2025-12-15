@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agentfarm.config import AgentFarmConfig, ProviderType, get_default_config
 from agentfarm.orchestrator import Orchestrator
+from agentfarm.providers.groq import GroqProvider
 from agentfarm.providers.ollama import OllamaProvider
 from agentfarm.tools.code_tools import CodeTools
 from agentfarm.tools.file_tools import FileTools
@@ -21,12 +22,16 @@ def create_provider(config: AgentFarmConfig):
     """Create LLM provider from config."""
     pc = config.provider
 
-    if pc.type == ProviderType.OLLAMA:
+    if pc.type == ProviderType.GROQ:
+        return GroqProvider(
+            model=pc.model,
+            api_key=pc.api_key,
+        )
+    elif pc.type == ProviderType.OLLAMA:
         return OllamaProvider(
             model=pc.model,
             base_url=pc.base_url or "http://localhost:11434",
         )
-    # Add other providers as needed
     raise ValueError(f"Unsupported provider: {pc.type}")
 
 

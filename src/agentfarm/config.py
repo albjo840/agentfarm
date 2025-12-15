@@ -23,8 +23,8 @@ class ProviderType(str, Enum):
 class ProviderConfig(BaseModel):
     """Configuration for an LLM provider."""
 
-    type: ProviderType = ProviderType.OLLAMA
-    model: str = "llama3.2"
+    type: ProviderType = ProviderType.GROQ
+    model: str = "llama-3.3-70b-versatile"
     base_url: str | None = None
     api_key: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
@@ -54,9 +54,9 @@ class AgentFarmConfig(BaseModel):
     @classmethod
     def from_env(cls) -> "AgentFarmConfig":
         """Load configuration from environment variables."""
-        provider_type = os.getenv("AGENTFARM_PROVIDER", "ollama")
-        model = os.getenv("AGENTFARM_MODEL", "llama3.2")
-        api_key = os.getenv("AGENTFARM_API_KEY")
+        provider_type = os.getenv("AGENTFARM_PROVIDER", "groq")
+        model = os.getenv("AGENTFARM_MODEL", "llama-3.3-70b-versatile")
+        api_key = os.getenv("AGENTFARM_API_KEY") or os.getenv("GROQ_API_KEY")
 
         # Provider-specific URLs
         base_url = None
