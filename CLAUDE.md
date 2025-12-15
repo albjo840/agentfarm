@@ -12,6 +12,23 @@ AgentFarm is a token-efficient multi-agent orchestration system for code tasks. 
 2. **Provider Abstraction** - Swap LLM providers without code changes
 3. **Safe Execution** - All generated code runs in Docker sandbox
 4. **MCP Integration** - Exposes tools via Model Context Protocol
+5. **Free-First** - Groq free tier as default, no cost to get started
+
+## Quick Start
+
+```bash
+# Set up API key (get free key at https://console.groq.com/keys)
+export GROQ_API_KEY=your_key_here
+
+# Install
+pip install -e ".[dev]"
+
+# Run a plan
+agentfarm plan "Add a hello world function"
+
+# Run full workflow
+agentfarm workflow "Add unit tests for utils.py"
+```
 
 ## Project Structure
 
@@ -33,7 +50,8 @@ agentfarm/
 │   │   └── reviewer.py        # ReviewerAgent - code review
 │   ├── providers/             # LLM provider implementations
 │   │   ├── base.py            # LLMProvider ABC
-│   │   └── ollama.py          # Free, local execution (default)
+│   │   ├── groq.py            # Groq API (default, free tier)
+│   │   └── ollama.py          # Ollama (local, free)
 │   ├── tools/                 # Agent tools
 │   │   ├── file_tools.py      # File read/write/edit/search
 │   │   ├── code_tools.py      # pytest, ruff, typecheck
@@ -43,7 +61,8 @@ agentfarm/
 │       └── schemas.py         # Pydantic models for all data
 ├── docker/
 │   └── Dockerfile.sandbox     # Sandbox container image
-├── tests/                     # pytest test suite
+├── tests/                     # pytest test suite (27 tests)
+├── .env                       # API keys (not in git)
 └── pyproject.toml             # Project configuration
 ```
 
@@ -52,10 +71,6 @@ agentfarm/
 ```bash
 # Install for development
 pip install -e ".[dev]"
-
-# Install with specific provider
-pip install -e ".[ollama]"
-pip install -e ".[full]"      # All optional deps
 
 # Run tests
 python -m pytest tests/ -v
@@ -66,9 +81,9 @@ python -m ruff check src/
 # Format code
 python -m ruff format src/
 
-# Run CLI
-agentfarm workflow "task description"
+# Run CLI (requires GROQ_API_KEY)
 agentfarm plan "task description"
+agentfarm workflow "task description"
 
 # Run MCP server
 agentfarm mcp
@@ -112,20 +127,27 @@ WorkflowResult + PR Summary
 ### Provider System
 
 ```python
-# Default: Ollama (free, local)
+# Default: Groq (free tier, fast)
+from agentfarm.providers.groq import GroqProvider
+provider = GroqProvider(model="llama-3.3-70b-versatile")
+
+# Alternative: Ollama (local, free)
 from agentfarm.providers.ollama import OllamaProvider
 provider = OllamaProvider(model="llama3.2")
 
-# Future: Other providers
+# Future: Claude, Azure AI Foundry
 # from agentfarm.providers.claude import ClaudeProvider
 # from agentfarm.providers.azure import AzureOpenAIProvider
 ```
 
-Environment variables:
-- `AGENTFARM_PROVIDER` - ollama, groq, claude, azure_openai
-- `AGENTFARM_MODEL` - Model name
-- `AGENTFARM_API_KEY` - API key (if needed)
-- `OLLAMA_HOST` - Ollama server URL
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GROQ_API_KEY` | (required) | Groq API key from console.groq.com |
+| `AGENTFARM_PROVIDER` | `groq` | Provider: groq, ollama, claude, azure_openai |
+| `AGENTFARM_MODEL` | `llama-3.3-70b-versatile` | Model name |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 
 ## Key Files to Understand
 
@@ -134,9 +156,11 @@ Environment variables:
 | `orchestrator.py` | Main entry point, coordinates full workflow |
 | `agents/base.py` | BaseAgent class with token optimization logic |
 | `providers/base.py` | LLMProvider ABC for provider abstraction |
+| `providers/groq.py` | Default provider (Groq free tier) |
 | `models/schemas.py` | All Pydantic models (TaskPlan, ExecutionResult, etc.) |
 | `tools/sandbox.py` | Docker sandbox for safe code execution |
 | `mcp_server.py` | MCP server exposing tools externally |
+| `config.py` | Configuration with env var support |
 
 ## Code Patterns
 
@@ -216,10 +240,10 @@ All changes must follow `policies/AGENTS.md`:
 ```python
 import asyncio
 from agentfarm import Orchestrator
-from agentfarm.providers.ollama import OllamaProvider
+from agentfarm.providers.groq import GroqProvider
 
 async def main():
-    provider = OllamaProvider(model="llama3.2")
+    provider = GroqProvider(model="llama-3.3-70b-versatile")
     orchestrator = Orchestrator(provider, working_dir="./my_project")
 
     result = await orchestrator.run_workflow(
@@ -228,20 +252,24 @@ async def main():
     )
 
     print(result.pr_summary)
+    print(f"Tokens used: {result.total_tokens_used}")
 
 asyncio.run(main())
 ```
 
 ### Use as MCP server
 
-Add to Claude Desktop config:
+Add to Claude Desktop config (`~/.config/claude/claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
     "agentfarm": {
       "command": "agentfarm",
       "args": ["mcp"],
-      "cwd": "/path/to/your/project"
+      "cwd": "/path/to/your/project",
+      "env": {
+        "GROQ_API_KEY": "your_key_here"
+      }
     }
   }
 }
@@ -259,8 +287,36 @@ Optional:
 - `docker` - Sandbox execution
 - `gitpython` - Git operations
 - `anthropic` - Claude provider
-- `ollama` - Ollama provider
+- `groq` - Groq provider (SDK, optional - httpx used by default)
 
 Dev:
 - `pytest`, `pytest-asyncio` - Testing
 - `ruff` - Linting/formatting
+
+## Roadmap / TODO
+
+### Priority 1: Core Functionality
+- [ ] Integration tests with Groq API
+- [ ] Retry logic for rate limits (429 errors)
+- [ ] Connect real FileTools to agents
+
+### Priority 2: More Providers
+- [ ] ClaudeProvider (`providers/claude.py`)
+- [ ] AzureOpenAIProvider (`providers/azure.py`)
+- [ ] Provider auto-detection from available API keys
+
+### Priority 3: MCP & Integration
+- [ ] Test MCP server with Claude Desktop
+- [ ] Add MCP resources for project files
+- [ ] VS Code extension integration
+
+### Priority 4: Security & Sandbox
+- [ ] Build and test Docker sandbox image
+- [ ] Timeout handling for sandbox execution
+- [ ] Resource limits enforcement
+
+### Priority 5: Improvements
+- [ ] Streaming output for real-time feedback
+- [ ] Token usage dashboard per agent
+- [ ] Response caching for identical requests
+- [ ] Structured logging for debugging
