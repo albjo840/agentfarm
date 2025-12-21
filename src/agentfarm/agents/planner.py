@@ -26,15 +26,15 @@ class PlannerAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a task planning agent. Your role is to:
-1. Analyze the given task
-2. Break it into small, atomic steps
-3. Assign each step to the appropriate agent (Executor, Verifier, Reviewer)
-4. Identify dependencies between steps
+        return """You are a task planning agent. Create executable plans quickly and efficiently.
+
+IMPORTANT: Generate your plan JSON IMMEDIATELY without excessive exploration.
+Only use tools when you NEED specific information about existing code.
+After 1-2 tool calls at most, output your plan.
 
 Output your plan as JSON with this structure:
 {
-  "summary": "Brief approach description",
+  "summary": "Brief approach description (1-2 sentences)",
   "steps": [
     {
       "id": 1,
@@ -46,13 +46,14 @@ Output your plan as JSON with this structure:
   ]
 }
 
-Guidelines:
-- Keep steps small and verifiable
-- One logical change per step
-- Executor handles code changes
-- Verifier handles testing/validation
-- Reviewer handles code review
-- Maximum 10 steps per plan"""
+RULES:
+- Keep plans SHORT: 3-5 steps typical, 8 steps maximum
+- Be decisive - don't overthink
+- Executor = code changes, Verifier = testing, Reviewer = code review
+- Output JSON directly - no markdown code blocks needed
+- If unsure about project structure, make reasonable assumptions
+
+After reading this prompt, generate your plan JSON immediately."""
 
     def _setup_tools(self) -> None:
         """Register tools for the planner."""
@@ -176,8 +177,11 @@ Guidelines:
         )
 
     async def create_plan(self, context: AgentContext, task: str) -> TaskPlan | None:
-        """Convenience method to create a plan and return it directly."""
-        result = await self.run(context, task)
+        """Convenience method to create a plan and return it directly.
+
+        Uses a low tool call limit (3) to encourage fast planning.
+        """
+        result = await self.run(context, task, max_tool_calls=3)
         if result.success and "plan" in result.data:
             plan_data = result.data["plan"]
             plan = TaskPlan(**plan_data)

@@ -10,8 +10,6 @@ from pathlib import Path
 
 from agentfarm.config import AgentFarmConfig, ProviderType, get_default_config
 from agentfarm.orchestrator import Orchestrator
-from agentfarm.providers.groq import GroqProvider
-from agentfarm.providers.ollama import OllamaProvider
 from agentfarm.tools.code_tools import CodeTools
 from agentfarm.tools.file_tools import FileTools
 from agentfarm.tools.git_tools import GitTools
@@ -23,14 +21,34 @@ def create_provider(config: AgentFarmConfig):
     pc = config.provider
 
     if pc.type == ProviderType.GROQ:
+        from agentfarm.providers.groq import GroqProvider
         return GroqProvider(
             model=pc.model,
             api_key=pc.api_key,
         )
     elif pc.type == ProviderType.OLLAMA:
+        from agentfarm.providers.ollama import OllamaProvider
         return OllamaProvider(
             model=pc.model,
             base_url=pc.base_url or "http://localhost:11434",
+        )
+    elif pc.type == ProviderType.GEMINI:
+        from agentfarm.providers.gemini import GeminiProvider
+        return GeminiProvider(
+            model=pc.model,
+            api_key=pc.api_key,
+        )
+    elif pc.type in (ProviderType.SILICONFLOW, ProviderType.QWEN):
+        from agentfarm.providers.siliconflow import SiliconFlowProvider
+        return SiliconFlowProvider(
+            model=pc.model,
+            api_key=pc.api_key,
+        )
+    elif pc.type == ProviderType.CLAUDE:
+        from agentfarm.providers.claude import ClaudeProvider
+        return ClaudeProvider(
+            model=pc.model,
+            api_key=pc.api_key,
         )
     raise ValueError(f"Unsupported provider: {pc.type}")
 
@@ -172,6 +190,20 @@ def main() -> None:
     # mcp command
     mcp_parser = subparsers.add_parser("mcp", help="Run as MCP server")
 
+    # web command
+    web_parser = subparsers.add_parser("web", help="Run the 80s sci-fi web interface")
+    web_parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0 for VPN access)",
+    )
+    web_parser.add_argument(
+        "--port", "-p",
+        type=int,
+        default=8080,
+        help="Port to listen on (default: 8080)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "workflow":
@@ -181,6 +213,9 @@ def main() -> None:
     elif args.command == "mcp":
         from agentfarm.mcp_server import main as mcp_main
         mcp_main()
+    elif args.command == "web":
+        from agentfarm.web.server import run_server
+        run_server(args.host, args.port, args.workdir)
     else:
         parser.print_help()
         sys.exit(1)

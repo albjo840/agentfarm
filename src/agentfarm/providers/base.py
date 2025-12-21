@@ -2,9 +2,25 @@ from __future__ import annotations
 
 """Base LLM provider abstraction for token-efficient multi-provider support."""
 
+import asyncio
+import logging
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable, TypeVar
+
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class RetryConfig(BaseModel):
+    """Configuration for retry behavior on rate limits."""
+
+    max_retries: int = Field(default=3, description="Maximum number of retry attempts")
+    base_delay: float = Field(default=1.0, description="Base delay in seconds")
+    max_delay: float = Field(default=60.0, description="Maximum delay in seconds")
+    exponential_base: float = Field(default=2.0, description="Exponential backoff base")
 
 
 class Message(BaseModel):
@@ -54,6 +70,20 @@ class ToolDefinition(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class RateLimitError(Exception):
+    """Raised when rate limit is exceeded and retries are exhausted."""
+
+    def __init__(
+        self,
+        message: str,
+        retry_after: float | None = None,
+        attempts: int = 0,
+    ) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+        self.attempts = attempts
+
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers.
 
@@ -61,8 +91,14 @@ class LLMProvider(ABC):
     ClaudeProvider, AzureOpenAIProvider, AzureMLProvider.
     """
 
-    def __init__(self, model: str, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        model: str,
+        retry_config: RetryConfig | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.model = model
+        self.retry_config = retry_config or RetryConfig()
         self._config = kwargs
         self._total_tokens_used = 0
 
@@ -132,3 +168,67 @@ class LLMProvider(ABC):
                 "parameters": tool.parameters,
             },
         }
+
+    async def _with_retry(
+        self,
+        operation: Callable[[], T],
+        is_rate_limit_error: Callable[[Exception], tuple[bool, float | None]],
+    ) -> T:
+        """Execute an operation with retry logic for rate limits.
+
+        Args:
+            operation: Async callable to execute
+            is_rate_limit_error: Function that checks if exception is rate limit
+                                 and returns (is_rate_limit, retry_after_seconds)
+
+        Returns:
+            Result of the operation
+
+        Raises:
+            RateLimitError: If retries exhausted
+            Exception: Any other error from operation
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(self.retry_config.max_retries + 1):
+            try:
+                return await operation()
+            except Exception as e:
+                is_rate_limit, retry_after = is_rate_limit_error(e)
+
+                if not is_rate_limit:
+                    raise
+
+                last_exception = e
+
+                if attempt >= self.retry_config.max_retries:
+                    raise RateLimitError(
+                        f"Rate limit exceeded after {attempt + 1} attempts: {e}",
+                        retry_after=retry_after,
+                        attempts=attempt + 1,
+                    ) from e
+
+                # Calculate delay with exponential backoff
+                delay = min(
+                    self.retry_config.base_delay
+                    * (self.retry_config.exponential_base**attempt),
+                    self.retry_config.max_delay,
+                )
+
+                # Use retry-after header if provided and larger
+                if retry_after and retry_after > delay:
+                    delay = min(retry_after, self.retry_config.max_delay)
+
+                logger.warning(
+                    "Rate limit hit (attempt %d/%d), retrying in %.1fs",
+                    attempt + 1,
+                    self.retry_config.max_retries + 1,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        # Should not reach here, but just in case
+        raise RateLimitError(
+            f"Rate limit exceeded: {last_exception}",
+            attempts=self.retry_config.max_retries + 1,
+        )

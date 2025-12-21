@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Groq provider - fast, free-tier LLM execution."""
+"""Azure OpenAI provider - Enterprise-grade OpenAI via Azure."""
 
 import json
 import os
@@ -18,37 +18,57 @@ from agentfarm.providers.base import (
 )
 
 
-class GroqProvider(LLMProvider):
-    """Groq provider for fast, free-tier LLM execution.
+class AzureOpenAIProvider(LLMProvider):
+    """Azure OpenAI provider for enterprise deployments.
 
-    Groq offers generous free tier with models like:
-    - llama-3.3-70b-versatile (recommended)
-    - llama-3.1-8b-instant (faster)
-    - mixtral-8x7b-32768
+    Requires Azure OpenAI resource with deployed models.
+    Supports GPT-4, GPT-4 Turbo, GPT-3.5 Turbo deployments.
 
-    Get API key at: https://console.groq.com/keys
+    Required environment variables:
+    - AZURE_OPENAI_ENDPOINT: Your Azure OpenAI resource endpoint
+    - AZURE_OPENAI_API_KEY: Your Azure OpenAI API key
+    - AZURE_OPENAI_DEPLOYMENT: Your model deployment name (optional, can pass as model)
+
+    Setup guide: https://learn.microsoft.com/en-us/azure/ai-services/openai/
     """
 
-    BASE_URL = "https://api.groq.com/openai/v1"
+    API_VERSION = "2024-02-15-preview"
 
     def __init__(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str | None = None,
         api_key: str | None = None,
+        endpoint: str | None = None,
+        api_version: str | None = None,
         retry_config: RetryConfig | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(model, retry_config=retry_config, **kwargs)
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        # Model is the deployment name in Azure
+        deployment = model or os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4")
+        super().__init__(deployment, retry_config=retry_config, **kwargs)
+
+        self.api_key = api_key or os.environ.get("AZURE_OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "Groq API key required. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter. Get key at: https://console.groq.com/keys"
+                "Azure OpenAI API key required. Set AZURE_OPENAI_API_KEY environment "
+                "variable or pass api_key parameter."
             )
+
+        self.endpoint = endpoint or os.environ.get("AZURE_OPENAI_ENDPOINT")
+        if not self.endpoint:
+            raise ValueError(
+                "Azure OpenAI endpoint required. Set AZURE_OPENAI_ENDPOINT environment "
+                "variable or pass endpoint parameter. "
+                "Example: https://your-resource.openai.azure.com"
+            )
+
+        self.endpoint = self.endpoint.rstrip("/")
+        self.api_version = api_version or self.API_VERSION
+
         self._client = httpx.AsyncClient(
             timeout=120.0,
             headers={
-                "Authorization": f"Bearer {self.api_key}",
+                "api-key": self.api_key,
                 "Content-Type": "application/json",
             },
         )
@@ -74,9 +94,8 @@ class GroqProvider(LLMProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> CompletionResponse:
-        """Generate a completion using Groq with automatic retry on rate limits."""
+        """Generate a completion using Azure OpenAI with automatic retry on rate limits."""
         payload: dict[str, Any] = {
-            "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "temperature": temperature,
         }
@@ -85,14 +104,16 @@ class GroqProvider(LLMProvider):
             payload["max_tokens"] = max_tokens
 
         if tools:
-            payload["tools"] = [self._format_tool_for_groq(t) for t in tools]
+            payload["tools"] = [self._format_tool_for_azure(t) for t in tools]
             payload["tool_choice"] = "auto"
 
+        url = (
+            f"{self.endpoint}/openai/deployments/{self.model}"
+            f"/chat/completions?api-version={self.api_version}"
+        )
+
         async def _do_request() -> CompletionResponse:
-            response = await self._client.post(
-                f"{self.BASE_URL}/chat/completions",
-                json=payload,
-            )
+            response = await self._client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
 
@@ -125,7 +146,6 @@ class GroqProvider(LLMProvider):
     ) -> AsyncIterator[str]:
         """Stream a completion token by token."""
         payload: dict[str, Any] = {
-            "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "temperature": temperature,
             "stream": True,
@@ -134,11 +154,12 @@ class GroqProvider(LLMProvider):
         if max_tokens:
             payload["max_tokens"] = max_tokens
 
-        async with self._client.stream(
-            "POST",
-            f"{self.BASE_URL}/chat/completions",
-            json=payload,
-        ) as response:
+        url = (
+            f"{self.endpoint}/openai/deployments/{self.model}"
+            f"/chat/completions?api-version={self.api_version}"
+        )
+
+        async with self._client.stream("POST", url, json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
@@ -154,8 +175,8 @@ class GroqProvider(LLMProvider):
                     except json.JSONDecodeError:
                         continue
 
-    def _format_tool_for_groq(self, tool: ToolDefinition) -> dict[str, Any]:
-        """Format tool for Groq's OpenAI-compatible format."""
+    def _format_tool_for_azure(self, tool: ToolDefinition) -> dict[str, Any]:
+        """Format tool for Azure OpenAI's format (same as OpenAI)."""
         return {
             "type": "function",
             "function": {
@@ -166,7 +187,7 @@ class GroqProvider(LLMProvider):
         }
 
     def _parse_tool_calls(self, raw_calls: list[dict[str, Any]]) -> list[ToolCall]:
-        """Parse Groq tool calls into ToolCall objects."""
+        """Parse Azure OpenAI tool calls into ToolCall objects."""
         calls = []
         for call in raw_calls:
             func = call.get("function", {})
@@ -189,7 +210,7 @@ class GroqProvider(LLMProvider):
         """Close the HTTP client."""
         await self._client.aclose()
 
-    async def __aenter__(self) -> "GroqProvider":
+    async def __aenter__(self) -> "AzureOpenAIProvider":
         return self
 
     async def __aexit__(self, *args: Any) -> None:

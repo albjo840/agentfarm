@@ -17,17 +17,22 @@ AgentFarm is a token-efficient multi-agent orchestration system for code tasks. 
 ## Quick Start
 
 ```bash
-# Set up API key (get free key at https://console.groq.com/keys)
-export GROQ_API_KEY=your_key_here
-
 # Install
 pip install -e ".[dev]"
+
+# Set up any of these free API keys:
+export GROQ_API_KEY=your_key       # https://console.groq.com/keys
+export GOOGLE_API_KEY=your_key     # https://aistudio.google.com/app/apikey
+export SILICONFLOW_API_KEY=your_key # https://cloud.siliconflow.cn/
 
 # Run a plan
 agentfarm plan "Add a hello world function"
 
 # Run full workflow
 agentfarm workflow "Add unit tests for utils.py"
+
+# Launch the 80s sci-fi web interface
+agentfarm web
 ```
 
 ## Project Structure
@@ -43,15 +48,36 @@ agentfarm/
 │   ├── cli.py                 # Command-line interface
 │   ├── mcp_server.py          # MCP server for external integration
 │   ├── agents/                # Specialized agents (one per file)
-│   │   ├── base.py            # BaseAgent ABC with token optimization
+│   │   ├── base.py            # BaseAgent ABC with token optimization + memory
+│   │   ├── orchestrator_agent.py  # OrchestratorAgent - LLM-driven coordinator
 │   │   ├── planner.py         # PlannerAgent - task breakdown
 │   │   ├── executor.py        # ExecutorAgent - code changes
 │   │   ├── verifier.py        # VerifierAgent - testing/validation
-│   │   └── reviewer.py        # ReviewerAgent - code review
+│   │   ├── reviewer.py        # ReviewerAgent - code review
+│   │   └── ux_designer.py     # UXDesignerAgent - UI/UX design
+│   ├── memory/                # Agent memory system
+│   │   ├── base.py            # MemoryManager and base classes
+│   │   ├── short_term.py      # In-memory LRU cache
+│   │   └── long_term.py       # Persistent JSON storage
+│   ├── prompts/               # System prompts per agent
+│   │   ├── orchestrator_prompt.py
+│   │   ├── planner_prompt.py
+│   │   ├── executor_prompt.py
+│   │   ├── verifier_prompt.py
+│   │   ├── reviewer_prompt.py
+│   │   └── ux_designer_prompt.py
 │   ├── providers/             # LLM provider implementations
 │   │   ├── base.py            # LLMProvider ABC
 │   │   ├── groq.py            # Groq API (default, free tier)
+│   │   ├── gemini.py          # Google Gemini (free tier, 15 RPM)
+│   │   ├── siliconflow.py     # SiliconFlow/Qwen (free tier)
+│   │   ├── claude.py          # Anthropic Claude
+│   │   ├── azure.py           # Azure OpenAI
 │   │   └── ollama.py          # Ollama (local, free)
+│   ├── web/                   # 80s Sci-Fi Web Interface
+│   │   ├── server.py          # aiohttp web server
+│   │   ├── static/            # CSS, JS
+│   │   └── templates/         # HTML templates
 │   ├── tools/                 # Agent tools
 │   │   ├── file_tools.py      # File read/write/edit/search
 │   │   ├── code_tools.py      # pytest, ruff, typecheck
@@ -61,7 +87,7 @@ agentfarm/
 │       └── schemas.py         # Pydantic models for all data
 ├── docker/
 │   └── Dockerfile.sandbox     # Sandbox container image
-├── tests/                     # pytest test suite (27 tests)
+├── tests/                     # pytest test suite (60 tests)
 ├── .env                       # API keys (not in git)
 └── pyproject.toml             # Project configuration
 ```
@@ -81,9 +107,13 @@ python -m ruff check src/
 # Format code
 python -m ruff format src/
 
-# Run CLI (requires GROQ_API_KEY)
+# Run CLI (requires any API key: GROQ, GOOGLE, SILICONFLOW)
 agentfarm plan "task description"
 agentfarm workflow "task description"
+
+# Run the 80s sci-fi web interface
+agentfarm web                    # Default: http://127.0.0.1:8080
+agentfarm web --port 3000        # Custom port
 
 # Run MCP server
 agentfarm mcp
@@ -91,26 +121,62 @@ agentfarm mcp
 
 ## Architecture
 
-### Workflow
+### Orchestrator-Agent Architecture
+
+The system uses an **LLM-driven OrchestratorAgent** that dynamically coordinates worker agents:
 
 ```
 User Task
     │
     ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Orchestrator                          │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
-│  │ PLAN    │→ │ EXECUTE │→ │ VERIFY  │→ │ REVIEW  │    │
-│  │ Agent   │  │ Agent   │  │ Agent   │  │ Agent   │    │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │
-│       │            │            │            │          │
-│       ▼            ▼            ▼            ▼          │
-│   TaskPlan    ExecutionResult  VerifyResult  ReviewResult│
-└─────────────────────────────────────────────────────────┘
-    │
-    ▼
-WorkflowResult + PR Summary
+┌─────────────────────────────────────────────────────────────────┐
+│                    OrchestratorAgent (LLM)                       │
+│  Tools: call_planner, call_executor, call_verifier,             │
+│         call_reviewer, call_ux_designer, store_memory,          │
+│         recall_memory, get_workflow_state                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+        ┌──────────┬──────────┼──────────┬──────────┐
+        ▼          ▼          ▼          ▼          ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │ Planner │ │Executor │ │Verifier │ │Reviewer │ │UXDesign │
+   │  Agent  │ │  Agent  │ │  Agent  │ │  Agent  │ │  Agent  │
+   └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+        │          │          │          │          │
+        ▼          ▼          ▼          ▼          ▼
+    TaskPlan  ExecutionResult VerifyResult ReviewResult ComponentDesign
 ```
+
+**Key difference from traditional orchestration:**
+- The OrchestratorAgent is an LLM that decides dynamically which agents to call
+- Can adapt strategy based on results (retry, adjust approach, etc.)
+- Uses memory to track progress and learnings
+
+### Memory System
+
+Agents have access to short-term and long-term memory:
+
+```python
+from agentfarm.memory import MemoryManager, ShortTermMemory, LongTermMemory
+
+memory = MemoryManager(
+    short_term=ShortTermMemory(max_entries=100),
+    long_term=LongTermMemory(storage_path=".agentfarm/memory.json"),
+)
+
+# Store information
+memory.store("api_pattern", "Use async/await for all I/O", long_term=True)
+
+# Retrieve information
+pattern = memory.retrieve("api_pattern")
+
+# Search memory
+results = memory.search("authentication")
+```
+
+**Memory types:**
+- **ShortTermMemory**: In-memory, session-scoped, LRU eviction
+- **LongTermMemory**: Persistent JSON storage, survives restarts
 
 ### Token Efficiency Strategy
 
@@ -126,41 +192,62 @@ WorkflowResult + PR Summary
 
 ### Provider System
 
+All providers with free tiers:
+
 ```python
-# Default: Groq (free tier, fast)
+# Groq (default, fast, free tier: 100k tokens/day)
 from agentfarm.providers.groq import GroqProvider
 provider = GroqProvider(model="llama-3.3-70b-versatile")
 
-# Alternative: Ollama (local, free)
+# Gemini (Google, free tier: 15 RPM, 1M tokens/min)
+from agentfarm.providers.gemini import GeminiProvider
+provider = GeminiProvider(model="gemini-1.5-flash-latest")
+
+# SiliconFlow/Qwen (free tier for Qwen models)
+from agentfarm.providers.siliconflow import SiliconFlowProvider
+provider = SiliconFlowProvider(model="Qwen/Qwen2.5-7B-Instruct")
+
+# Ollama (local, completely free)
 from agentfarm.providers.ollama import OllamaProvider
 provider = OllamaProvider(model="llama3.2")
 
-# Future: Claude, Azure AI Foundry
-# from agentfarm.providers.claude import ClaudeProvider
-# from agentfarm.providers.azure import AzureOpenAIProvider
+# Claude (paid, high quality)
+from agentfarm.providers.claude import ClaudeProvider
+provider = ClaudeProvider(model="claude-sonnet-4-20250514")
+
+# Auto-detect from environment:
+from agentfarm.providers import get_provider
+provider = get_provider()  # Finds first available API key
 ```
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GROQ_API_KEY` | (required) | Groq API key from console.groq.com |
-| `AGENTFARM_PROVIDER` | `groq` | Provider: groq, ollama, claude, azure_openai |
-| `AGENTFARM_MODEL` | `llama-3.3-70b-versatile` | Model name |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `GROQ_API_KEY` | - | Groq API key (console.groq.com) |
+| `GOOGLE_API_KEY` | - | Gemini API key (aistudio.google.com) |
+| `GEMINI_API_KEY` | - | Alias for GOOGLE_API_KEY |
+| `SILICONFLOW_API_KEY` | - | SiliconFlow key (cloud.siliconflow.cn) |
+| `ANTHROPIC_API_KEY` | - | Claude API key |
+| `OLLAMA_HOST` | localhost:11434 | Ollama server URL |
+| `AGENTFARM_PROVIDER` | auto | Override: groq, gemini, qwen, claude, ollama |
+| `AGENTFARM_MODEL` | provider-specific | Override model name |
 
 ## Key Files to Understand
 
 | File | Purpose |
 |------|---------|
-| `orchestrator.py` | Main entry point, coordinates full workflow |
-| `agents/base.py` | BaseAgent class with token optimization logic |
+| `agents/orchestrator_agent.py` | LLM-driven coordinator that dynamically calls other agents |
+| `agents/base.py` | BaseAgent class with token optimization and memory integration |
+| `agents/ux_designer.py` | UXDesignerAgent for UI/UX design tasks |
+| `memory/base.py` | MemoryManager for short/long-term memory |
+| `memory/short_term.py` | In-memory LRU cache for session data |
+| `memory/long_term.py` | Persistent JSON storage across sessions |
+| `prompts/*.py` | Dedicated system prompts for each agent |
 | `providers/base.py` | LLMProvider ABC for provider abstraction |
 | `providers/groq.py` | Default provider (Groq free tier) |
 | `models/schemas.py` | All Pydantic models (TaskPlan, ExecutionResult, etc.) |
-| `tools/sandbox.py` | Docker sandbox for safe code execution |
-| `mcp_server.py` | MCP server exposing tools externally |
-| `config.py` | Configuration with env var support |
+| `orchestrator.py` | Legacy hardcoded orchestrator (deprecated) |
 
 ## Code Patterns
 
@@ -169,19 +256,33 @@ provider = OllamaProvider(model="llama3.2")
 ```python
 # src/agentfarm/agents/my_agent.py
 from agentfarm.agents.base import BaseAgent, AgentContext, AgentResult
+from agentfarm.memory.base import MemoryManager
 
 class MyAgent(BaseAgent):
     name = "MyAgent"
 
+    def __init__(self, provider, memory: MemoryManager | None = None):
+        super().__init__(provider, memory)
+        # Register agent-specific tools
+        self._register_my_tools()
+
     @property
     def system_prompt(self) -> str:
-        return "Your minimal, focused system prompt"
+        # Load from prompts module for easier editing
+        try:
+            from agentfarm.prompts import my_agent_prompt
+            return my_agent_prompt.SYSTEM_PROMPT
+        except ImportError:
+            return "Your minimal, focused system prompt"
 
     def get_tools(self) -> list[ToolDefinition]:
         return self._tools  # Only tools this agent needs
 
     async def process_response(self, response, tool_outputs) -> AgentResult:
-        # Parse response into structured result
+        # Use memory to store learnings
+        if self.memory:
+            self.remember("last_output", response.content[:200])
+
         return AgentResult(
             success=True,
             output=response.content,
@@ -297,13 +398,13 @@ Dev:
 
 ### Priority 1: Core Functionality
 - [ ] Integration tests with Groq API
-- [ ] Retry logic for rate limits (429 errors)
-- [ ] Connect real FileTools to agents
+- [x] Retry logic for rate limits (429 errors)
+- [x] Connect real FileTools to agents
 
 ### Priority 2: More Providers
-- [ ] ClaudeProvider (`providers/claude.py`)
-- [ ] AzureOpenAIProvider (`providers/azure.py`)
-- [ ] Provider auto-detection from available API keys
+- [x] ClaudeProvider (`providers/claude.py`)
+- [x] AzureOpenAIProvider (`providers/azure.py`)
+- [x] Provider auto-detection from available API keys
 
 ### Priority 3: MCP & Integration
 - [ ] Test MCP server with Claude Desktop

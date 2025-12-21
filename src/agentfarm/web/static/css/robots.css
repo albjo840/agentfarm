@@ -1,0 +1,220 @@
+/**
+ * Pixel Art Robot Agents
+ * Inspired by retro gaming aesthetics
+ */
+
+/* Robot container */
+.robot-agent {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    z-index: 10;
+}
+
+.robot-agent:hover {
+    transform: scale(1.1);
+}
+
+.robot-agent.active {
+    z-index: 20;
+}
+
+/* Robot sprite container */
+.robot-sprite {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px var(--robot-glow, #00fff2));
+}
+
+.robot-agent.active .robot-sprite {
+    animation: float 1.5s ease-in-out infinite, pulse-glow 0.5s ease-in-out infinite;
+}
+
+/* Float animation */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 10px var(--robot-glow)); }
+    50% { filter: drop-shadow(0 0 20px var(--robot-glow)) brightness(1.2); }
+}
+
+/* Robot name label */
+.robot-name {
+    margin-top: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--robot-color, #00fff2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 0 5px var(--robot-glow);
+    white-space: nowrap;
+}
+
+/* Speech bubble */
+.speech-bubble {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 10, 20, 0.95);
+    border: 2px solid var(--robot-color, #00fff2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    max-width: 200px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: #fff;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 100;
+    box-shadow: 0 0 15px var(--robot-glow);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: var(--robot-color, #00fff2);
+}
+
+.robot-agent.speaking .speech-bubble {
+    opacity: 1;
+    visibility: visible;
+    animation: bubble-appear 0.3s ease-out;
+}
+
+@keyframes bubble-appear {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Movement animation for interactions */
+.robot-agent.moving-to-center {
+    animation: move-to-center 1s ease-in-out;
+}
+
+@keyframes move-to-center {
+    0% { transform: translate(0, 0); }
+    50% { transform: translate(calc(50vw - 100%), calc(50vh - 100%)) scale(1.2); }
+    100% { transform: translate(0, 0); }
+}
+
+/* Agent-specific colors */
+.robot-agent[data-agent="orchestrator"] {
+    --robot-color: #00fff2;
+    --robot-glow: rgba(0, 255, 242, 0.5);
+}
+
+.robot-agent[data-agent="planner"] {
+    --robot-color: #00aaff;
+    --robot-glow: rgba(0, 170, 255, 0.5);
+}
+
+.robot-agent[data-agent="executor"] {
+    --robot-color: #ff00ff;
+    --robot-glow: rgba(255, 0, 255, 0.5);
+}
+
+.robot-agent[data-agent="verifier"] {
+    --robot-color: #00ff88;
+    --robot-glow: rgba(0, 255, 136, 0.5);
+}
+
+.robot-agent[data-agent="reviewer"] {
+    --robot-color: #ffff00;
+    --robot-glow: rgba(255, 255, 0, 0.5);
+}
+
+.robot-agent[data-agent="ux"] {
+    --robot-color: #ff6b6b;
+    --robot-glow: rgba(255, 107, 107, 0.5);
+}
+
+/* Connection lines between robots */
+.robot-connection {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.robot-connection line {
+    stroke: url(#connection-gradient);
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+    animation: dash-flow 1s linear infinite;
+}
+
+@keyframes dash-flow {
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+
+/* Data packet animation */
+.data-packet {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--packet-color, #00fff2);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--packet-color);
+    animation: travel-path 1s linear forwards;
+    z-index: 15;
+}
+
+/* Stars background enhancement */
+.robot-arena {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(ellipse at center, rgba(0, 50, 80, 0.3) 0%, transparent 70%),
+        linear-gradient(180deg, #0a0a15 0%, #0d1520 100%);
+    overflow: hidden;
+}
+
+.robot-arena::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(1px 1px at 20px 30px, white, transparent),
+        radial-gradient(1px 1px at 40px 70px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 50px 160px, rgba(255,255,255,0.6), transparent),
+        radial-gradient(1px 1px at 90px 40px, white, transparent),
+        radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(2px 2px at 160px 120px, white, transparent);
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    animation: twinkle 4s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Pixel art SVG robots */
+.robot-svg {
+    width: 64px;
+    height: 64px;
+}

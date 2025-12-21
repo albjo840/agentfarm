@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentFarm :: Neural Interface</title>
+    <link rel="stylesheet" href="/static/css/retro.css">
+    <link rel="stylesheet" href="/static/css/robots.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<!-- Stranger Things / Synthwave Background Music -->
+<audio id="bg-music" loop preload="auto">
+    <!-- Synthwave mix from archive.org (CC) -->
+    <source src="https://archive.org/download/the-oasis-synthwave-mix/The%20Oasis%20Synthwave%20Futurewave%20Chillwave%20Mix.mp3" type="audio/mpeg">
+</audio>
+<body>
+    <!-- Scanline overlay -->
+    <div class="scanlines"></div>
+
+    <!-- CRT flicker effect -->
+    <div class="crt-effect"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">◈</span>
+                <h1>AGENTFARM</h1>
+                <span class="version">v2.0</span>
+            </div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="label">SYSTEM</span>
+                    <span class="value online">ONLINE</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">AGENTS</span>
+                    <span class="value" id="agent-count">5</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">TOKENS</span>
+                    <span class="value" id="token-count">0</span>
+                </div>
+                <div class="status-item music-control">
+                    <button id="music-toggle" class="music-btn" title="Toggle Synthwave Music">
+                        <span class="music-icon">♪</span>
+                        <span class="music-label">SYNTH</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main grid -->
+        <main class="main-grid">
+            <!-- Agent visualization -->
+            <section class="agent-network">
+                <div class="section-header">
+                    <span class="icon">◇</span>
+                    <h2>NEURAL NETWORK</h2>
+                </div>
+                <div class="network-container" id="robot-arena">
+                    <!-- Robot agents rendered by JS -->
+                </div>
+            </section>
+
+            <!-- Message flow -->
+            <section class="message-flow">
+                <div class="section-header">
+                    <span class="icon">▷</span>
+                    <h2>DATA STREAM</h2>
+                </div>
+                <div class="messages-container" id="messages">
+                    <!-- Messages rendered by JS -->
+                </div>
+            </section>
+
+            <!-- Task input -->
+            <section class="task-input">
+                <div class="section-header">
+                    <span class="icon">⌘</span>
+                    <h2>COMMAND INTERFACE</h2>
+                </div>
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <span class="prompt">&gt;</span>
+                        <input type="text" id="task-input" placeholder="Enter task directive..." autocomplete="off">
+                    </div>
+                    <button id="execute-btn" class="execute-btn">
+                        <span>EXECUTE</span>
+                        <span class="btn-icon">▶</span>
+                    </button>
+                </div>
+                <div class="multi-provider-badge">
+                    <span class="badge-icon">◈</span>
+                    <span class="badge-text">MULTI-PROVIDER MODE</span>
+                </div>
+            </section>
+
+            <!-- Workflow status -->
+            <section class="workflow-status">
+                <div class="section-header">
+                    <span class="icon">◎</span>
+                    <h2>WORKFLOW STATUS</h2>
+                </div>
+                <div class="workflow-stages">
+                    <div class="stage" id="stage-plan">
+                        <div class="stage-icon">◇</div>
+                        <div class="stage-name">PLAN</div>
+                        <div class="stage-status">STANDBY</div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage-execute">
+                        <div class="stage-icon">▷</div>
+                        <div class="stage-name">EXECUTE</div>
+                        <div class="stage-status">STANDBY</div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage-verify">
+                        <div class="stage-icon">◈</div>
+                        <div class="stage-name">VERIFY</div>
+                        <div class="stage-status">STANDBY</div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage-review">
+                        <div class="stage-icon">◉</div>
+                        <div class="stage-name">REVIEW</div>
+                        <div class="stage-status">STANDBY</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-left">
+                <span class="cyber-text">NEURAL ORCHESTRATION SYSTEM</span>
+            </div>
+            <div class="footer-right">
+                <span id="current-time"></span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/js/robots.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

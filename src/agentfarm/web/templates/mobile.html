@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a15">
+    <title>AgentFarm</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 50%, #0a0a15 100%);
+            color: #00fff2;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(0, 255, 242, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px rgba(0, 255, 242, 0.5);
+        }
+
+        .logo span {
+            color: #ff00ff;
+        }
+
+        .status {
+            font-size: 12px;
+            margin-top: 8px;
+            color: #666;
+        }
+
+        .status.connected {
+            color: #00ff88;
+        }
+
+        .status.error {
+            color: #ff4444;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* Project name input */
+        .project-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .project-section label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .project-input {
+            background: rgba(0, 255, 242, 0.05);
+            border: 1px solid rgba(0, 255, 242, 0.3);
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-family: inherit;
+            font-size: 16px;
+            color: #00fff2;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .project-input:focus {
+            border-color: #00fff2;
+            box-shadow: 0 0 15px rgba(0, 255, 242, 0.2);
+        }
+
+        .project-input::placeholder {
+            color: #445;
+        }
+
+        /* Prompt textarea */
+        .prompt-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 200px;
+        }
+
+        .prompt-textarea {
+            flex: 1;
+            background: rgba(0, 255, 242, 0.05);
+            border: 1px solid rgba(0, 255, 242, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: inherit;
+            font-size: 16px;
+            color: #fff;
+            resize: none;
+            outline: none;
+            transition: all 0.3s;
+            min-height: 150px;
+        }
+
+        .prompt-textarea:focus {
+            border-color: #ff00ff;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+        }
+
+        .prompt-textarea::placeholder {
+            color: #445;
+        }
+
+        /* Multi-provider info */
+        .multi-provider-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: rgba(0, 255, 242, 0.05);
+            border: 1px solid rgba(0, 255, 242, 0.2);
+            border-radius: 8px;
+        }
+
+        .mp-badge {
+            background: linear-gradient(135deg, #ff00ff, #00fff2);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .mp-text {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+        }
+
+        /* Submit button */
+        .submit-btn {
+            padding: 20px;
+            background: linear-gradient(135deg, #ff00ff 0%, #00fff2 100%);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-family: inherit;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .submit-btn.running {
+            background: linear-gradient(135deg, #444 0%, #666 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        /* Status/Log area */
+        .log-section {
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .log-section.visible {
+            display: block;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-entry.success {
+            color: #00ff88;
+        }
+
+        .log-entry.error {
+            color: #ff4444;
+        }
+
+        .log-entry .time {
+            color: #666;
+            margin-right: 8px;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00fff2;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-color: #00ff88;
+        }
+
+        .toast.error {
+            border-color: #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">AGENT<span>FARM</span></div>
+        <div class="status" id="status">Ansluter...</div>
+    </header>
+
+    <main class="main">
+        <div class="project-section">
+            <label>Projektnamn</label>
+            <input type="text" class="project-input" id="project-name" placeholder="mitt-nya-projekt">
+        </div>
+
+        <div class="prompt-section">
+            <label>Vad vill du bygga?</label>
+            <textarea class="prompt-textarea" id="prompt" placeholder="Beskriv vad du vill skapa...
+
+Exempel:
+- En todo-app med React
+- Ett REST API med Python Flask
+- En landningssida for min startup"></textarea>
+        </div>
+
+        <div class="multi-provider-info">
+            <span class="mp-badge">MULTI-PROVIDER</span>
+            <span class="mp-text">Agenterna använder olika LLM:er automatiskt</span>
+        </div>
+
+        <button class="submit-btn" id="submit-btn">SKAPA PROJEKT</button>
+
+        <div class="log-section" id="log"></div>
+    </main>
+
+    <footer class="footer">
+        AgentFarm Neural Interface
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // State
+        let ws = null;
+        let isRunning = false;
+
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const projectInput = document.getElementById('project-name');
+        const promptTextarea = document.getElementById('prompt');
+        const submitBtn = document.getElementById('submit-btn');
+        const logSection = document.getElementById('log');
+        const toastEl = document.getElementById('toast');
+
+        // Connect to WebSocket
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                statusEl.textContent = 'Ansluten';
+                statusEl.className = 'status connected';
+            };
+
+            ws.onclose = () => {
+                statusEl.textContent = 'Frånkopplad - återansluter...';
+                statusEl.className = 'status error';
+                setTimeout(connect, 3000);
+            };
+
+            ws.onerror = () => {
+                statusEl.className = 'status error';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+        }
+
+        // Handle WebSocket messages
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'connected':
+                    // Multi-provider mode - no provider selection needed
+                    break;
+
+                case 'project_created':
+                    addLog(`Projekt skapat: ${data.path}`, 'success');
+                    showToast(`Projekt "${data.name}" skapat!`, 'success');
+                    break;
+
+                case 'workflow_start':
+                    addLog(`Workflow startat: ${data.task}`);
+                    submitBtn.textContent = 'ARBETAR...';
+                    submitBtn.classList.add('running');
+                    break;
+
+                case 'stage_change':
+                    addLog(`${data.stage.toUpperCase()}: ${data.status}`);
+                    break;
+
+                case 'agent_message':
+                    addLog(`[${data.agent}] ${data.content.substring(0, 100)}...`);
+                    break;
+
+                case 'workflow_complete':
+                    isRunning = false;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'SKAPA PROJEKT';
+                    submitBtn.classList.remove('running');
+
+                    if (data.success) {
+                        showToast('Workflow klart!', 'success');
+                        addLog('Workflow slutfort!', 'success');
+                    } else {
+                        showToast('Workflow misslyckades', 'error');
+                        addLog(`Fel: ${data.error}`, 'error');
+                    }
+                    break;
+
+                case 'error':
+                    showToast(data.message, 'error');
+                    addLog(data.message, 'error');
+                    isRunning = false;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'SKAPA PROJEKT';
+                    submitBtn.classList.remove('running');
+                    break;
+            }
+        }
+
+        // Add log entry
+        function addLog(message, type = '') {
+            const time = new Date().toLocaleTimeString('sv-SE', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="time">${time}</span>${message}`;
+
+            logSection.appendChild(entry);
+            logSection.classList.add('visible');
+            logSection.scrollTop = logSection.scrollHeight;
+        }
+
+        // Show toast notification
+        function showToast(message, type = '') {
+            toastEl.textContent = message;
+            toastEl.className = `toast show ${type}`;
+
+            setTimeout(() => {
+                toastEl.classList.remove('show');
+            }, 3000);
+        }
+
+        // Submit project
+        function submitProject() {
+            const projectName = projectInput.value.trim() || generateProjectName();
+            const prompt = promptTextarea.value.trim();
+
+            if (!prompt) {
+                showToast('Skriv vad du vill bygga!', 'error');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Inte ansluten till server', 'error');
+                return;
+            }
+
+            isRunning = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'SKAPAR...';
+            submitBtn.classList.add('running');
+
+            // Clear previous log
+            logSection.innerHTML = '';
+
+            ws.send(JSON.stringify({
+                type: 'create_project',
+                name: projectName,
+                prompt: prompt
+            }));
+
+            addLog(`Skapar projekt: ${projectName}`);
+        }
+
+        // Generate project name from date
+        function generateProjectName() {
+            const now = new Date();
+            return `projekt-${now.toISOString().slice(0, 10)}`;
+        }
+
+        // Submit button
+        submitBtn.addEventListener('click', submitProject);
+
+        // Connect on load
+        connect();
+
+        // Keep alive
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

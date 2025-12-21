@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Groq provider - fast, free-tier LLM execution."""
+"""SiliconFlow provider - Free tier access to Qwen and other models."""
 
 import json
 import os
@@ -18,32 +18,34 @@ from agentfarm.providers.base import (
 )
 
 
-class GroqProvider(LLMProvider):
-    """Groq provider for fast, free-tier LLM execution.
+class SiliconFlowProvider(LLMProvider):
+    """SiliconFlow provider with free tier for Qwen models.
 
-    Groq offers generous free tier with models like:
-    - llama-3.3-70b-versatile (recommended)
-    - llama-3.1-8b-instant (faster)
-    - mixtral-8x7b-32768
+    Available free models:
+    - Qwen/Qwen2.5-7B-Instruct (fast, good for simple tasks)
+    - Qwen/Qwen2.5-72B-Instruct (powerful, good for complex reasoning)
+    - Qwen/Qwen2.5-Coder-7B-Instruct (specialized for code)
+    - deepseek-ai/DeepSeek-V2.5 (alternative)
 
-    Get API key at: https://console.groq.com/keys
+    Get API key at: https://cloud.siliconflow.cn/
+    OpenAI-compatible API format.
     """
 
-    BASE_URL = "https://api.groq.com/openai/v1"
+    BASE_URL = "https://api.siliconflow.cn/v1"
 
     def __init__(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "Qwen/Qwen2.5-7B-Instruct",
         api_key: str | None = None,
         retry_config: RetryConfig | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(model, retry_config=retry_config, **kwargs)
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self.api_key = api_key or os.environ.get("SILICONFLOW_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "Groq API key required. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter. Get key at: https://console.groq.com/keys"
+                "SiliconFlow API key required. Set SILICONFLOW_API_KEY "
+                "environment variable. Get key at: https://cloud.siliconflow.cn/"
             )
         self._client = httpx.AsyncClient(
             timeout=120.0,
@@ -57,7 +59,6 @@ class GroqProvider(LLMProvider):
     def _is_rate_limit_error(e: Exception) -> tuple[bool, float | None]:
         """Check if exception is a rate limit error (429)."""
         if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
-            # Try to extract retry-after header
             retry_after = e.response.headers.get("retry-after")
             if retry_after:
                 try:
@@ -74,7 +75,7 @@ class GroqProvider(LLMProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> CompletionResponse:
-        """Generate a completion using Groq with automatic retry on rate limits."""
+        """Generate a completion using SiliconFlow (OpenAI-compatible)."""
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
@@ -85,7 +86,7 @@ class GroqProvider(LLMProvider):
             payload["max_tokens"] = max_tokens
 
         if tools:
-            payload["tools"] = [self._format_tool_for_groq(t) for t in tools]
+            payload["tools"] = [self._format_tool(t) for t in tools]
             payload["tool_choice"] = "auto"
 
         async def _do_request() -> CompletionResponse:
@@ -154,8 +155,8 @@ class GroqProvider(LLMProvider):
                     except json.JSONDecodeError:
                         continue
 
-    def _format_tool_for_groq(self, tool: ToolDefinition) -> dict[str, Any]:
-        """Format tool for Groq's OpenAI-compatible format."""
+    def _format_tool(self, tool: ToolDefinition) -> dict[str, Any]:
+        """Format tool for OpenAI-compatible format."""
         return {
             "type": "function",
             "function": {
@@ -166,7 +167,7 @@ class GroqProvider(LLMProvider):
         }
 
     def _parse_tool_calls(self, raw_calls: list[dict[str, Any]]) -> list[ToolCall]:
-        """Parse Groq tool calls into ToolCall objects."""
+        """Parse tool calls from response."""
         calls = []
         for call in raw_calls:
             func = call.get("function", {})
@@ -189,8 +190,12 @@ class GroqProvider(LLMProvider):
         """Close the HTTP client."""
         await self._client.aclose()
 
-    async def __aenter__(self) -> "GroqProvider":
+    async def __aenter__(self) -> "SiliconFlowProvider":
         return self
 
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
+
+
+# Alias for convenience
+QwenProvider = SiliconFlowProvider
