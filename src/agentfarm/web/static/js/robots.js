@@ -1,9 +1,9 @@
 /**
- * Pixel Art Robot Sprites
+ * Pixel Art Robot Sprites with Walking Animation
  * SVG-based robots for AgentFarm visualization
  */
 
-// Robot SVG templates - pixel art style
+// Robot SVG templates - pixel art style with walk frames
 const ROBOT_SPRITES = {
     orchestrator: `
         <svg viewBox="0 0 32 32" class="robot-svg">
@@ -20,11 +20,11 @@ const ROBOT_SPRITES = {
             <rect x="15" y="1" width="2" height="4" fill="#00fff2"/>
             <circle cx="16" cy="1" r="2" fill="#ff0066"/>
             <!-- Arms -->
-            <rect x="4" y="14" width="4" height="2" fill="#00fff2"/>
-            <rect x="24" y="14" width="4" height="2" fill="#00fff2"/>
-            <!-- Legs -->
-            <rect x="10" y="26" width="4" height="4" fill="#00fff2"/>
-            <rect x="18" y="26" width="4" height="4" fill="#00fff2"/>
+            <rect x="4" y="14" width="4" height="2" fill="#00fff2" class="arm-left"/>
+            <rect x="24" y="14" width="4" height="2" fill="#00fff2" class="arm-right"/>
+            <!-- Legs - animated -->
+            <rect x="10" y="26" width="4" height="4" fill="#00fff2" class="leg-left"/>
+            <rect x="18" y="26" width="4" height="4" fill="#00fff2" class="leg-right"/>
             <!-- Core glow -->
             <rect x="14" y="16" width="4" height="4" fill="#00ffff" opacity="0.8">
                 <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite"/>
@@ -41,20 +41,20 @@ const ROBOT_SPRITES = {
             <rect x="9" y="4" width="14" height="12" fill="#0066ff"/>
             <rect x="11" y="6" width="10" height="8" fill="#002255"/>
             <!-- Eyes - wise -->
-            <rect x="12" y="8" width="3" height="2" fill="#00ccff"/>
-            <rect x="17" y="8" width="3" height="2" fill="#00ccff"/>
+            <rect x="12" y="8" width="3" height="2" fill="#00ccff" class="eye-left"/>
+            <rect x="17" y="8" width="3" height="2" fill="#00ccff" class="eye-right"/>
             <!-- Thinking gears -->
-            <circle cx="7" cy="6" r="3" fill="#0088ff" stroke="#00ccff" stroke-width="1">
+            <circle cx="7" cy="6" r="3" fill="#0088ff" stroke="#00ccff" stroke-width="1" class="gear">
                 <animateTransform attributeName="transform" type="rotate" from="0 7 6" to="360 7 6" dur="3s" repeatCount="indefinite"/>
             </circle>
             <!-- Clipboard -->
-            <rect x="20" y="18" width="8" height="10" fill="#004488"/>
+            <rect x="20" y="18" width="8" height="10" fill="#004488" class="clipboard"/>
             <rect x="21" y="20" width="6" height="1" fill="#00ccff"/>
             <rect x="21" y="22" width="4" height="1" fill="#00ccff"/>
             <rect x="21" y="24" width="5" height="1" fill="#00ccff"/>
             <!-- Legs -->
-            <rect x="10" y="26" width="4" height="4" fill="#0066ff"/>
-            <rect x="18" y="26" width="4" height="4" fill="#0066ff"/>
+            <rect x="10" y="26" width="4" height="4" fill="#0066ff" class="leg-left"/>
+            <rect x="18" y="26" width="4" height="4" fill="#0066ff" class="leg-right"/>
         </svg>
     `,
 
@@ -67,23 +67,23 @@ const ROBOT_SPRITES = {
             <rect x="8" y="4" width="16" height="10" fill="#ff00ff"/>
             <rect x="10" y="6" width="12" height="6" fill="#220022"/>
             <!-- Eyes - focused -->
-            <rect x="11" y="7" width="4" height="3" fill="#ff66ff"/>
-            <rect x="17" y="7" width="4" height="3" fill="#ff66ff"/>
+            <rect x="11" y="7" width="4" height="3" fill="#ff66ff" class="eye-left"/>
+            <rect x="17" y="7" width="4" height="3" fill="#ff66ff" class="eye-right"/>
             <!-- Visor line -->
             <rect x="10" y="8" width="12" height="1" fill="#ff00ff" opacity="0.5"/>
             <!-- Power core -->
-            <rect x="13" y="16" width="6" height="6" fill="#ff00ff">
+            <rect x="13" y="16" width="6" height="6" fill="#ff00ff" class="power-core">
                 <animate attributeName="fill" values="#ff00ff;#ffffff;#ff00ff" dur="0.5s" repeatCount="indefinite"/>
             </rect>
             <!-- Strong arms -->
-            <rect x="2" y="13" width="4" height="6" fill="#ff00ff"/>
-            <rect x="26" y="13" width="4" height="6" fill="#ff00ff"/>
+            <rect x="2" y="13" width="4" height="6" fill="#ff00ff" class="arm-left"/>
+            <rect x="26" y="13" width="4" height="6" fill="#ff00ff" class="arm-right"/>
             <!-- Tool hand -->
             <rect x="0" y="16" width="3" height="4" fill="#ff66ff"/>
             <rect x="29" y="16" width="3" height="4" fill="#ff66ff"/>
             <!-- Legs -->
-            <rect x="8" y="26" width="6" height="4" fill="#ff00ff"/>
-            <rect x="18" y="26" width="6" height="4" fill="#ff00ff"/>
+            <rect x="8" y="26" width="6" height="4" fill="#ff00ff" class="leg-left"/>
+            <rect x="18" y="26" width="6" height="4" fill="#ff00ff" class="leg-right"/>
         </svg>
     `,
 
@@ -96,20 +96,20 @@ const ROBOT_SPRITES = {
             <rect x="9" y="4" width="14" height="12" fill="#00ff88"/>
             <rect x="11" y="6" width="10" height="8" fill="#002211"/>
             <!-- Magnifying glass eye -->
-            <circle cx="13" cy="9" r="3" fill="none" stroke="#00ffaa" stroke-width="2"/>
+            <circle cx="13" cy="9" r="3" fill="none" stroke="#00ffaa" stroke-width="2" class="eye-left"/>
             <rect x="15" y="11" width="3" height="1" fill="#00ffaa" transform="rotate(45 15 11)"/>
             <!-- Normal eye -->
-            <rect x="18" y="8" width="2" height="2" fill="#00ffaa"/>
+            <rect x="18" y="8" width="2" height="2" fill="#00ffaa" class="eye-right"/>
             <!-- Checkmark badge -->
             <rect x="18" y="18" width="8" height="8" fill="#006644"/>
             <path d="M20 22 L22 24 L26 18" stroke="#00ff88" stroke-width="2" fill="none"/>
             <!-- Scanner beam -->
-            <rect x="6" y="20" width="2" height="6" fill="#00ff88" opacity="0.6">
+            <rect x="6" y="20" width="2" height="6" fill="#00ff88" opacity="0.6" class="scanner">
                 <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
             </rect>
             <!-- Legs -->
-            <rect x="10" y="26" width="4" height="4" fill="#00ff88"/>
-            <rect x="18" y="26" width="4" height="4" fill="#00ff88"/>
+            <rect x="10" y="26" width="4" height="4" fill="#00ff88" class="leg-left"/>
+            <rect x="18" y="26" width="4" height="4" fill="#00ff88" class="leg-right"/>
         </svg>
     `,
 
@@ -126,16 +126,16 @@ const ROBOT_SPRITES = {
             <rect x="17" y="7" width="4" height="3" fill="none" stroke="#ffffff" stroke-width="1"/>
             <rect x="15" y="8" width="2" height="1" fill="#ffffff"/>
             <!-- Eyes behind glasses -->
-            <rect x="12" y="8" width="2" height="1" fill="#ffff88"/>
-            <rect x="18" y="8" width="2" height="1" fill="#ffff88"/>
+            <rect x="12" y="8" width="2" height="1" fill="#ffff88" class="eye-left"/>
+            <rect x="18" y="8" width="2" height="1" fill="#ffff88" class="eye-right"/>
             <!-- Judge's gavel -->
-            <rect x="24" y="12" width="6" height="3" fill="#884400"/>
+            <rect x="24" y="12" width="6" height="3" fill="#884400" class="gavel"/>
             <rect x="26" y="15" width="2" height="6" fill="#663300"/>
             <!-- Star rating -->
             <polygon points="14,18 15,20 17,20 15.5,21.5 16,24 14,22.5 12,24 12.5,21.5 11,20 13,20" fill="#ffff00"/>
             <!-- Legs -->
-            <rect x="10" y="26" width="4" height="4" fill="#ffff00"/>
-            <rect x="18" y="26" width="4" height="4" fill="#ffff00"/>
+            <rect x="10" y="26" width="4" height="4" fill="#ffff00" class="leg-left"/>
+            <rect x="18" y="26" width="4" height="4" fill="#ffff00" class="leg-right"/>
         </svg>
     `,
 
@@ -148,35 +148,35 @@ const ROBOT_SPRITES = {
             <rect x="9" y="4" width="14" height="12" fill="#ff6b6b"/>
             <rect x="11" y="6" width="10" height="8" fill="#220808"/>
             <!-- Heart eyes -->
-            <path d="M12 8 L13 7 L14 8 L13 10 Z" fill="#ff9999"/>
-            <path d="M18 8 L19 7 L20 8 L19 10 Z" fill="#ff9999"/>
+            <path d="M12 8 L13 7 L14 8 L13 10 Z" fill="#ff9999" class="eye-left"/>
+            <path d="M18 8 L19 7 L20 8 L19 10 Z" fill="#ff9999" class="eye-right"/>
             <!-- Beret -->
             <ellipse cx="16" cy="4" rx="8" ry="2" fill="#ff4444"/>
             <circle cx="16" cy="2" r="2" fill="#ff4444"/>
             <!-- Paint palette -->
-            <ellipse cx="6" cy="20" rx="5" ry="4" fill="#ffcccc"/>
+            <ellipse cx="6" cy="20" rx="5" ry="4" fill="#ffcccc" class="palette"/>
             <circle cx="4" cy="19" r="1.5" fill="#ff0000"/>
             <circle cx="6" cy="18" r="1.5" fill="#00ff00"/>
             <circle cx="8" cy="19" r="1.5" fill="#0000ff"/>
             <circle cx="6" cy="21" r="1.5" fill="#ffff00"/>
             <!-- Paintbrush -->
-            <rect x="24" y="16" width="2" height="8" fill="#8b4513"/>
+            <rect x="24" y="16" width="2" height="8" fill="#8b4513" class="brush"/>
             <rect x="23" y="14" width="4" height="3" fill="#ff6b6b"/>
             <!-- Legs -->
-            <rect x="10" y="26" width="4" height="4" fill="#ff6b6b"/>
-            <rect x="18" y="26" width="4" height="4" fill="#ff6b6b"/>
+            <rect x="10" y="26" width="4" height="4" fill="#ff6b6b" class="leg-left"/>
+            <rect x="18" y="26" width="4" height="4" fill="#ff6b6b" class="leg-right"/>
         </svg>
     `
 };
 
 // Robot agent definitions with positions
 const ROBOT_AGENTS = [
-    { id: 'orchestrator', name: 'THE ORCHESTRATOR', x: 50, y: 45, role: 'Coordinates all agents' },
-    { id: 'planner', name: 'THE PLANNER', x: 20, y: 25, role: 'Creates execution plans' },
-    { id: 'executor', name: 'THE EXECUTOR', x: 80, y: 25, role: 'Writes and modifies code' },
-    { id: 'verifier', name: 'THE VERIFIER', x: 20, y: 70, role: 'Tests and validates' },
-    { id: 'reviewer', name: 'THE REVIEWER', x: 80, y: 70, role: 'Reviews code quality' },
-    { id: 'ux', name: 'THE DESIGNER', x: 50, y: 85, role: 'Creates UI/UX designs' },
+    { id: 'orchestrator', name: 'ORCHESTRATOR', x: 50, y: 50, role: 'Koordinerar alla agenter' },
+    { id: 'planner', name: 'PLANNER', x: 20, y: 25, role: 'Skapar exekveringsplaner' },
+    { id: 'executor', name: 'EXECUTOR', x: 80, y: 25, role: 'Skriver och modifierar kod' },
+    { id: 'verifier', name: 'VERIFIER', x: 20, y: 75, role: 'Testar och validerar' },
+    { id: 'reviewer', name: 'REVIEWER', x: 80, y: 75, role: 'Granskar kodkvalitet' },
+    { id: 'ux', name: 'DESIGNER', x: 50, y: 90, role: 'Skapar UI/UX design' },
 ];
 
 class RobotVisualizer {
@@ -185,6 +185,9 @@ class RobotVisualizer {
         this.robots = new Map();
         this.activeRobot = null;
         this.speechTimeouts = new Map();
+        this.walkingRobots = new Set();
+        this.messageQueue = [];
+        this.isProcessingQueue = false;
     }
 
     init() {
@@ -201,7 +204,13 @@ class RobotVisualizer {
         ROBOT_AGENTS.forEach(agent => {
             const robotEl = this.createRobotElement(agent);
             this.container.appendChild(robotEl);
-            this.robots.set(agent.id, { element: robotEl, data: agent });
+            this.robots.set(agent.id, {
+                element: robotEl,
+                data: agent,
+                originalX: agent.x,
+                originalY: agent.y,
+                isWalking: false
+            });
         });
 
         // Draw initial connections
@@ -217,7 +226,6 @@ class RobotVisualizer {
         robot.dataset.agent = agent.id;
         robot.style.left = `${agent.x}%`;
         robot.style.top = `${agent.y}%`;
-        robot.style.transform = 'translate(-50%, -50%)';
 
         robot.innerHTML = `
             <div class="speech-bubble"></div>
@@ -225,6 +233,7 @@ class RobotVisualizer {
                 ${ROBOT_SPRITES[agent.id] || ROBOT_SPRITES.orchestrator}
             </div>
             <div class="robot-name">${agent.name}</div>
+            <div class="robot-provider"></div>
         `;
 
         // Click handler
@@ -247,8 +256,12 @@ class RobotVisualizer {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         defs.innerHTML = `
             <linearGradient id="connection-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color:#00fff2;stop-opacity:0.3"/>
-                <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:0.3"/>
+                <stop offset="0%" style="stop-color:#00fff2;stop-opacity:0.2"/>
+                <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:0.2"/>
+            </linearGradient>
+            <linearGradient id="active-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#00fff2;stop-opacity:0.8"/>
+                <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:0.8"/>
             </linearGradient>
         `;
         svg.appendChild(defs);
@@ -267,38 +280,49 @@ class RobotVisualizer {
         const orchestrator = this.robots.get('orchestrator');
         if (!orchestrator) return;
 
-        const oRect = orchestrator.element.getBoundingClientRect();
         const containerRect = this.container.getBoundingClientRect();
 
-        const ox = oRect.left + oRect.width / 2 - containerRect.left;
-        const oy = oRect.top + oRect.height / 2 - containerRect.top;
-
-        // Draw lines to all other robots
+        // Draw lines from orchestrator to all other robots
         this.robots.forEach((robot, id) => {
             if (id === 'orchestrator') return;
 
-            const rect = robot.element.getBoundingClientRect();
-            const x = rect.left + rect.width / 2 - containerRect.left;
-            const y = rect.top + rect.height / 2 - containerRect.top;
+            const oX = orchestrator.data.x;
+            const oY = orchestrator.data.y;
+            const rX = robot.data.x;
+            const rY = robot.data.y;
 
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', ox);
-            line.setAttribute('y1', oy);
-            line.setAttribute('x2', x);
-            line.setAttribute('y2', y);
+            line.setAttribute('x1', `${oX}%`);
+            line.setAttribute('y1', `${oY}%`);
+            line.setAttribute('x2', `${rX}%`);
+            line.setAttribute('y2', `${rY}%`);
             line.setAttribute('stroke', 'url(#connection-gradient)');
             line.setAttribute('stroke-width', '2');
             line.setAttribute('stroke-dasharray', '5,5');
-
-            // Animate when this robot is active
-            if (id === this.activeRobot) {
-                line.style.stroke = this.getRobotColor(id);
-                line.style.strokeWidth = '3';
-                line.style.strokeOpacity = '0.8';
-            }
+            line.dataset.target = id;
 
             this.connectionsSVG.appendChild(line);
         });
+    }
+
+    highlightConnection(fromId, toId) {
+        const lines = this.connectionsSVG.querySelectorAll('line');
+        lines.forEach(line => {
+            if (line.dataset.target === toId || line.dataset.target === fromId) {
+                line.setAttribute('stroke', 'url(#active-gradient)');
+                line.setAttribute('stroke-width', '3');
+                line.classList.add('active-connection');
+            }
+        });
+
+        // Reset after animation
+        setTimeout(() => {
+            lines.forEach(line => {
+                line.setAttribute('stroke', 'url(#connection-gradient)');
+                line.setAttribute('stroke-width', '2');
+                line.classList.remove('active-connection');
+            });
+        }, 2000);
     }
 
     getRobotColor(id) {
@@ -325,12 +349,99 @@ class RobotVisualizer {
         if (robot) {
             robot.element.classList.add('active');
         }
-
-        // Redraw connections
-        this.drawConnections();
     }
 
-    speak(agentId, message) {
+    // Queue a communication event
+    queueCommunication(fromId, toId, message) {
+        this.messageQueue.push({ fromId, toId, message });
+        this.processQueue();
+    }
+
+    async processQueue() {
+        if (this.isProcessingQueue || this.messageQueue.length === 0) return;
+
+        this.isProcessingQueue = true;
+
+        while (this.messageQueue.length > 0) {
+            const { fromId, toId, message } = this.messageQueue.shift();
+            await this.walkAndSpeak(fromId, toId, message);
+            await this.delay(500); // Small pause between communications
+        }
+
+        this.isProcessingQueue = false;
+    }
+
+    // Main communication method - robot walks to another and speaks
+    async walkAndSpeak(fromId, toId, message) {
+        const fromRobot = this.robots.get(fromId);
+        const toRobot = this.robots.get(toId);
+
+        if (!fromRobot || !toRobot) return;
+        if (fromId === toId) {
+            // Just speak in place
+            this.speak(fromId, message);
+            return;
+        }
+
+        // Highlight connection
+        this.highlightConnection(fromId, toId);
+
+        // Set active
+        this.setActive(fromId);
+
+        // Start walking animation
+        fromRobot.element.classList.add('walking');
+        fromRobot.isWalking = true;
+
+        // Calculate position to walk to (near the target robot)
+        const targetX = toRobot.data.x;
+        const targetY = toRobot.data.y;
+        const startX = fromRobot.originalX;
+        const startY = fromRobot.originalY;
+
+        // Walk towards target (stop at 70% of the way)
+        const midX = startX + (targetX - startX) * 0.6;
+        const midY = startY + (targetY - startY) * 0.6;
+
+        // Determine walk direction for proper facing
+        const direction = targetX > startX ? 'right' : 'left';
+        fromRobot.element.classList.add(`facing-${direction}`);
+
+        // Animate walk
+        await this.animateWalk(fromRobot, midX, midY, 800);
+
+        // Speak when arrived
+        this.speak(fromId, message, true);
+
+        // Wait for speech
+        await this.delay(Math.min(message.length * 30, 3000) + 1000);
+
+        // Walk back
+        fromRobot.element.classList.remove(`facing-${direction}`);
+        const returnDirection = startX > midX ? 'right' : 'left';
+        fromRobot.element.classList.add(`facing-${returnDirection}`);
+
+        await this.animateWalk(fromRobot, startX, startY, 600);
+
+        // Clean up
+        fromRobot.element.classList.remove('walking', 'facing-left', 'facing-right');
+        fromRobot.isWalking = false;
+    }
+
+    async animateWalk(robot, targetX, targetY, duration) {
+        return new Promise(resolve => {
+            robot.element.style.transition = `left ${duration}ms ease-in-out, top ${duration}ms ease-in-out`;
+            robot.element.style.left = `${targetX}%`;
+            robot.element.style.top = `${targetY}%`;
+
+            setTimeout(() => {
+                robot.element.style.transition = '';
+                resolve();
+            }, duration);
+        });
+    }
+
+    speak(agentId, message, persistent = false) {
         const robot = this.robots.get(agentId);
         if (!robot) return;
 
@@ -342,47 +453,61 @@ class RobotVisualizer {
         // Set speech bubble content
         const bubble = robot.element.querySelector('.speech-bubble');
         if (bubble) {
-            // Truncate long messages
-            const displayMessage = message.length > 80 ? message.substring(0, 80) + '...' : message;
+            // Truncate long messages for display
+            const displayMessage = message.length > 100 ? message.substring(0, 100) + '...' : message;
             bubble.textContent = displayMessage;
             robot.element.classList.add('speaking');
 
-            // Auto-hide after delay
+            // Auto-hide after delay (longer for persistent)
+            const hideDelay = persistent ? Math.min(message.length * 30, 3000) + 500 : 4000;
             const timeout = setTimeout(() => {
                 robot.element.classList.remove('speaking');
-            }, 4000);
+            }, hideDelay);
             this.speechTimeouts.set(agentId, timeout);
         }
     }
 
+    // Simplified data transfer animation
     animateDataTransfer(fromId, toId) {
         const from = this.robots.get(fromId);
         const to = this.robots.get(toId);
         if (!from || !to) return;
 
-        const fromRect = from.element.getBoundingClientRect();
-        const toRect = to.element.getBoundingClientRect();
-        const containerRect = this.container.getBoundingClientRect();
-
+        // Create data packet
         const packet = document.createElement('div');
         packet.className = 'data-packet';
         packet.style.setProperty('--packet-color', this.getRobotColor(fromId));
-        packet.style.left = `${fromRect.left + fromRect.width / 2 - containerRect.left}px`;
-        packet.style.top = `${fromRect.top + fromRect.height / 2 - containerRect.top}px`;
+        packet.style.left = `${from.data.x}%`;
+        packet.style.top = `${from.data.y}%`;
 
         this.container.appendChild(packet);
 
         // Animate to destination
-        const dx = toRect.left - fromRect.left;
-        const dy = toRect.top - fromRect.top;
+        const dx = to.data.x - from.data.x;
+        const dy = to.data.y - from.data.y;
 
         packet.animate([
-            { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-            { transform: `translate(${dx}px, ${dy}px) scale(0.5)`, opacity: 0.5 }
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+            { transform: `translate(calc(${dx}vw * 0.5 - 50%), calc(${dy}vh * 0.5 - 50%)) scale(0.5)`, opacity: 0.5 }
         ], {
-            duration: 800,
+            duration: 600,
             easing: 'ease-in-out'
         }).onfinish = () => packet.remove();
+    }
+
+    // Set provider label under robot
+    setProvider(agentId, providerName) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        const providerEl = robot.element.querySelector('.robot-provider');
+        if (providerEl) {
+            providerEl.textContent = providerName;
+        }
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 

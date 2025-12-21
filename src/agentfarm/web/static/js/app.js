@@ -114,9 +114,21 @@ function handleServerMessage(data) {
 
         case 'agent_message':
             addMessage(data.agent, data.content);
-            // Show speech bubble on robot
+            // Animate robot communication
             if (robotVisualizer) {
-                robotVisualizer.speak(data.agent, data.content);
+                // Determine who is talking to whom
+                const fromAgent = data.agent;
+                const toAgent = data.target || 'orchestrator';
+
+                // Queue the walk and speak animation
+                robotVisualizer.queueCommunication(fromAgent, toAgent, data.content);
+            }
+            break;
+
+        case 'agent_handoff':
+            // When one agent hands off to another
+            if (robotVisualizer && data.from && data.to) {
+                robotVisualizer.queueCommunication(data.from, data.to, data.message || `Överlämnar till ${data.to}`);
             }
             break;
 

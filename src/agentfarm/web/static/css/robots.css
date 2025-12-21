@@ -47,6 +47,58 @@
     50% { filter: drop-shadow(0 0 20px var(--robot-glow)) brightness(1.2); }
 }
 
+/* Walk animation - leg movement */
+@keyframes walk {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    25% {
+        transform: translateY(-4px);
+    }
+    50% {
+        transform: translateY(0);
+    }
+    75% {
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes leg-left-walk {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(2px) translateY(-2px); }
+    50% { transform: translateX(0); }
+    75% { transform: translateX(-2px) translateY(-2px); }
+}
+
+@keyframes leg-right-walk {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px) translateY(-2px); }
+    50% { transform: translateX(0); }
+    75% { transform: translateX(2px) translateY(-2px); }
+}
+
+/* Walking state */
+.robot-agent.walking .robot-sprite {
+    animation: walk 0.3s ease-in-out infinite;
+}
+
+.robot-agent.walking .leg-left {
+    animation: leg-left-walk 0.3s ease-in-out infinite;
+}
+
+.robot-agent.walking .leg-right {
+    animation: leg-right-walk 0.3s ease-in-out infinite;
+}
+
+/* Facing direction */
+.robot-agent.facing-left .robot-sprite {
+    transform: scaleX(-1);
+}
+
+.robot-agent.facing-right .robot-sprite {
+    transform: scaleX(1);
+}
+
 /* Robot name label */
 .robot-name {
     margin-top: 8px;
@@ -57,6 +109,15 @@
     letter-spacing: 1px;
     text-shadow: 0 0 5px var(--robot-glow);
     white-space: nowrap;
+}
+
+/* Provider label under robot */
+.robot-provider {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    margin-top: 2px;
 }
 
 /* Speech bubble */
