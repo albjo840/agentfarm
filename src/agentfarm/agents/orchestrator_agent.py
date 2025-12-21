@@ -34,17 +34,27 @@ class OrchestratorAgent(BaseAgent):
         provider: LLMProvider,
         memory: MemoryManager | None = None,
         working_dir: str = ".",
+        use_multi_provider: bool = True,
     ) -> None:
         super().__init__(provider)
         self.working_dir = working_dir
         self.memory = memory
 
-        # Initialize worker agents
-        self._planner = PlannerAgent(provider)
-        self._executor = ExecutorAgent(provider)
-        self._verifier = VerifierAgent(provider)
-        self._reviewer = ReviewerAgent(provider)
-        self._ux_designer = UXDesignerAgent(provider)
+        # Initialize worker agents with optimal providers
+        if use_multi_provider:
+            from agentfarm.multi_provider import create_provider_for_agent
+            self._planner = PlannerAgent(create_provider_for_agent("planner"))
+            self._executor = ExecutorAgent(create_provider_for_agent("executor"))
+            self._verifier = VerifierAgent(create_provider_for_agent("verifier"))
+            self._reviewer = ReviewerAgent(create_provider_for_agent("reviewer"))
+            self._ux_designer = UXDesignerAgent(create_provider_for_agent("designer"))
+        else:
+            # Use single provider for all agents
+            self._planner = PlannerAgent(provider)
+            self._executor = ExecutorAgent(provider)
+            self._verifier = VerifierAgent(provider)
+            self._reviewer = ReviewerAgent(provider)
+            self._ux_designer = UXDesignerAgent(provider)
 
         # Store results from agent calls
         self._workflow_state: dict[str, Any] = {
