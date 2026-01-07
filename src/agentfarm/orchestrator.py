@@ -2,10 +2,12 @@ from __future__ import annotations
 
 """Orchestrator - coordinates the PLAN→EXECUTE→VERIFY→REVIEW→SUMMARY workflow."""
 
+import logging
 from typing import Any, Callable, Awaitable
 
-from agentfarm.agents.base import AgentContext
+from agentfarm.agents.base import AgentContext, RecursionGuard
 
+logger = logging.getLogger(__name__)
 
 # Event callback type
 EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -50,10 +52,19 @@ class Orchestrator:
         auto_inject_tools: bool = True,
         event_callback: EventCallback | None = None,
         use_multi_provider: bool = True,
+        max_recursion_depth: int = 5,
+        max_total_agent_calls: int = 50,
     ) -> None:
         self.working_dir = working_dir
         self._event_callback = event_callback
         self._use_multi_provider = use_multi_provider
+
+        # Create recursion guard to prevent infinite agent loops
+        self._recursion_guard = RecursionGuard(
+            max_depth=max_recursion_depth,
+            max_total_calls=max_total_agent_calls,
+            allow_self_calls=False,
+        )
 
         # Initialize agents with appropriate providers
         if use_multi_provider and provider is None:
@@ -65,6 +76,12 @@ class Orchestrator:
             self.executor = ExecutorAgent(provider)
             self.verifier = VerifierAgent(provider)
             self.reviewer = ReviewerAgent(provider)
+
+        # Set recursion guard on all agents
+        self.planner.set_recursion_guard(self._recursion_guard)
+        self.executor.set_recursion_guard(self._recursion_guard)
+        self.verifier.set_recursion_guard(self._recursion_guard)
+        self.reviewer.set_recursion_guard(self._recursion_guard)
 
         # Track token usage across all providers
         self._total_tokens = 0
@@ -131,10 +148,13 @@ class Orchestrator:
                 return "Proceed with your best judgment."
             return "No user callback configured. Proceeding with best judgment."
 
-        # Create collaborator
-        self._collaborator = AgentCollaborator(user_callback=user_callback)
+        # Create collaborator with shared recursion guard
+        self._collaborator = AgentCollaborator(
+            user_callback=user_callback,
+            recursion_guard=self._recursion_guard,
+        )
 
-        # Register all agents
+        # Register all agents (this also shares the recursion guard)
         self._collaborator.register_agents(self._agents)
 
         # Set collaborator on all agents
@@ -151,7 +171,7 @@ class Orchestrator:
         """Get total tokens used across all providers."""
         if hasattr(self, '_agent_providers'):
             return sum(p.total_tokens_used for p in self._agent_providers.values())
-        return self.get_total_tokens_used() if self.provider else 0
+        return self.provider.total_tokens_used if self.provider else 0
 
     async def _emit(self, event: str, data: dict[str, Any]) -> None:
         """Emit an event to the callback if registered."""
