@@ -50,7 +50,10 @@ class OllamaProvider(LLMProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> CompletionResponse:
-        """Generate a completion using Ollama."""
+        """Generate a completion using Ollama.
+
+        Uses /api/generate for compatibility with older Ollama versions.
+        """
         # Truncate messages to fit within context limit
         truncated_messages = truncate_messages(
             messages,
@@ -59,9 +62,12 @@ class OllamaProvider(LLMProvider):
             preserve_recent=4,
         )
 
+        # Convert messages to a single prompt (for /api/generate compatibility)
+        prompt = self._messages_to_prompt(truncated_messages)
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in truncated_messages],
+            "prompt": prompt,
             "stream": False,
             "options": {"temperature": temperature},
         }
@@ -69,19 +75,21 @@ class OllamaProvider(LLMProvider):
         if max_tokens:
             payload["options"]["num_predict"] = max_tokens
 
+        # Note: tools are not supported in /api/generate - would need /api/chat
+        # For now, we include tool descriptions in the prompt if tools are provided
         if tools:
-            payload["tools"] = [self._format_tool_for_ollama(t) for t in tools]
+            tool_desc = self._format_tools_as_prompt(tools)
+            payload["prompt"] = tool_desc + "\n\n" + prompt
 
         response = await self._client.post(
-            f"{self.base_url}/api/chat",
+            f"{self.base_url}/api/generate",
             json=payload,
         )
         response.raise_for_status()
         data = response.json()
 
-        message = data.get("message", {})
-        content = message.get("content", "")
-        tool_calls = self._parse_tool_calls(message.get("tool_calls", []))
+        content = data.get("response", "")
+        tool_calls = []  # /api/generate doesn't support native tool calls
 
         # Ollama provides token counts in some versions
         input_tokens = data.get("prompt_eval_count")
@@ -128,8 +136,32 @@ class OllamaProvider(LLMProvider):
                     if content:
                         yield content
 
+    def _messages_to_prompt(self, messages: list[Message]) -> str:
+        """Convert messages to a single prompt string for /api/generate."""
+        parts = []
+        for msg in messages:
+            if msg.role == "system":
+                parts.append(f"System: {msg.content}")
+            elif msg.role == "user":
+                parts.append(f"User: {msg.content}")
+            elif msg.role == "assistant":
+                parts.append(f"Assistant: {msg.content}")
+        parts.append("Assistant:")  # Prompt for response
+        return "\n\n".join(parts)
+
+    def _format_tools_as_prompt(self, tools: list[ToolDefinition]) -> str:
+        """Format tools as text description for the prompt."""
+        lines = ["You have access to the following tools:"]
+        for tool in tools:
+            lines.append(f"\n- {tool.name}: {tool.description}")
+            if tool.parameters.get("properties"):
+                params = ", ".join(tool.parameters["properties"].keys())
+                lines.append(f"  Parameters: {params}")
+        lines.append("\nTo use a tool, respond with: TOOL: tool_name(param=value)")
+        return "\n".join(lines)
+
     def _format_tool_for_ollama(self, tool: ToolDefinition) -> dict[str, Any]:
-        """Format tool for Ollama's tool calling format."""
+        """Format tool for Ollama's tool calling format (for /api/chat)."""
         return {
             "type": "function",
             "function": {
