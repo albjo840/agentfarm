@@ -279,3 +279,172 @@
     width: 64px;
     height: 64px;
 }
+
+/* ============================================
+   IDLE BEHAVIOR ANIMATIONS
+   ============================================ */
+
+/* Thinking animation - gentle bob with question mark */
+@keyframes thinking-bob {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-3px) rotate(-2deg); }
+    75% { transform: translateY(-3px) rotate(2deg); }
+}
+
+.robot-agent.thinking .robot-sprite {
+    animation: thinking-bob 0.8s ease-in-out infinite;
+}
+
+.robot-agent.thinking::after {
+    content: '?';
+    position: absolute;
+    top: -15px;
+    right: 5px;
+    font-size: 18px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--robot-color);
+    text-shadow: 0 0 10px var(--robot-glow);
+    animation: thought-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes thought-pulse {
+    from { opacity: 0.5; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1.1); }
+}
+
+/* Scanning animation - look around */
+@keyframes scan-sweep {
+    0%, 100% { transform: translateX(0) scaleX(1); }
+    50% { transform: translateX(15px) scaleX(-1); }
+}
+
+.robot-agent.scanning .robot-sprite {
+    animation: scan-sweep 1.5s ease-in-out;
+}
+
+.robot-agent.scanning::before {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--robot-color), transparent);
+    animation: scan-beam 0.6s linear infinite;
+    opacity: 0.7;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+@keyframes scan-beam {
+    0% { top: -10px; opacity: 0; }
+    50% { opacity: 0.8; }
+    100% { top: 70px; opacity: 0; }
+}
+
+/* Looking animation - just turning head */
+.robot-agent.looking .robot-sprite {
+    transition: transform 0.3s ease;
+}
+
+/* Idle walking - slower, more relaxed than active walking */
+.robot-agent.idle-walking .robot-sprite {
+    animation: walk 0.5s ease-in-out infinite;
+}
+
+.robot-agent.idle-walking .leg-left {
+    animation: leg-left-walk 0.5s ease-in-out infinite;
+}
+
+.robot-agent.idle-walking .leg-right {
+    animation: leg-right-walk 0.5s ease-in-out infinite;
+}
+
+/* Working animation - busy processing */
+@keyframes working-pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 10px var(--robot-glow));
+    }
+    50% {
+        filter: drop-shadow(0 0 25px var(--robot-glow)) brightness(1.4);
+    }
+}
+
+.robot-agent.working .robot-sprite {
+    animation: working-pulse 0.4s ease-in-out infinite;
+}
+
+.robot-agent.working .power-core,
+.robot-agent.working .eye-left,
+.robot-agent.working .eye-right {
+    animation: rapid-blink 0.15s step-end infinite;
+}
+
+@keyframes rapid-blink {
+    50% { opacity: 0.4; }
+}
+
+/* Working indicator badge */
+.robot-agent.working::before {
+    content: '⚡';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    animation: working-badge 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes working-badge {
+    from { transform: translateX(-50%) scale(0.8); opacity: 0.7; }
+    to { transform: translateX(-50%) scale(1.1); opacity: 1; }
+}
+
+/* Gravitating toward another robot */
+.robot-agent.gravitating {
+    z-index: 25;
+}
+
+.robot-agent.gravitating .robot-sprite {
+    animation: float 0.8s ease-in-out infinite;
+}
+
+/* Collaboration indicator */
+.robot-agent.collaborating::after {
+    content: '💬';
+    position: absolute;
+    top: -20px;
+    right: -5px;
+    font-size: 16px;
+    animation: collab-bounce 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes collab-bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-5px); }
+}
+
+/* Multiple robots active (parallel execution) */
+.robot-agent.parallel-active {
+    z-index: 22;
+}
+
+.robot-agent.parallel-active::before {
+    content: '▶';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--robot-color);
+    animation: parallel-indicator 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes parallel-indicator {
+    from { opacity: 0.5; }
+    to { opacity: 1; }
+}
+
+/* Connection highlight during collaboration */
+.active-connection {
+    stroke-width: 4 !important;
+    filter: drop-shadow(0 0 8px var(--robot-color));
+}

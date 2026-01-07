@@ -188,6 +188,10 @@ class RobotVisualizer {
         this.walkingRobots = new Set();
         this.messageQueue = [];
         this.isProcessingQueue = false;
+        // Idle behavior state
+        this.idleIntervals = new Map();
+        this.workingRobots = new Set();
+        this.idleEnabled = true;
     }
 
     init() {
@@ -508,6 +512,241 @@ class RobotVisualizer {
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ============================================
+    // IDLE BEHAVIOR SYSTEM - Free Robot Movement
+    // ============================================
+
+    startIdleBehavior() {
+        if (!this.idleEnabled) return;
+
+        ROBOT_AGENTS.forEach(agent => {
+            this.startRobotIdle(agent.id);
+        });
+    }
+
+    stopIdleBehavior() {
+        this.idleIntervals.forEach((interval, id) => {
+            clearInterval(interval);
+        });
+        this.idleIntervals.clear();
+    }
+
+    startRobotIdle(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        // Random interval between 4-10 seconds
+        const interval = setInterval(() => {
+            // Don't do idle actions if robot is busy
+            if (robot.isWalking || this.workingRobots.has(agentId)) return;
+            if (this.isProcessingQueue) return;
+
+            // 25% chance to do an idle action
+            if (Math.random() < 0.25) {
+                this.performIdleAction(agentId);
+            }
+        }, 4000 + Math.random() * 6000);
+
+        this.idleIntervals.set(agentId, interval);
+    }
+
+    async performIdleAction(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot || robot.isWalking) return;
+
+        const actions = ['wander', 'think', 'scan', 'look'];
+        const action = actions[Math.floor(Math.random() * actions.length)];
+
+        switch (action) {
+            case 'wander':
+                await this.idleWander(agentId);
+                break;
+            case 'think':
+                this.showThinkingAnimation(agentId);
+                break;
+            case 'scan':
+                this.showScanningAnimation(agentId);
+                break;
+            case 'look':
+                this.showLookingAnimation(agentId);
+                break;
+        }
+    }
+
+    async idleWander(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot || robot.isWalking) return;
+
+        robot.isWalking = true;
+        robot.element.classList.add('idle-walking');
+
+        // Calculate a small random offset from original position
+        const offsetX = (Math.random() - 0.5) * 12; // +/- 6%
+        const offsetY = (Math.random() - 0.5) * 12;
+
+        const targetX = Math.max(5, Math.min(95, robot.originalX + offsetX));
+        const targetY = Math.max(5, Math.min(95, robot.originalY + offsetY));
+
+        // Determine direction
+        const direction = targetX > robot.data.x ? 'right' : 'left';
+        robot.element.classList.add(`facing-${direction}`);
+        robot.element.classList.add('walking');
+
+        await this.animateWalk(robot, targetX, targetY, 1200);
+
+        // Pause briefly at the new position
+        await this.delay(800 + Math.random() * 1200);
+
+        // Return to original position
+        robot.element.classList.remove(`facing-${direction}`);
+        const returnDir = robot.originalX > targetX ? 'right' : 'left';
+        robot.element.classList.add(`facing-${returnDir}`);
+
+        await this.animateWalk(robot, robot.originalX, robot.originalY, 1000);
+
+        robot.element.classList.remove('walking', 'idle-walking', 'facing-left', 'facing-right');
+        robot.isWalking = false;
+    }
+
+    showThinkingAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        robot.element.classList.add('thinking');
+
+        // Show thought bubble with dots
+        const bubble = robot.element.querySelector('.speech-bubble');
+        if (bubble) {
+            bubble.textContent = '...';
+            robot.element.classList.add('speaking');
+        }
+
+        setTimeout(() => {
+            robot.element.classList.remove('thinking', 'speaking');
+        }, 2000);
+    }
+
+    showScanningAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        robot.element.classList.add('scanning');
+
+        setTimeout(() => {
+            robot.element.classList.remove('scanning');
+        }, 2500);
+    }
+
+    showLookingAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        // Briefly look left then right
+        robot.element.classList.add('looking');
+        robot.element.classList.add('facing-left');
+
+        setTimeout(() => {
+            robot.element.classList.remove('facing-left');
+            robot.element.classList.add('facing-right');
+        }, 600);
+
+        setTimeout(() => {
+            robot.element.classList.remove('looking', 'facing-right');
+        }, 1200);
+    }
+
+    // Set robot to "working" state (busy animation)
+    setWorking(agentId, working = true) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        if (working) {
+            this.workingRobots.add(agentId);
+            robot.element.classList.add('working');
+        } else {
+            this.workingRobots.delete(agentId);
+            robot.element.classList.remove('working');
+        }
+    }
+
+    // Gravitate robots toward each other during collaboration
+    async gravitateToward(fromId, toId, distance = 0.35) {
+        const fromRobot = this.robots.get(fromId);
+        const toRobot = this.robots.get(toId);
+
+        if (!fromRobot || !toRobot) return;
+        if (fromRobot.isWalking) return;
+
+        fromRobot.isWalking = true;
+
+        // Calculate position closer to target
+        const targetX = fromRobot.originalX +
+            (toRobot.originalX - fromRobot.originalX) * distance;
+        const targetY = fromRobot.originalY +
+            (toRobot.originalY - fromRobot.originalY) * distance;
+
+        fromRobot.element.classList.add('walking', 'gravitating');
+
+        const direction = targetX > fromRobot.data.x ? 'right' : 'left';
+        fromRobot.element.classList.add(`facing-${direction}`);
+
+        // Update current position
+        fromRobot.data.x = targetX;
+        fromRobot.data.y = targetY;
+
+        await this.animateWalk(fromRobot, targetX, targetY, 600);
+
+        fromRobot.element.classList.remove('walking', `facing-${direction}`);
+        fromRobot.isWalking = false;
+    }
+
+    // Return robot to home position
+    async returnHome(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+        if (robot.isWalking) return;
+
+        robot.isWalking = true;
+        robot.element.classList.add('walking');
+
+        const direction = robot.originalX > robot.data.x ? 'right' : 'left';
+        robot.element.classList.add(`facing-${direction}`);
+
+        // Update current position back to original
+        robot.data.x = robot.originalX;
+        robot.data.y = robot.originalY;
+
+        await this.animateWalk(robot, robot.originalX, robot.originalY, 700);
+
+        robot.element.classList.remove('walking', 'gravitating', `facing-${direction}`);
+        robot.isWalking = false;
+    }
+
+    // Show collaboration between agents (multiple robots move toward each other)
+    async showCollaboration(initiator, participants, topic) {
+        // All participants gravitate toward the initiator
+        const promises = participants.map(p => {
+            if (p !== initiator) {
+                return this.gravitateToward(p, initiator, 0.3);
+            }
+            return Promise.resolve();
+        });
+
+        await Promise.all(promises);
+
+        // Show speech from initiator
+        this.speak(initiator, topic.substring(0, 60) + '...', true);
+
+        // Return to positions after a delay
+        setTimeout(async () => {
+            for (const p of participants) {
+                if (p !== initiator) {
+                    await this.returnHome(p);
+                }
+            }
+        }, 3000);
     }
 }
 

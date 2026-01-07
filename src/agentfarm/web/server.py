@@ -319,6 +319,9 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
             use_multi_provider=True,
         )
 
+        # Set up collaboration event broadcasting
+        setup_collaboration_events(orchestrator)
+
         # Inject file tools
         file_tools = FileTools(working_dir)
         orchestrator.inject_tools(file_tools=file_tools)
@@ -400,6 +403,9 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> 
                     use_multi_provider=True,
                 )
 
+        # Set up collaboration event broadcasting
+        setup_collaboration_events(orchestrator)
+
         # Inject file tools
         file_tools = FileTools(working_dir)
         orchestrator.inject_tools(file_tools=file_tools)
@@ -436,6 +442,35 @@ async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
         'type': event_type,
         **data,
     })
+
+
+def setup_collaboration_events(orchestrator) -> None:
+    """Set up collaboration event broadcasting to WebSocket clients.
+
+    This connects the ProactiveCollaborator to the WebSocket so that
+    collaboration events are visualized in the UI (robots moving together,
+    speech bubbles showing discussion, etc.)
+    """
+    from agentfarm.agents.collaboration import ProactiveCollaboration
+
+    async def on_collaboration(collab: ProactiveCollaboration) -> None:
+        """Broadcast collaboration event to all clients."""
+        await ws_clients.broadcast({
+            'type': 'agent_collaboration',
+            'initiator': collab.initiator,
+            'participants': collab.participants,
+            'collaboration_type': collab.collaboration_type.value,
+            'topic': collab.topic[:100],  # Truncate for UI
+        })
+
+    # If orchestrator has a proactive collaborator, add listener
+    if hasattr(orchestrator, 'proactive_collaborator') and orchestrator.proactive_collaborator:
+        orchestrator.proactive_collaborator.add_listener(on_collaboration)
+
+    # Also hook into the agents' proactive collaborators
+    for agent_name, agent in getattr(orchestrator, '_agents', {}).items():
+        if hasattr(agent, 'proactive_collaborator') and agent.proactive_collaborator:
+            agent.proactive_collaborator.add_listener(on_collaboration)
 
 
 def create_app() -> web.Application:

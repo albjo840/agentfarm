@@ -99,6 +99,63 @@ Guidelines:
             handler=self._run_in_sandbox,
         )
 
+        # Proactive collaboration tools
+        self.register_tool(
+            name="request_review",
+            description="Request a quick peer review from the reviewer agent before finalizing code",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Code snippet to review (max 500 chars)",
+                    },
+                    "question": {
+                        "type": "string",
+                        "description": "Specific question about the code",
+                    },
+                },
+                "required": ["code"],
+            },
+            handler=self._request_review,
+        )
+
+        self.register_tool(
+            name="consult_planner",
+            description="Consult the planner about an approach or design decision",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "Question about approach or design",
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Additional context for the question",
+                    },
+                },
+                "required": ["question"],
+            },
+            handler=self._consult_planner,
+        )
+
+        self.register_tool(
+            name="sanity_check",
+            description="Quick sanity check with verifier before proceeding with significant changes",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "approach": {
+                        "type": "string",
+                        "description": "Description of your proposed approach",
+                    },
+                },
+                "required": ["approach"],
+            },
+            handler=self._sanity_check,
+        )
+
     def get_tools(self) -> list[ToolDefinition]:
         """Return executor-specific tools."""
         return self._tools
@@ -118,6 +175,21 @@ Guidelines:
     async def _run_in_sandbox(self, command: str, timeout: int = 30) -> str:
         """Run in sandbox - placeholder."""
         return f"[Ran '{command}' with timeout {timeout}s]"
+
+    async def _request_review(
+        self, code: str, question: str = "Does this look correct?"
+    ) -> str:
+        """Request peer review using proactive collaboration."""
+        return await self.request_quick_review(code, question)
+
+    async def _consult_planner(self, question: str, context: str = "") -> str:
+        """Consult the planner about approach/design."""
+        return await self.ask_agent("planner", question, context)
+
+    async def _sanity_check(self, approach: str) -> str:
+        """Quick sanity check with verifier."""
+        approved, feedback = await self.check_approach(approach)
+        return f"{'✓ APPROVED' if approved else '✗ NEEDS CHANGES'}: {feedback}"
 
     def inject_tools(self, file_tools: Any, sandbox: Any) -> None:
         """Inject real tool implementations."""

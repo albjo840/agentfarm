@@ -359,3 +359,233 @@ def create_collaboration_tools(
         })
 
     return tools
+
+
+# ============================================
+# PROACTIVE COLLABORATION SYSTEM
+# ============================================
+
+class CollaborationType(Enum):
+    """Types of proactive collaboration between agents."""
+    PEER_REVIEW = "peer_review"        # Quick code review during execution
+    BRAINSTORM = "brainstorm"          # Design discussion between agents
+    SANITY_CHECK = "sanity_check"      # Verify approach before proceeding
+    KNOWLEDGE_SHARE = "knowledge_share" # Share relevant context/learnings
+
+
+@dataclass
+class ProactiveCollaboration:
+    """A proactive collaboration request between agents."""
+    initiator: str
+    participants: list[str]
+    collaboration_type: CollaborationType
+    topic: str
+    context: str = ""
+    outcome: str = ""
+    timestamp: float = field(default_factory=lambda: __import__('time').time())
+
+
+class ProactiveCollaborator:
+    """Enables agents to proactively collaborate without orchestrator prompting.
+
+    Features:
+    - Peer review: Executor asks Reviewer for quick feedback during execution
+    - Brainstorming: Multiple agents discuss design decisions
+    - Sanity check: Verify approach before proceeding
+    - Event broadcasting for UI visualization
+    """
+
+    def __init__(self, base_collaborator: AgentCollaborator):
+        self.base = base_collaborator
+        self.collaboration_history: list[ProactiveCollaboration] = []
+        self.collaboration_listeners: list[Callable[[ProactiveCollaboration], Awaitable[None]]] = []
+
+    def add_listener(
+        self, callback: Callable[[ProactiveCollaboration], Awaitable[None]]
+    ) -> None:
+        """Add a listener for collaboration events (for UI updates)."""
+        self.collaboration_listeners.append(callback)
+
+    async def _notify_listeners(self, collab: ProactiveCollaboration) -> None:
+        """Notify all listeners of a collaboration event."""
+        for listener in self.collaboration_listeners:
+            try:
+                await listener(collab)
+            except Exception as e:
+                logger.error("Error notifying collaboration listener: %s", e)
+
+    async def request_peer_review(
+        self,
+        from_agent: str,
+        code_snippet: str,
+        question: str = "Does this look correct?",
+    ) -> str:
+        """Request a quick peer review from the reviewer agent.
+
+        Args:
+            from_agent: Agent requesting review (usually executor)
+            code_snippet: Code to review (truncated to 500 chars)
+            question: Specific question about the code
+
+        Returns:
+            Review feedback as string
+        """
+        collab = ProactiveCollaboration(
+            initiator=from_agent,
+            participants=["reviewer", from_agent],
+            collaboration_type=CollaborationType.PEER_REVIEW,
+            topic=question,
+            context=code_snippet[:500],
+        )
+
+        await self._notify_listeners(collab)
+
+        answer = await self.base.ask_agent(
+            from_agent=from_agent,
+            to_agent="reviewer",
+            question=f"Quick review: {question}\n\nCode:\n```\n{code_snippet[:500]}\n```",
+            question_type=QuestionType.VERIFICATION,
+        )
+
+        collab.outcome = answer.answer
+        self.collaboration_history.append(collab)
+
+        return answer.answer
+
+    async def brainstorm_design(
+        self,
+        from_agent: str,
+        design_question: str,
+        participants: list[str] | None = None,
+    ) -> dict[str, str]:
+        """Initiate a brainstorming session with multiple agents.
+
+        Args:
+            from_agent: Agent initiating brainstorm
+            design_question: Topic to brainstorm about
+            participants: Agents to include (default: planner, designer)
+
+        Returns:
+            Dict mapping agent name to their response
+        """
+        if participants is None:
+            participants = ["planner", "ux"]
+
+        all_participants = [from_agent] + [p for p in participants if p != from_agent]
+
+        collab = ProactiveCollaboration(
+            initiator=from_agent,
+            participants=all_participants,
+            collaboration_type=CollaborationType.BRAINSTORM,
+            topic=design_question,
+        )
+
+        await self._notify_listeners(collab)
+
+        responses: dict[str, str] = {}
+        for participant in participants:
+            if participant == from_agent:
+                continue
+
+            try:
+                answer = await self.base.ask_agent(
+                    from_agent=from_agent,
+                    to_agent=participant,
+                    question=f"Brainstorming: {design_question}\n\nShare your thoughts and ideas.",
+                    question_type=QuestionType.DESIGN,
+                )
+                responses[participant] = answer.answer
+            except Exception as e:
+                logger.error("Brainstorm error with %s: %s", participant, e)
+                responses[participant] = f"Error: {e}"
+
+        collab.outcome = str(responses)
+        self.collaboration_history.append(collab)
+
+        return responses
+
+    async def sanity_check(
+        self,
+        from_agent: str,
+        approach: str,
+        check_with: str = "verifier",
+    ) -> tuple[bool, str]:
+        """Quick sanity check before proceeding with an approach.
+
+        Args:
+            from_agent: Agent asking for check
+            approach: Description of the approach to verify
+            check_with: Agent to check with (default: verifier)
+
+        Returns:
+            Tuple of (approved: bool, feedback: str)
+        """
+        collab = ProactiveCollaboration(
+            initiator=from_agent,
+            participants=[check_with, from_agent],
+            collaboration_type=CollaborationType.SANITY_CHECK,
+            topic=f"Sanity check: {approach[:100]}...",
+        )
+
+        await self._notify_listeners(collab)
+
+        answer = await self.base.ask_agent(
+            from_agent=from_agent,
+            to_agent=check_with,
+            question=f"Sanity check - is this approach reasonable?\n\n{approach}\n\nRespond with APPROVED or NEEDS_CHANGES and explain why.",
+            question_type=QuestionType.VERIFICATION,
+        )
+
+        # Parse approval from answer
+        answer_lower = answer.answer.lower()
+        approved = "approved" in answer_lower and "needs_changes" not in answer_lower
+        approved = approved and not any(
+            word in answer_lower
+            for word in ["no", "wrong", "incorrect", "problem", "issue", "error"]
+        )
+
+        collab.outcome = f"{'Approved' if approved else 'Needs changes'}: {answer.answer}"
+        self.collaboration_history.append(collab)
+
+        return approved, answer.answer
+
+    async def share_knowledge(
+        self,
+        from_agent: str,
+        to_agent: str,
+        knowledge: str,
+        topic: str = "FYI",
+    ) -> None:
+        """Share knowledge/context with another agent (one-way).
+
+        Args:
+            from_agent: Agent sharing knowledge
+            to_agent: Agent to share with
+            knowledge: The knowledge to share
+            topic: Brief topic description
+        """
+        collab = ProactiveCollaboration(
+            initiator=from_agent,
+            participants=[to_agent, from_agent],
+            collaboration_type=CollaborationType.KNOWLEDGE_SHARE,
+            topic=topic,
+            context=knowledge[:500],
+        )
+
+        await self._notify_listeners(collab)
+        self.collaboration_history.append(collab)
+
+    def get_collaboration_summary(self, max_entries: int = 5) -> str:
+        """Get a summary of recent collaborations."""
+        if not self.collaboration_history:
+            return ""
+
+        lines = ["Recent Agent Collaborations:"]
+        for collab in self.collaboration_history[-max_entries:]:
+            lines.append(
+                f"  [{collab.collaboration_type.value}] "
+                f"{collab.initiator} + {', '.join(p for p in collab.participants if p != collab.initiator)}: "
+                f"{collab.topic[:50]}..."
+            )
+
+        return "\n".join(lines)

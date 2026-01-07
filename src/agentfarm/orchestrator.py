@@ -18,6 +18,7 @@ from agentfarm.agents.reviewer import ReviewerAgent
 from agentfarm.agents.verifier import VerifierAgent
 from agentfarm.models.schemas import (
     ExecutionResult,
+    PlanStep,
     ReviewResult,
     StepStatus,
     TaskPlan,
@@ -352,45 +353,92 @@ class Orchestrator:
     async def _run_execute_phase(
         self, context: AgentContext, plan: TaskPlan
     ) -> list[ExecutionResult]:
-        """Run the execution phase - execute all steps in order."""
-        results: list[ExecutionResult] = []
+        """Run the execution phase with parallel step execution.
+
+        Uses dependency analysis to run independent steps concurrently.
+        """
+        from agentfarm.execution.parallel import ParallelExecutor
 
         # Log all steps for debugging
         logger.info("Plan has %d total steps", len(plan.steps))
         for i, s in enumerate(plan.steps):
-            logger.info("  Step %d: agent=%s, desc=%s", i + 1, s.agent, s.description[:50])
+            deps_str = f" (deps: {s.dependencies})" if s.dependencies else ""
+            logger.info("  Step %d: agent=%s, desc=%s%s", i + 1, s.agent, s.description[:50], deps_str)
 
         executor_steps = [s for s in plan.steps if s.agent == "ExecutorAgent"]
         logger.info("Found %d ExecutorAgent steps to execute", len(executor_steps))
 
-        for step in plan.steps:
-            if step.agent != "ExecutorAgent":
-                continue
+        if not executor_steps:
+            return []
 
-            logger.info("Executing step %d: %s", step.id, step.description[:80])
-
-            # Update context with previous step summary
-            if results:
-                context.previous_step_output = results[-1].output
-
-            # Execute the step
-            step.status = StepStatus.IN_PROGRESS
-            result = await self.executor.execute_step(
-                context, step.description, step.id
+        # Create step execution function
+        async def execute_step(step: PlanStep) -> ExecutionResult:
+            """Execute a single step."""
+            step_context = AgentContext(
+                task_summary=context.task_summary,
+                relevant_files=context.relevant_files,
+                constraints=context.constraints,
             )
-            results.append(result)
+            return await self.executor.execute_step(
+                step_context, step.description, step.id
+            )
 
-            logger.info("Step %d result: success=%s, files_changed=%d",
-                       step.id, result.success, len(result.files_changed))
+        # Callbacks for UI updates
+        async def on_step_start(step_id: int, concurrent_ids: list[int]) -> None:
+            """Emit event when step starts."""
+            is_parallel = len(concurrent_ids) > 1
+            await self._emit("step_start", {
+                "step_id": step_id,
+                "parallel": is_parallel,
+                "concurrent_steps": concurrent_ids,
+            })
+            step = next((s for s in plan.steps if s.id == step_id), None)
+            if step:
+                await self._emit("agent_message", {
+                    "agent": "executor",
+                    "content": f"Starting step {step_id}: {step.description[:60]}..."
+                })
 
-            # Update step status
-            step.status = StepStatus.COMPLETED if result.success else StepStatus.FAILED
-            step.output = result.output
+        async def on_step_complete(step_id: int, result: ExecutionResult) -> None:
+            """Emit event when step completes."""
+            await self._emit("step_complete", {
+                "step_id": step_id,
+                "success": result.success,
+                "files_changed": len(result.files_changed),
+            })
 
-            # Stop on failure
-            if not result.success:
-                logger.warning("Step %d failed: %s", step.id, result.error)
-                break
+        async def on_parallel_group(step_ids: list[int]) -> None:
+            """Emit event when a parallel group starts."""
+            await self._emit("parallel_group_start", {
+                "step_ids": step_ids,
+                "count": len(step_ids),
+            })
+            await self._emit("agent_message", {
+                "agent": "executor",
+                "content": f"Executing {len(step_ids)} steps in parallel: {step_ids}"
+            })
+
+        # Create parallel executor
+        parallel_exec = ParallelExecutor(
+            steps=plan.steps,
+            execute_fn=execute_step,
+            on_step_start=on_step_start,
+            on_step_complete=on_step_complete,
+            on_parallel_group=on_parallel_group,
+            max_concurrent=4,
+            stop_on_failure=False,  # Continue other parallel steps even if one fails
+        )
+
+        # Emit parallel execution start event with analysis
+        summary = parallel_exec.get_execution_summary()
+        await self._emit("parallel_execution_start", {
+            "total_steps": len(executor_steps),
+            "max_parallelism": summary["max_parallelism"],
+            "parallel_groups": summary["parallel_groups"],
+        })
+
+        # Execute all steps with parallelization
+        results = await parallel_exec.execute_all(agent_filter="ExecutorAgent")
 
         logger.info("Execute phase complete: %d results", len(results))
         return results

@@ -19,7 +19,7 @@ from agentfarm.providers.base import (
 
 if TYPE_CHECKING:
     from agentfarm.memory.base import MemoryManager
-    from agentfarm.agents.collaboration import AgentCollaborator
+    from agentfarm.agents.collaboration import AgentCollaborator, ProactiveCollaborator
 
 logger = logging.getLogger(__name__)
 
@@ -207,11 +207,13 @@ class BaseAgent(ABC):
         memory: MemoryManager | None = None,
         collaborator: AgentCollaborator | None = None,
         recursion_guard: RecursionGuard | None = None,
+        proactive_collaborator: ProactiveCollaborator | None = None,
     ) -> None:
         self.provider = provider
         self.memory = memory
         self.collaborator = collaborator
         self.recursion_guard = recursion_guard
+        self.proactive_collaborator = proactive_collaborator
         self._tools: list[ToolDefinition] = []
         self._tool_handlers: dict[str, Any] = {}
 
@@ -433,6 +435,135 @@ class BaseAgent(ABC):
     def set_recursion_guard(self, guard: RecursionGuard) -> None:
         """Set the recursion guard for this agent."""
         self.recursion_guard = guard
+
+    def set_proactive_collaborator(self, proactive: ProactiveCollaborator) -> None:
+        """Set the proactive collaborator for this agent."""
+        self.proactive_collaborator = proactive
+
+    # ============================================
+    # PROACTIVE COLLABORATION METHODS
+    # ============================================
+
+    async def request_quick_review(
+        self,
+        code: str,
+        question: str = "Does this look correct?",
+    ) -> str:
+        """Request a quick peer review from the reviewer agent.
+
+        Use this when you want feedback on code before finalizing.
+
+        Args:
+            code: Code snippet to review (will be truncated)
+            question: Specific question about the code
+
+        Returns:
+            Review feedback string
+        """
+        if not self.proactive_collaborator:
+            logger.warning(
+                "%s tried to request review but no proactive collaborator set",
+                self.name,
+            )
+            return "Peer review not available. Proceeding with best judgment."
+
+        agent_id = self.name.lower().replace("agent", "")
+        return await self.proactive_collaborator.request_peer_review(
+            from_agent=agent_id,
+            code_snippet=code,
+            question=question,
+        )
+
+    async def brainstorm(
+        self,
+        topic: str,
+        with_agents: list[str] | None = None,
+    ) -> dict[str, str]:
+        """Initiate a brainstorming session with other agents.
+
+        Use this for design decisions or when multiple perspectives help.
+
+        Args:
+            topic: The topic/question to brainstorm about
+            with_agents: Agents to include (default: planner, ux)
+
+        Returns:
+            Dict mapping agent name to their response
+        """
+        if not self.proactive_collaborator:
+            logger.warning(
+                "%s tried to brainstorm but no proactive collaborator set",
+                self.name,
+            )
+            return {"error": "Brainstorming not available. No collaborator set."}
+
+        agent_id = self.name.lower().replace("agent", "")
+        return await self.proactive_collaborator.brainstorm_design(
+            from_agent=agent_id,
+            design_question=topic,
+            participants=with_agents,
+        )
+
+    async def check_approach(
+        self,
+        approach: str,
+        check_with: str = "verifier",
+    ) -> tuple[bool, str]:
+        """Sanity check an approach before proceeding.
+
+        Use this before committing to a significant decision.
+
+        Args:
+            approach: Description of your proposed approach
+            check_with: Agent to verify with (default: verifier)
+
+        Returns:
+            Tuple of (approved: bool, feedback: str)
+        """
+        if not self.proactive_collaborator:
+            logger.warning(
+                "%s tried to check approach but no proactive collaborator set",
+                self.name,
+            )
+            return True, "Approach check not available. Proceeding."
+
+        agent_id = self.name.lower().replace("agent", "")
+        return await self.proactive_collaborator.sanity_check(
+            from_agent=agent_id,
+            approach=approach,
+            check_with=check_with,
+        )
+
+    async def share_knowledge(
+        self,
+        to_agent: str,
+        knowledge: str,
+        topic: str = "FYI",
+    ) -> None:
+        """Share knowledge/context with another agent.
+
+        Use this to proactively inform other agents about discoveries
+        or context they might need.
+
+        Args:
+            to_agent: Agent to share with
+            knowledge: The knowledge to share
+            topic: Brief topic description
+        """
+        if not self.proactive_collaborator:
+            logger.warning(
+                "%s tried to share knowledge but no proactive collaborator set",
+                self.name,
+            )
+            return
+
+        agent_id = self.name.lower().replace("agent", "")
+        await self.proactive_collaborator.share_knowledge(
+            from_agent=agent_id,
+            to_agent=to_agent,
+            knowledge=knowledge,
+            topic=topic,
+        )
 
     async def run(
         self,

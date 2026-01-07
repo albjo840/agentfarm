@@ -100,6 +100,10 @@ function handleServerMessage(data) {
             executeBtn.querySelector('span').textContent = 'RUNNING...';
             ['plan', 'execute', 'verify', 'review'].forEach(s => setStageStatus(s, null));
             addMessage('orchestrator', `Initiating workflow: "${data.task}" via ${data.provider.toUpperCase()}`);
+            // Start idle behavior for visual life
+            if (robotVisualizer) {
+                robotVisualizer.startIdleBehavior();
+            }
             break;
 
         case 'stage_change':
@@ -146,6 +150,15 @@ function handleServerMessage(data) {
             executeBtn.disabled = false;
             executeBtn.querySelector('span').textContent = 'EXECUTE';
             setActiveAgent('orchestrator');
+            // Stop idle behavior when workflow ends
+            if (robotVisualizer) {
+                robotVisualizer.stopIdleBehavior();
+                // Return all robots to home positions
+                AGENTS.forEach(agent => {
+                    robotVisualizer.returnHome(agent.id);
+                    robotVisualizer.setWorking(agent.id, false);
+                });
+            }
             if (data.success) {
                 addMessage('orchestrator', '✓ Workflow completed successfully.');
             } else {
@@ -164,8 +177,103 @@ function handleServerMessage(data) {
             // Heartbeat response
             break;
 
+        // ============================================
+        // NEW EVENTS: Parallel Execution & Collaboration
+        // ============================================
+
+        case 'parallel_execution_start':
+            // Parallel step execution starting
+            addMessage('orchestrator', `⚡ Startar parallell exekvering: ${data.total_steps} steg i ${data.groups?.length || 0} grupper`);
+            break;
+
+        case 'parallel_group_start':
+            // A group of parallel steps is starting
+            addMessage('orchestrator', `▶ Kör ${data.step_ids?.length || 0} steg parallellt...`);
+            // Mark multiple robots as working
+            if (robotVisualizer && data.step_ids) {
+                data.step_ids.forEach(() => {
+                    robotVisualizer.setWorking('executor', true);
+                });
+            }
+            break;
+
+        case 'step_start':
+            // Single step starting
+            if (robotVisualizer) {
+                robotVisualizer.setWorking('executor', true);
+                if (data.parallel) {
+                    // Mark as parallel-active for special animation
+                    const robot = document.querySelector('[data-agent="executor"]');
+                    if (robot) robot.classList.add('parallel-active');
+                }
+            }
+            break;
+
+        case 'step_complete':
+            // Single step completed
+            if (robotVisualizer) {
+                robotVisualizer.setWorking('executor', false);
+                const robot = document.querySelector('[data-agent="executor"]');
+                if (robot) robot.classList.remove('parallel-active');
+            }
+            if (!data.success) {
+                addMessage('executor', `✗ Steg ${data.step_id} misslyckades`);
+            }
+            break;
+
+        case 'agent_collaboration':
+            // Proactive collaboration between agents
+            handleAgentCollaboration(data);
+            break;
+
+        case 'agent_thinking':
+            // Agent is processing/thinking
+            if (robotVisualizer && data.agent) {
+                robotVisualizer.showThinkingAnimation(data.agent);
+            }
+            break;
+
         default:
             console.log('Unknown message type:', data.type, data);
+    }
+}
+
+/**
+ * Handle agent collaboration events - shows robots moving together and discussing
+ */
+function handleAgentCollaboration(data) {
+    const { initiator, participants, collaboration_type, topic } = data;
+
+    // Log collaboration to message stream
+    const typeLabels = {
+        'peer_review': '👀 Peer Review',
+        'brainstorm': '💡 Brainstorm',
+        'sanity_check': '✓ Sanity Check',
+        'knowledge_share': '📚 Knowledge Share'
+    };
+    const typeLabel = typeLabels[collaboration_type] || collaboration_type;
+    const participantNames = participants.filter(p => p !== initiator).join(', ');
+
+    addMessage(initiator, `${typeLabel} med ${participantNames}: "${topic}"`);
+
+    // Animate robots moving together
+    if (robotVisualizer) {
+        // Show collaboration visualization
+        robotVisualizer.showCollaboration(initiator, participants, topic);
+
+        // Move robots toward each other
+        participants.forEach(participant => {
+            if (participant !== initiator) {
+                robotVisualizer.gravitateToward(participant, initiator, 80);
+            }
+        });
+
+        // After collaboration, return to positions
+        setTimeout(() => {
+            participants.forEach(participant => {
+                robotVisualizer.returnHome(participant);
+            });
+        }, 3000);
     }
 }
 
