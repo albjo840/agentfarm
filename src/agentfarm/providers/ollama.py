@@ -52,7 +52,7 @@ class OllamaProvider(LLMProvider):
     ) -> CompletionResponse:
         """Generate a completion using Ollama.
 
-        Uses /api/generate for compatibility with older Ollama versions.
+        Uses /api/chat with full tool calling support (requires Ollama 0.13+).
         """
         # Truncate messages to fit within context limit
         truncated_messages = truncate_messages(
@@ -62,12 +62,9 @@ class OllamaProvider(LLMProvider):
             preserve_recent=4,
         )
 
-        # Convert messages to a single prompt (for /api/generate compatibility)
-        prompt = self._messages_to_prompt(truncated_messages)
-
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": prompt,
+            "messages": [{"role": m.role, "content": m.content} for m in truncated_messages],
             "stream": False,
             "options": {"temperature": temperature},
         }
@@ -75,21 +72,19 @@ class OllamaProvider(LLMProvider):
         if max_tokens:
             payload["options"]["num_predict"] = max_tokens
 
-        # Note: tools are not supported in /api/generate - would need /api/chat
-        # For now, we include tool descriptions in the prompt if tools are provided
         if tools:
-            tool_desc = self._format_tools_as_prompt(tools)
-            payload["prompt"] = tool_desc + "\n\n" + prompt
+            payload["tools"] = [self._format_tool_for_ollama(t) for t in tools]
 
         response = await self._client.post(
-            f"{self.base_url}/api/generate",
+            f"{self.base_url}/api/chat",
             json=payload,
         )
         response.raise_for_status()
         data = response.json()
 
-        content = data.get("response", "")
-        tool_calls = []  # /api/generate doesn't support native tool calls
+        message = data.get("message", {})
+        content = message.get("content", "")
+        tool_calls = self._parse_tool_calls(message.get("tool_calls", []))
 
         # Ollama provides token counts in some versions
         input_tokens = data.get("prompt_eval_count")
@@ -113,12 +108,9 @@ class OllamaProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         """Stream a completion token by token."""
-        # Convert messages to prompt for /api/generate compatibility
-        prompt = self._messages_to_prompt(messages)
-
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": prompt,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
             "options": {"temperature": temperature},
         }
@@ -128,14 +120,14 @@ class OllamaProvider(LLMProvider):
 
         async with self._client.stream(
             "POST",
-            f"{self.base_url}/api/generate",
+            f"{self.base_url}/api/chat",
             json=payload,
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if line:
                     data = json.loads(line)
-                    content = data.get("response", "")
+                    content = data.get("message", {}).get("content", "")
                     if content:
                         yield content
 
