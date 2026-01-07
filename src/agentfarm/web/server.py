@@ -13,6 +13,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Try to import aiohttp, fall back to basic HTTP server if not available
 try:
     from aiohttp import web
@@ -124,6 +131,9 @@ def get_available_providers() -> list[dict[str, Any]]:
     """Get list of available providers based on env vars."""
     providers = []
 
+    # Auto mode always available - uses multi-provider with fallback
+    providers.append({"id": "auto", "name": "AUTO (Multi-provider)", "available": True})
+
     if os.getenv("GROQ_API_KEY"):
         providers.append({"id": "groq", "name": "GROQ (Llama)", "available": True})
     else:
@@ -214,7 +224,7 @@ async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any]) -> 
     if msg_type == 'execute':
         # Start a workflow execution
         task = data.get('task', '')
-        provider = data.get('provider', 'groq')
+        provider = data.get('provider', 'auto')  # Default to auto (uses multi-provider/Ollama)
         workdir = data.get('workdir', current_working_dir)
         # Run in background so we don't block
         asyncio.create_task(run_real_workflow(task, provider, workdir))
@@ -327,7 +337,7 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
 
 
 async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> None:
-    """Run a real AgentFarm workflow and broadcast updates (legacy single-provider mode)."""
+    """Run a real AgentFarm workflow and broadcast updates."""
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
 
@@ -344,28 +354,38 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> 
             'working_dir': working_dir,
         })
 
-        # Create provider
-        try:
-            provider = create_provider(provider_type)
-        except ValueError as e:
-            await ws_clients.broadcast({
-                'type': 'agent_message',
-                'agent': 'orchestrator',
-                'content': f"Error: {str(e)}",
-            })
-            await ws_clients.broadcast({
-                'type': 'workflow_complete',
-                'success': False,
-                'error': str(e),
-            })
-            return
-
-        # Create orchestrator with event callback
-        orchestrator = Orchestrator(
-            provider=provider,
-            working_dir=working_dir,
-            event_callback=event_callback,
-        )
+        # Create orchestrator - use multi-provider mode for "auto" or as fallback
+        if provider_type == "auto":
+            # Use multi-provider mode with automatic fallback
+            orchestrator = Orchestrator(
+                provider=None,
+                working_dir=working_dir,
+                event_callback=event_callback,
+                use_multi_provider=True,
+            )
+        else:
+            # Try specific provider, fall back to multi-provider if unavailable
+            try:
+                provider = create_provider(provider_type)
+                orchestrator = Orchestrator(
+                    provider=provider,
+                    working_dir=working_dir,
+                    event_callback=event_callback,
+                    use_multi_provider=False,
+                )
+            except ValueError as e:
+                # Fallback to multi-provider mode
+                await ws_clients.broadcast({
+                    'type': 'agent_message',
+                    'agent': 'orchestrator',
+                    'content': f"Provider {provider_type} unavailable, using auto-detect...",
+                })
+                orchestrator = Orchestrator(
+                    provider=None,
+                    working_dir=working_dir,
+                    event_callback=event_callback,
+                    use_multi_provider=True,
+                )
 
         # Inject file tools
         file_tools = FileTools(working_dir)
