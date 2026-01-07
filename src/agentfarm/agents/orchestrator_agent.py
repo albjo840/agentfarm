@@ -3,9 +3,10 @@ from __future__ import annotations
 """OrchestratorAgent - LLM-driven coordinator that dynamically controls other agents."""
 
 import json
+import logging
 from typing import Any
 
-from agentfarm.agents.base import AgentContext, AgentResult, BaseAgent
+from agentfarm.agents.base import AgentContext, AgentResult, BaseAgent, RecursionGuard, RecursionLimitError
 from agentfarm.agents.executor import ExecutorAgent
 from agentfarm.agents.planner import PlannerAgent
 from agentfarm.agents.reviewer import ReviewerAgent
@@ -14,6 +15,8 @@ from agentfarm.agents.verifier import VerifierAgent
 from agentfarm.memory.base import MemoryManager
 from agentfarm.models.schemas import WorkflowResult
 from agentfarm.providers.base import CompletionResponse, LLMProvider, ToolDefinition
+
+logger = logging.getLogger(__name__)
 
 
 class OrchestratorAgent(BaseAgent):
@@ -35,12 +38,21 @@ class OrchestratorAgent(BaseAgent):
         memory: MemoryManager | None = None,
         working_dir: str = ".",
         use_multi_provider: bool = True,
+        max_recursion_depth: int = 5,
+        max_total_agent_calls: int = 50,
     ) -> None:
-        super().__init__(provider)
+        # Create the recursion guard for this workflow
+        self._recursion_guard = RecursionGuard(
+            max_depth=max_recursion_depth,
+            max_total_calls=max_total_agent_calls,
+            allow_self_calls=False,
+        )
+
+        super().__init__(provider, recursion_guard=self._recursion_guard)
         self.working_dir = working_dir
         self.memory = memory
 
-        # Initialize worker agents with optimal providers
+        # Initialize worker agents with optimal providers and shared recursion guard
         if use_multi_provider:
             from agentfarm.multi_provider import create_provider_for_agent
             self._planner = PlannerAgent(create_provider_for_agent("planner"))
@@ -55,6 +67,13 @@ class OrchestratorAgent(BaseAgent):
             self._verifier = VerifierAgent(provider)
             self._reviewer = ReviewerAgent(provider)
             self._ux_designer = UXDesignerAgent(provider)
+
+        # Share the recursion guard with all worker agents
+        self._planner.set_recursion_guard(self._recursion_guard)
+        self._executor.set_recursion_guard(self._recursion_guard)
+        self._verifier.set_recursion_guard(self._recursion_guard)
+        self._reviewer.set_recursion_guard(self._recursion_guard)
+        self._ux_designer.set_recursion_guard(self._recursion_guard)
 
         # Store results from agent calls
         self._workflow_state: dict[str, Any] = {
@@ -524,6 +543,26 @@ Always explain your reasoning before calling an agent."""
             "review": None,
         }
 
+        # Reset the recursion guard for a fresh workflow
+        self._recursion_guard = RecursionGuard(
+            max_depth=self._recursion_guard.max_depth,
+            max_total_calls=self._recursion_guard.max_total_calls,
+            allow_self_calls=self._recursion_guard.allow_self_calls,
+        )
+
+        # Update the guard on all worker agents
+        self._planner.set_recursion_guard(self._recursion_guard)
+        self._executor.set_recursion_guard(self._recursion_guard)
+        self._verifier.set_recursion_guard(self._recursion_guard)
+        self._reviewer.set_recursion_guard(self._recursion_guard)
+        self._ux_designer.set_recursion_guard(self._recursion_guard)
+        self.recursion_guard = self._recursion_guard
+
+        logger.info("Starting workflow for task: %s", task[:100])
+        logger.debug("Recursion limits: depth=%d, total_calls=%d",
+                     self._recursion_guard.max_depth,
+                     self._recursion_guard.max_total_calls)
+
         # Build context for orchestrator
         context = AgentContext(
             task_summary=task,
@@ -541,19 +580,49 @@ Constraints: {', '.join(constraints) if constraints else 'None'}
 
 Analyze the task and call the appropriate agents to complete it. Start with planning if needed, then execute, verify, and review."""
 
-        result = await self.run(context, request)
+        try:
+            result = await self.run(context, request, recursion_guard=self._recursion_guard)
 
-        # Build WorkflowResult from workflow state
-        return WorkflowResult(
-            success=result.success,
-            task_description=task,
-            plan=self._workflow_state.get("plan"),
-            execution_results=self._workflow_state.get("execution_results", []),
-            verification=self._workflow_state.get("verification"),
-            review=self._workflow_state.get("review"),
-            pr_summary=result.output,
-            total_tokens_used=result.tokens_used,
-        )
+            # Check if workflow was stopped due to recursion limit
+            if result.data.get("error") == "recursion_limit":
+                logger.error("Workflow stopped due to recursion limit: %s", result.output)
+                return WorkflowResult(
+                    success=False,
+                    task_description=task,
+                    plan=self._workflow_state.get("plan"),
+                    execution_results=self._workflow_state.get("execution_results", []),
+                    verification=self._workflow_state.get("verification"),
+                    review=self._workflow_state.get("review"),
+                    pr_summary=f"Workflow stopped: {result.output}\n\nRecursion guard status: {self._recursion_guard.get_status()}",
+                    total_tokens_used=result.tokens_used,
+                )
+
+            logger.info("Workflow completed. Guard status: %s", self._recursion_guard.get_status())
+
+            # Build WorkflowResult from workflow state
+            return WorkflowResult(
+                success=result.success,
+                task_description=task,
+                plan=self._workflow_state.get("plan"),
+                execution_results=self._workflow_state.get("execution_results", []),
+                verification=self._workflow_state.get("verification"),
+                review=self._workflow_state.get("review"),
+                pr_summary=result.output,
+                total_tokens_used=result.tokens_used,
+            )
+
+        except RecursionLimitError as e:
+            logger.error("Workflow failed due to recursion limit: %s", e)
+            return WorkflowResult(
+                success=False,
+                task_description=task,
+                plan=self._workflow_state.get("plan"),
+                execution_results=self._workflow_state.get("execution_results", []),
+                verification=self._workflow_state.get("verification"),
+                review=self._workflow_state.get("review"),
+                pr_summary=f"Workflow failed: {e}\n\nCall stack: {' → '.join(e.call_stack)}\nTotal calls: {e.total_calls}",
+                total_tokens_used=None,
+            )
 
     def inject_tools(
         self,

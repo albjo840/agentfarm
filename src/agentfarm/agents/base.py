@@ -2,7 +2,9 @@ from __future__ import annotations
 
 """Base agent class with token-efficient context management."""
 
+import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -18,6 +20,148 @@ from agentfarm.providers.base import (
 if TYPE_CHECKING:
     from agentfarm.memory.base import MemoryManager
     from agentfarm.agents.collaboration import AgentCollaborator
+
+logger = logging.getLogger(__name__)
+
+
+class RecursionLimitError(Exception):
+    """Raised when recursion limits are exceeded."""
+
+    def __init__(
+        self,
+        message: str,
+        depth: int = 0,
+        call_stack: list[str] | None = None,
+        total_calls: int = 0,
+    ) -> None:
+        super().__init__(message)
+        self.depth = depth
+        self.call_stack = call_stack or []
+        self.total_calls = total_calls
+
+
+@dataclass
+class RecursionGuard:
+    """Guards against infinite recursion in agent-to-agent calls.
+
+    Implements three protection mechanisms:
+    1. Depth limit - Maximum nesting of agent calls
+    2. Cycle detection - Prevents A→B→A loops
+    3. Total call limit - Maximum agent invocations per workflow
+    """
+
+    max_depth: int = 5
+    max_total_calls: int = 50
+    allow_self_calls: bool = False
+
+    # Mutable state (use field with default_factory)
+    call_stack: list[str] = field(default_factory=list)
+    total_calls: int = 0
+    call_history: list[tuple[str, str]] = field(default_factory=list)  # (agent, task_hash)
+
+    def enter(self, agent_name: str, task_summary: str = "") -> "RecursionGuard":
+        """Enter an agent call. Returns self for chaining.
+
+        Raises:
+            RecursionLimitError: If any limit is exceeded
+        """
+        # Check depth limit
+        if len(self.call_stack) >= self.max_depth:
+            raise RecursionLimitError(
+                f"Maximum recursion depth ({self.max_depth}) exceeded. "
+                f"Call stack: {' → '.join(self.call_stack)} → {agent_name}",
+                depth=len(self.call_stack),
+                call_stack=self.call_stack.copy(),
+                total_calls=self.total_calls,
+            )
+
+        # Check for cycles (same agent already in call stack)
+        if agent_name in self.call_stack and not self.allow_self_calls:
+            cycle_start = self.call_stack.index(agent_name)
+            cycle = self.call_stack[cycle_start:] + [agent_name]
+            raise RecursionLimitError(
+                f"Circular agent dependency detected: {' → '.join(cycle)}",
+                depth=len(self.call_stack),
+                call_stack=self.call_stack.copy(),
+                total_calls=self.total_calls,
+            )
+
+        # Check total calls limit
+        if self.total_calls >= self.max_total_calls:
+            raise RecursionLimitError(
+                f"Maximum total agent calls ({self.max_total_calls}) exceeded. "
+                f"This may indicate an infinite loop.",
+                depth=len(self.call_stack),
+                call_stack=self.call_stack.copy(),
+                total_calls=self.total_calls,
+            )
+
+        # Check for repeated identical calls (same agent + similar task)
+        task_hash = hash(task_summary[:100]) if task_summary else 0
+        recent_calls = self.call_history[-10:]  # Check last 10 calls
+        identical_recent = sum(1 for a, t in recent_calls if a == agent_name and t == task_hash)
+        if identical_recent >= 3:
+            raise RecursionLimitError(
+                f"Agent '{agent_name}' called {identical_recent} times with similar task. "
+                f"Possible infinite loop detected.",
+                depth=len(self.call_stack),
+                call_stack=self.call_stack.copy(),
+                total_calls=self.total_calls,
+            )
+
+        # All checks passed - record the call
+        self.call_stack.append(agent_name)
+        self.total_calls += 1
+        self.call_history.append((agent_name, task_hash))
+
+        logger.debug(
+            "Agent call: %s (depth=%d, total=%d)",
+            agent_name,
+            len(self.call_stack),
+            self.total_calls,
+        )
+
+        return self
+
+    def exit(self, agent_name: str) -> None:
+        """Exit an agent call."""
+        if self.call_stack and self.call_stack[-1] == agent_name:
+            self.call_stack.pop()
+        else:
+            logger.warning(
+                "Mismatched agent exit: expected %s, got %s",
+                self.call_stack[-1] if self.call_stack else "empty",
+                agent_name,
+            )
+
+    def child_guard(self) -> "RecursionGuard":
+        """Create a child guard that shares state but can be passed to nested calls."""
+        return RecursionGuard(
+            max_depth=self.max_depth,
+            max_total_calls=self.max_total_calls,
+            allow_self_calls=self.allow_self_calls,
+            call_stack=self.call_stack,  # Shared reference
+            total_calls=self.total_calls,
+            call_history=self.call_history,  # Shared reference
+        )
+
+    @property
+    def current_depth(self) -> int:
+        """Current recursion depth."""
+        return len(self.call_stack)
+
+    @property
+    def is_nested(self) -> bool:
+        """True if we're inside a nested agent call."""
+        return len(self.call_stack) > 1
+
+    def get_status(self) -> str:
+        """Get a human-readable status string."""
+        return (
+            f"Depth: {len(self.call_stack)}/{self.max_depth}, "
+            f"Total calls: {self.total_calls}/{self.max_total_calls}, "
+            f"Stack: {' → '.join(self.call_stack) or '(empty)'}"
+        )
 
 
 class AgentContext(BaseModel):
@@ -51,6 +195,7 @@ class BaseAgent(ABC):
     4. Tool filtering - only tools this agent can use
     5. Memory integration - optional short/long-term memory
     6. Agent collaboration - ask other agents, not the user
+    7. Recursion protection - prevents infinite agent loops
     """
 
     name: str = "BaseAgent"
@@ -61,10 +206,12 @@ class BaseAgent(ABC):
         provider: LLMProvider,
         memory: MemoryManager | None = None,
         collaborator: AgentCollaborator | None = None,
+        recursion_guard: RecursionGuard | None = None,
     ) -> None:
         self.provider = provider
         self.memory = memory
         self.collaborator = collaborator
+        self.recursion_guard = recursion_guard
         self._tools: list[ToolDefinition] = []
         self._tool_handlers: dict[str, Any] = {}
 
@@ -278,11 +425,17 @@ class BaseAgent(ABC):
 
         self._tool_handlers["escalate_to_orchestrator"] = escalate_handler
 
+    def set_recursion_guard(self, guard: RecursionGuard) -> None:
+        """Set the recursion guard for this agent."""
+        self.recursion_guard = guard
+
     async def run(
         self,
         context: AgentContext,
         request: str,
         max_tool_calls: int = 10,
+        temperature: float = 0.7,
+        recursion_guard: RecursionGuard | None = None,
     ) -> AgentResult:
         """Execute the agent with given context and request.
 
@@ -292,44 +445,77 @@ class BaseAgent(ABC):
             context: Minimal context for the agent
             request: The user's request
             max_tool_calls: Maximum number of tool call rounds to prevent infinite loops
+            temperature: LLM temperature (lower = more deterministic)
+            recursion_guard: Optional guard to prevent infinite recursion (passed from parent)
         """
-        messages = self.build_messages(context, request)
-        tools = self.get_tools()
+        # Use provided guard, instance guard, or create a new one
+        guard = recursion_guard or self.recursion_guard or RecursionGuard()
 
-        # Initial completion
-        response = await self.provider.complete(messages, tools=tools if tools else None)
+        # Enter the recursion guard (this checks all limits)
+        try:
+            guard.enter(self.name, context.task_summary)
+        except RecursionLimitError as e:
+            logger.error("Recursion limit hit: %s", e)
+            return AgentResult(
+                success=False,
+                output=f"Agent execution stopped: {e}",
+                data={"error": "recursion_limit", "details": str(e)},
+                summary_for_next_agent=f"STOPPED: {e}",
+            )
 
-        # Handle tool calls in a loop with a limit
-        tool_outputs: list[str] = []
-        tool_call_count = 0
+        try:
+            messages = self.build_messages(context, request)
+            tools = self.get_tools()
 
-        while response.tool_calls and tool_call_count < max_tool_calls:
-            tool_call_count += 1
+            # Initial completion
+            response = await self.provider.complete(
+                messages, tools=tools if tools else None, temperature=temperature
+            )
 
-            for tool_call in response.tool_calls:
-                result = await self.execute_tool(tool_call.name, tool_call.arguments)
-                tool_outputs.append(f"{tool_call.name}: {result.output or result.error}")
+            # Handle tool calls in a loop with a limit
+            tool_outputs: list[str] = []
+            tool_call_count = 0
 
-                # Add tool result to messages
-                messages.append(Message(role="assistant", content=response.content or ""))
-                messages.append(
-                    Message(
-                        role="user",
-                        content=f"Tool result for {tool_call.name}:\n{result.output or result.error}",
+            while response.tool_calls and tool_call_count < max_tool_calls:
+                tool_call_count += 1
+
+                for tool_call in response.tool_calls:
+                    result = await self.execute_tool(tool_call.name, tool_call.arguments)
+                    tool_outputs.append(f"{tool_call.name}: {result.output or result.error}")
+
+                    # Add tool result to messages
+                    messages.append(Message(role="assistant", content=response.content or ""))
+                    messages.append(
+                        Message(
+                            role="user",
+                            content=f"Tool result for {tool_call.name}:\n{result.output or result.error}",
+                        )
                     )
+
+                # Check if we've hit the limit
+                if tool_call_count >= max_tool_calls:
+                    logger.warning(
+                        "Agent %s hit max_tool_calls limit (%d)",
+                        self.name,
+                        max_tool_calls,
+                    )
+                    # Force final response without tools
+                    response = await self.provider.complete(
+                        messages, tools=None, temperature=temperature
+                    )
+                    break
+
+                # Get next response
+                response = await self.provider.complete(
+                    messages, tools=tools if tools else None, temperature=temperature
                 )
 
-            # Check if we've hit the limit
-            if tool_call_count >= max_tool_calls:
-                # Force final response without tools
-                response = await self.provider.complete(messages, tools=None)
-                break
+            # Process the final response
+            return await self.process_response(response, tool_outputs)
 
-            # Get next response
-            response = await self.provider.complete(messages, tools=tools if tools else None)
-
-        # Process the final response
-        return await self.process_response(response, tool_outputs)
+        finally:
+            # Always exit the guard, even if an exception occurred
+            guard.exit(self.name)
 
     @abstractmethod
     async def process_response(

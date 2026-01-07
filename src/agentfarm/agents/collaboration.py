@@ -2,16 +2,21 @@
 
 This module enables agents to consult each other instead of asking the user.
 Only the orchestrator should communicate directly with the user.
+
+Includes recursion protection to prevent infinite agent loops.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Awaitable
 from enum import Enum
 
 if TYPE_CHECKING:
-    from agentfarm.agents.base import BaseAgent
+    from agentfarm.agents.base import BaseAgent, RecursionGuard
+
+logger = logging.getLogger(__name__)
 
 
 class QuestionType(Enum):
@@ -71,20 +76,37 @@ class AgentCollaborator:
     2. Only orchestrator asks user questions
     3. If an agent can't answer, it escalates to orchestrator
     4. All exchanges are logged for context
+    5. Recursion protection prevents infinite loops
     """
 
-    def __init__(self, user_callback: Callable[[str], Awaitable[str]] | None = None):
+    def __init__(
+        self,
+        user_callback: Callable[[str], Awaitable[str]] | None = None,
+        recursion_guard: RecursionGuard | None = None,
+    ):
         self._agents: dict[str, BaseAgent] = {}
         self._session = CollaborationSession()
         self._user_callback = user_callback  # For orchestrator to ask user
+        self._recursion_guard = recursion_guard
+
+    def set_recursion_guard(self, guard: RecursionGuard) -> None:
+        """Set or update the recursion guard."""
+        self._recursion_guard = guard
+        # Also set on all registered agents
+        for agent in self._agents.values():
+            agent.set_recursion_guard(guard)
 
     def register_agent(self, name: str, agent: BaseAgent) -> None:
         """Register an agent for collaboration."""
         self._agents[name] = agent
+        # Share recursion guard with new agent
+        if self._recursion_guard:
+            agent.set_recursion_guard(self._recursion_guard)
 
     def register_agents(self, agents: dict[str, BaseAgent]) -> None:
         """Register multiple agents at once."""
-        self._agents.update(agents)
+        for name, agent in agents.items():
+            self.register_agent(name, agent)
 
     async def ask_agent(
         self,
@@ -106,6 +128,8 @@ class AgentCollaborator:
         Returns:
             AgentAnswer with the response
         """
+        from agentfarm.agents.base import AgentContext, RecursionGuard, RecursionLimitError
+
         q = AgentQuestion(
             from_agent=from_agent,
             to_agent=to_agent,
@@ -128,9 +152,6 @@ class AgentCollaborator:
             self._session.add_exchange(q, answer)
             return answer
 
-        # Ask the target agent
-        from agentfarm.agents.base import AgentContext
-
         # Build a focused context for the question
         ctx = AgentContext(
             task_summary=f"Answer question from {from_agent}",
@@ -140,18 +161,52 @@ class AgentCollaborator:
         # Format the question for the agent
         formatted_question = self._format_question_for_agent(q)
 
-        try:
-            result = await target.run(ctx, formatted_question)
+        # Use existing guard or create a new one
+        guard = self._recursion_guard or RecursionGuard()
 
-            # Parse the answer
+        try:
+            # Pass the recursion guard to the nested agent call
+            result = await target.run(
+                ctx,
+                formatted_question,
+                recursion_guard=guard,
+            )
+
+            # Check if result indicates recursion was stopped
+            if result.data.get("error") == "recursion_limit":
+                logger.warning(
+                    "Recursion limit prevented %s from answering %s's question",
+                    to_agent,
+                    from_agent,
+                )
+                answer = AgentAnswer(
+                    from_agent=to_agent,
+                    question=question,
+                    answer=f"Cannot answer: recursion limit reached. {result.output}",
+                    confidence=0.0,
+                    needs_user_input=True,
+                )
+            else:
+                # Parse the answer
+                answer = AgentAnswer(
+                    from_agent=to_agent,
+                    question=question,
+                    answer=result.output,
+                    confidence=self._estimate_confidence(result.output),
+                    needs_user_input=self._needs_user_input(result.output),
+                )
+
+        except RecursionLimitError as e:
+            logger.error("Recursion limit in ask_agent: %s", e)
             answer = AgentAnswer(
                 from_agent=to_agent,
                 question=question,
-                answer=result.output,
-                confidence=self._estimate_confidence(result.output),
-                needs_user_input=self._needs_user_input(result.output),
+                answer=f"Cannot answer: {e}. Consider simplifying the task or breaking it into smaller steps.",
+                confidence=0.0,
+                needs_user_input=True,
             )
         except Exception as e:
+            logger.exception("Error in ask_agent from %s to %s", from_agent, to_agent)
             answer = AgentAnswer(
                 from_agent=to_agent,
                 question=question,
