@@ -61,10 +61,11 @@ class Orchestrator:
         self._use_multi_provider = use_multi_provider
 
         # Create recursion guard to prevent infinite agent loops
+        # allow_self_calls=True enables parallel execution of same agent type
         self._recursion_guard = RecursionGuard(
             max_depth=max_recursion_depth,
             max_total_calls=max_total_agent_calls,
-            allow_self_calls=False,
+            allow_self_calls=True,  # Needed for parallel step execution
         )
 
         # Initialize agents with appropriate providers

@@ -377,11 +377,13 @@ function executeTask(task) {
         return;
     }
 
-    // Generate project name from task (first 30 chars, sanitized)
-    const projectName = task.substring(0, 30)
+    // Generate project name from task (first 3 words, sanitized)
+    const projectName = task
+        .split(/\s+/)
+        .slice(0, 3)
+        .join('-')
         .toLowerCase()
-        .replace(/[^a-zA-Z0-9åäöÅÄÖ\s-]/g, '')
-        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9åäö-]/g, '')
         .replace(/-+/g, '-')
         .trim() || 'nytt-projekt';
 
