@@ -7,6 +7,13 @@ Maps each agent to its optimal LLM provider to maximize free tier usage.
 from __future__ import annotations
 
 import os
+
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -22,37 +29,38 @@ class AgentProviderConfig:
     description: str
 
 
-# Default agent-to-provider mapping optimized for free tier usage
+# Default agent-to-provider mapping optimized for local GPU + cloud fallback
+# This config prioritizes local Ollama to avoid rate limits and use your GPU
 AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
     "orchestrator": AgentProviderConfig(
-        provider_type="groq",
-        model="llama-3.3-70b-versatile",
-        description="Koordinering, user-kontakt - behöver bäst reasoning"
+        provider_type="ollama",
+        model="llama3.2",
+        description="Koordinering - lokal GPU"
     ),
     "planner": AgentProviderConfig(
-        provider_type="gemini",
-        model="gemini-1.5-flash",
-        description="Planering - bra på strukturerad output"
+        provider_type="ollama",
+        model="llama3.2",
+        description="Planering - lokal GPU (snabb)"
     ),
     "executor": AgentProviderConfig(
-        provider_type="qwen",
-        model="Qwen/Qwen2.5-Coder-7B-Instruct",
-        description="Kod-generering - specialiserad kodmodell"
+        provider_type="ollama",
+        model="codellama",  # Specialiserad för kod!
+        description="Kod-generering - lokal kodmodell"
     ),
     "verifier": AgentProviderConfig(
         provider_type="ollama",
         model="llama3.2",
-        description="Test-loopar - obegränsad lokal körning"
+        description="Verifiering - lokal GPU"
     ),
     "designer": AgentProviderConfig(
         provider_type="gemini",
         model="gemini-1.5-flash",
-        description="UI/UX design - kreativa uppgifter"
+        description="UI/UX design - kreativa uppgifter (cloud)"
     ),
     "reviewer": AgentProviderConfig(
         provider_type="groq",
         model="llama-3.3-70b-versatile",
-        description="Kod-review - bra på analys"
+        description="Kod-review - stor modell för kvalitet (cloud)"
     ),
 }
 
@@ -69,8 +77,8 @@ def get_available_provider_for_agent(agent_name: str) -> AgentProviderConfig:
 
     # Check if the provider is available
     if not _is_provider_available(config.provider_type):
-        # Try fallbacks in order of preference
-        fallback_order = ["groq", "gemini", "qwen", "ollama"]
+        # Try fallbacks in order of preference (ollama first since it's always available locally)
+        fallback_order = ["ollama", "groq", "gemini", "qwen"]
         for fallback in fallback_order:
             if _is_provider_available(fallback):
                 # Get a model for this fallback provider
