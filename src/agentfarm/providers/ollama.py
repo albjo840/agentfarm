@@ -113,9 +113,12 @@ class OllamaProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         """Stream a completion token by token."""
+        # Convert messages to prompt for /api/generate compatibility
+        prompt = self._messages_to_prompt(messages)
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "prompt": prompt,
             "stream": True,
             "options": {"temperature": temperature},
         }
@@ -125,14 +128,14 @@ class OllamaProvider(LLMProvider):
 
         async with self._client.stream(
             "POST",
-            f"{self.base_url}/api/chat",
+            f"{self.base_url}/api/generate",
             json=payload,
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if line:
                     data = json.loads(line)
-                    content = data.get("message", {}).get("content", "")
+                    content = data.get("response", "")
                     if content:
                         yield content
 
