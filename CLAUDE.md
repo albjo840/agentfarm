@@ -48,13 +48,17 @@ agentfarm/
 │   ├── cli.py                 # Command-line interface
 │   ├── mcp_server.py          # MCP server for external integration
 │   ├── agents/                # Specialized agents (one per file)
-│   │   ├── base.py            # BaseAgent ABC with token optimization + memory
+│   │   ├── base.py            # BaseAgent ABC with token optimization + memory + collaboration
+│   │   ├── collaboration.py   # AgentCollaborator + ProactiveCollaborator
 │   │   ├── orchestrator_agent.py  # OrchestratorAgent - LLM-driven coordinator
 │   │   ├── planner.py         # PlannerAgent - task breakdown
-│   │   ├── executor.py        # ExecutorAgent - code changes
+│   │   ├── executor.py        # ExecutorAgent - code changes + collaboration tools
 │   │   ├── verifier.py        # VerifierAgent - testing/validation
 │   │   ├── reviewer.py        # ReviewerAgent - code review
 │   │   └── ux_designer.py     # UXDesignerAgent - UI/UX design
+│   ├── execution/             # Parallel execution system
+│   │   ├── __init__.py
+│   │   └── parallel.py        # DependencyAnalyzer + ParallelExecutor
 │   ├── memory/                # Agent memory system
 │   │   ├── base.py            # MemoryManager and base classes
 │   │   ├── short_term.py      # In-memory LRU cache
@@ -178,6 +182,96 @@ results = memory.search("authentication")
 - **ShortTermMemory**: In-memory, session-scoped, LRU eviction
 - **LongTermMemory**: Persistent JSON storage, survives restarts
 
+### Parallel Execution System
+
+The orchestrator can execute independent steps in parallel using the `execution/parallel.py` module:
+
+```python
+from agentfarm.execution.parallel import DependencyAnalyzer, ParallelExecutor
+
+# Analyze step dependencies
+analyzer = DependencyAnalyzer(steps)
+groups = analyzer.get_parallel_groups()  # [[0], [1, 2, 3], [4, 5]]
+
+# Execute steps concurrently
+executor = ParallelExecutor(
+    steps=steps,
+    execute_fn=my_execute_function,
+    max_concurrent=4,  # Limit concurrent executions
+)
+results = await executor.execute_all()
+```
+
+**Key features:**
+- **Topological sorting** for dependency analysis
+- **asyncio.gather()** for concurrent execution
+- **Event callbacks** for UI updates: `step_start`, `step_complete`, `parallel_group_start`
+- **Failure handling** with optional `stop_on_failure`
+
+### Proactive Agent Collaboration
+
+Agents can collaborate directly without orchestrator prompting:
+
+```python
+from agentfarm.agents.collaboration import ProactiveCollaborator, CollaborationType
+
+# Set up proactive collaboration
+proactive = ProactiveCollaborator(base_collaborator)
+
+# Executor requests peer review during code generation
+feedback = await proactive.request_peer_review(
+    from_agent="executor",
+    code_snippet="def hello(): return 'world'",
+    question="Is this the right pattern?"
+)
+
+# Multiple agents brainstorm a design decision
+responses = await proactive.brainstorm_design(
+    from_agent="executor",
+    design_question="Should we use REST or GraphQL?",
+    participants=["planner", "ux"]
+)
+
+# Sanity check before proceeding
+approved, feedback = await proactive.sanity_check(
+    from_agent="executor",
+    approach="I'm going to refactor the entire auth module"
+)
+```
+
+**Collaboration types:**
+- `PEER_REVIEW` - Quick code review during execution
+- `BRAINSTORM` - Multi-agent design discussion
+- `SANITY_CHECK` - Verify approach before proceeding
+- `KNOWLEDGE_SHARE` - One-way context sharing
+
+**BaseAgent collaboration methods:**
+- `request_quick_review(code, question)` - Ask reviewer for feedback
+- `brainstorm(topic, with_agents)` - Multi-agent discussion
+- `check_approach(approach)` - Sanity check with verifier
+- `share_knowledge(to_agent, knowledge, topic)` - Share context
+
+### Web Interface Features
+
+The 80s sci-fi web interface includes:
+
+**Robot Visualizer (`robots.js`):**
+- Pixel art robots for each agent
+- Walking animations when robots communicate
+- Speech bubbles showing messages
+- Idle behavior: wandering, thinking, scanning
+- Collaboration visualization: robots gravitate toward each other
+
+**WebSocket Events:**
+| Event | Data | Description |
+|-------|------|-------------|
+| `workflow_start` | `{task, provider}` | Workflow begins |
+| `agent_message` | `{agent, content}` | Agent sends message |
+| `parallel_execution_start` | `{total_steps, groups}` | Parallel execution begins |
+| `step_start/complete` | `{step_id, success}` | Step lifecycle |
+| `agent_collaboration` | `{initiator, participants, type, topic}` | Proactive collaboration |
+| `workflow_complete` | `{success, error}` | Workflow ends |
+
 ### Token Efficiency Strategy
 
 1. **AgentContext** - Minimal context passed to each agent:
@@ -238,16 +332,16 @@ provider = get_provider()  # Finds first available API key
 | File | Purpose |
 |------|---------|
 | `agents/orchestrator_agent.py` | LLM-driven coordinator that dynamically calls other agents |
-| `agents/base.py` | BaseAgent class with token optimization and memory integration |
-| `agents/ux_designer.py` | UXDesignerAgent for UI/UX design tasks |
+| `agents/base.py` | BaseAgent class with token optimization, memory, and proactive collaboration |
+| `agents/collaboration.py` | AgentCollaborator + ProactiveCollaborator for agent-to-agent communication |
+| `agents/executor.py` | ExecutorAgent with request_review, consult_planner, sanity_check tools |
+| `execution/parallel.py` | DependencyAnalyzer and ParallelExecutor for concurrent step execution |
 | `memory/base.py` | MemoryManager for short/long-term memory |
-| `memory/short_term.py` | In-memory LRU cache for session data |
-| `memory/long_term.py` | Persistent JSON storage across sessions |
 | `prompts/*.py` | Dedicated system prompts for each agent |
 | `providers/base.py` | LLMProvider ABC for provider abstraction |
-| `providers/groq.py` | Default provider (Groq free tier) |
 | `models/schemas.py` | All Pydantic models (TaskPlan, ExecutionResult, etc.) |
-| `orchestrator.py` | Legacy hardcoded orchestrator (deprecated) |
+| `web/static/js/robots.js` | RobotVisualizer with idle behavior and collaboration animations |
+| `web/server.py` | WebSocket server with collaboration event broadcasting |
 
 ## Code Patterns
 
@@ -400,6 +494,8 @@ Dev:
 - [ ] Integration tests with Groq API
 - [x] Retry logic for rate limits (429 errors)
 - [x] Connect real FileTools to agents
+- [x] Parallel step execution (`execution/parallel.py`)
+- [x] Proactive agent collaboration (`agents/collaboration.py`)
 
 ### Priority 2: More Providers
 - [x] ClaudeProvider (`providers/claude.py`)
@@ -416,8 +512,9 @@ Dev:
 - [ ] Timeout handling for sandbox execution
 - [ ] Resource limits enforcement
 
-### Priority 5: Improvements
+### Priority 5: Web Interface
+- [x] Robot idle behavior (wandering, thinking, scanning)
+- [x] Collaboration visualization (robots gravitate together)
+- [x] WebSocket events for parallel execution
 - [ ] Streaming output for real-time feedback
 - [ ] Token usage dashboard per agent
-- [ ] Response caching for identical requests
-- [ ] Structured logging for debugging
