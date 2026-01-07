@@ -29,8 +29,8 @@ class AgentProviderConfig:
     description: str
 
 
-# Default agent-to-provider mapping optimized for local GPU + cloud fallback
-# This config prioritizes local Ollama to avoid rate limits and use your GPU
+# Default agent-to-provider mapping - 100% local GPU
+# All agents run on Ollama for maximum reliability (no cloud rate limits)
 AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
     "orchestrator": AgentProviderConfig(
         provider_type="ollama",
@@ -40,7 +40,7 @@ AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
     "planner": AgentProviderConfig(
         provider_type="ollama",
         model="llama3.2",
-        description="Planering - lokal GPU (snabb)"
+        description="Planering - lokal GPU"
     ),
     "executor": AgentProviderConfig(
         provider_type="ollama",
@@ -53,14 +53,14 @@ AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
         description="Verifiering - lokal GPU"
     ),
     "designer": AgentProviderConfig(
-        provider_type="gemini",
-        model="gemini-1.5-flash",
-        description="UI/UX design - kreativa uppgifter (cloud)"
+        provider_type="ollama",
+        model="llama3.2",
+        description="UI/UX design - lokal GPU"
     ),
     "reviewer": AgentProviderConfig(
-        provider_type="groq",
-        model="llama-3.3-70b-versatile",
-        description="Kod-review - stor modell för kvalitet (cloud)"
+        provider_type="ollama",
+        model="llama3.2",
+        description="Kod-review - lokal GPU"
     ),
 }
 
