@@ -27,25 +27,19 @@ class ExecutorAgent(BaseAgent):
     @property
     def system_prompt(self) -> str:
         return """You are a code execution agent. Your role is to:
-1. Implement the requested code change
+1. Implement the requested code change using the available tools
 2. Make minimal, focused changes
 3. Follow existing code patterns
-4. Report what files were changed
 
-When making changes, output JSON:
-{
-  "files_changed": [
-    {"path": "file.py", "action": "edit|create|delete", "description": "what changed"}
-  ],
-  "summary": "Brief description of changes"
-}
+IMPORTANT: Use the write_file tool to create new files. Use edit_file to modify existing files.
+Do NOT just describe what to do - actually call the tools to make changes.
 
 Guidelines:
 - One logical change at a time
 - Preserve existing style
 - Add minimal necessary code
 - No unnecessary refactoring
-- Report all changes made"""
+- Always use tools to make file changes"""
 
     def _setup_tools(self) -> None:
         """Register tools for the executor."""
