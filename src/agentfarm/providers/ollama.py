@@ -13,6 +13,7 @@ from agentfarm.providers.base import (
     Message,
     ToolCall,
     ToolDefinition,
+    truncate_messages,
 )
 
 
@@ -23,13 +24,22 @@ class OllamaProvider(LLMProvider):
     Recommended models: llama3.2, codellama, mistral, mixtral.
     """
 
+    # Ollama models typically support 4k-8k context
+    # llama3.2 supports 128k but we use conservative default
+    DEFAULT_MAX_CONTEXT_TOKENS = 6000
+
     def __init__(
         self,
         model: str = "llama3.2",
         base_url: str = "http://localhost:11434",
+        max_context_tokens: int | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(model, **kwargs)
+        super().__init__(
+            model,
+            max_context_tokens=max_context_tokens or self.DEFAULT_MAX_CONTEXT_TOKENS,
+            **kwargs,
+        )
         self.base_url = base_url.rstrip("/")
         self._client = httpx.AsyncClient(timeout=120.0)
 
@@ -41,9 +51,17 @@ class OllamaProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> CompletionResponse:
         """Generate a completion using Ollama."""
+        # Truncate messages to fit within context limit
+        truncated_messages = truncate_messages(
+            messages,
+            max_tokens=self.max_context_tokens,
+            preserve_system=True,
+            preserve_recent=4,
+        )
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [{"role": m.role, "content": m.content} for m in truncated_messages],
             "stream": False,
             "options": {"temperature": temperature},
         }
