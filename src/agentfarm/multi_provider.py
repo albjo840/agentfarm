@@ -44,8 +44,8 @@ AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
     ),
     "executor": AgentProviderConfig(
         provider_type="ollama",
-        model="codellama",  # Specialiserad för kod!
-        description="Kod-generering - lokal kodmodell"
+        model="qwen2.5-coder:7b",  # Kinesisk kodmodell - topp på benchmarks!
+        description="Kod-generering - Qwen2.5-Coder (Alibaba)"
     ),
     "verifier": AgentProviderConfig(
         provider_type="ollama",
