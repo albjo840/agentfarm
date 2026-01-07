@@ -1,1 +1,0 @@
-Game development environment set up. Pygame installed. Game.py created.

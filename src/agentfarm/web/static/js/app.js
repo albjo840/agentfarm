@@ -90,6 +90,10 @@ function handleServerMessage(data) {
             }
             break;
 
+        case 'project_created':
+            addMessage('orchestrator', `📁 Projekt skapat: ${data.path}`);
+            break;
+
         case 'workflow_start':
             isRunning = true;
             executeBtn.disabled = true;
@@ -265,11 +269,19 @@ function executeTask(task) {
         return;
     }
 
-    // Multi-provider mode - no provider selection needed
+    // Generate project name from task (first 30 chars, sanitized)
+    const projectName = task.substring(0, 30)
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9åäöÅÄÖ\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim() || 'nytt-projekt';
+
+    // Create project in ~/nya projekt/ and run workflow
     ws.send(JSON.stringify({
-        type: 'execute',
-        task: task,
-        workdir: workingDir,
+        type: 'create_project',
+        name: projectName,
+        prompt: task,
     }));
 }
 
