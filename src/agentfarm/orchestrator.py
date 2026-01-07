@@ -209,6 +209,12 @@ class Orchestrator:
         if file_tools:
             self._file_tools = file_tools
             self.planner.inject_file_tools(file_tools)
+            # Also update executor file tools
+            self.executor._tool_handlers["read_file"] = file_tools.read_file
+            self.executor._tool_handlers["write_file"] = file_tools.write_file
+            self.executor._tool_handlers["edit_file"] = file_tools.edit_file
+            # And reviewer
+            self.reviewer._tool_handlers["read_file"] = file_tools.read_file
 
         if file_tools and sandbox:
             self.executor.inject_tools(file_tools, sandbox)
@@ -349,9 +355,19 @@ class Orchestrator:
         """Run the execution phase - execute all steps in order."""
         results: list[ExecutionResult] = []
 
+        # Log all steps for debugging
+        logger.info("Plan has %d total steps", len(plan.steps))
+        for i, s in enumerate(plan.steps):
+            logger.info("  Step %d: agent=%s, desc=%s", i + 1, s.agent, s.description[:50])
+
+        executor_steps = [s for s in plan.steps if s.agent == "ExecutorAgent"]
+        logger.info("Found %d ExecutorAgent steps to execute", len(executor_steps))
+
         for step in plan.steps:
             if step.agent != "ExecutorAgent":
                 continue
+
+            logger.info("Executing step %d: %s", step.id, step.description[:80])
 
             # Update context with previous step summary
             if results:
@@ -364,14 +380,19 @@ class Orchestrator:
             )
             results.append(result)
 
+            logger.info("Step %d result: success=%s, files_changed=%d",
+                       step.id, result.success, len(result.files_changed))
+
             # Update step status
             step.status = StepStatus.COMPLETED if result.success else StepStatus.FAILED
             step.output = result.output
 
             # Stop on failure
             if not result.success:
+                logger.warning("Step %d failed: %s", step.id, result.error)
                 break
 
+        logger.info("Execute phase complete: %d results", len(results))
         return results
 
     async def _run_verify_phase(

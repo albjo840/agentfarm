@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,14 @@ try:
     load_dotenv()
 except ImportError:
     pass
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # Try to import aiohttp, fall back to basic HTTP server if not available
 try:
@@ -248,6 +257,8 @@ async def create_and_run_project(name: str, prompt: str) -> None:
     """Create a new project directory and run workflow in multi-provider mode."""
     import re
 
+    logger.info("Creating project: %s with prompt: %s", name, prompt[:100])
+
     # Sanitize project name
     safe_name = re.sub(r'[^a-zA-Z0-9_-]', '-', name.lower())
     safe_name = re.sub(r'-+', '-', safe_name).strip('-')
@@ -257,6 +268,7 @@ async def create_and_run_project(name: str, prompt: str) -> None:
     # Create project in ~/nya projekt/
     projects_base = Path.home() / "nya projekt"
     projects_base.mkdir(exist_ok=True)
+    logger.info("Projects base directory: %s", projects_base)
 
     project_path = projects_base / safe_name
 
@@ -270,6 +282,7 @@ async def create_and_run_project(name: str, prompt: str) -> None:
 
     # Create project directory
     project_path.mkdir(parents=True)
+    logger.info("Created project directory: %s", project_path)
 
     await ws_clients.broadcast({
         'type': 'project_created',

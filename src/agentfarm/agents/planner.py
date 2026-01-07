@@ -176,15 +176,20 @@ After reading this prompt, generate your plan JSON immediately."""
             summary_for_next_agent="Planning failed: could not parse response",
         )
 
-    async def create_plan(self, context: AgentContext, task: str) -> TaskPlan | None:
+    async def create_plan(
+        self, context: AgentContext, task: str, max_retries: int = 3
+    ) -> TaskPlan | None:
         """Convenience method to create a plan and return it directly.
 
         Uses a low tool call limit (3) to encourage fast planning.
+        Retries up to max_retries times for unreliable models.
         """
-        result = await self.run(context, task, max_tool_calls=3)
-        if result.success and "plan" in result.data:
-            plan_data = result.data["plan"]
-            plan = TaskPlan(**plan_data)
-            plan.task_description = task
-            return plan
+        for attempt in range(max_retries):
+            result = await self.run(context, task, max_tool_calls=3, temperature=0.3)
+            if result.success and "plan" in result.data:
+                plan_data = result.data["plan"]
+                plan = TaskPlan(**plan_data)
+                if plan.steps:  # Only accept plans with actual steps
+                    plan.task_description = task
+                    return plan
         return None

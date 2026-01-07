@@ -245,8 +245,11 @@ class BaseAgent(ABC):
 
     async def execute_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """Execute a tool and return its result."""
+        logger.info("%s executing tool: %s with args: %s", self.name, name, arguments)
+
         handler = self._tool_handlers.get(name)
         if not handler:
+            logger.warning("%s: Unknown tool: %s", self.name, name)
             return ToolResult(
                 tool_call_id=name,
                 output="",
@@ -255,8 +258,10 @@ class BaseAgent(ABC):
 
         try:
             result = await handler(**arguments)
+            logger.info("%s tool %s result: %s", self.name, name, str(result)[:200])
             return ToolResult(tool_call_id=name, output=str(result))
         except Exception as e:
+            logger.error("%s tool %s error: %s", self.name, name, e)
             return ToolResult(tool_call_id=name, output="", error=str(e))
 
     def build_messages(self, context: AgentContext, user_request: str) -> list[Message]:

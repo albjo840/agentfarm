@@ -5,8 +5,23 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from pathlib import Path
+
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from agentfarm.config import AgentFarmConfig, ProviderType, get_default_config
 from agentfarm.orchestrator import Orchestrator
@@ -54,9 +69,23 @@ def create_provider(config: AgentFarmConfig):
 
 
 def create_orchestrator(config: AgentFarmConfig) -> Orchestrator:
-    """Create and configure orchestrator."""
-    provider = create_provider(config)
-    orchestrator = Orchestrator(provider, working_dir=config.working_dir)
+    """Create and configure orchestrator.
+
+    Uses multi-provider mode by default, falling back to available providers.
+    Only creates a single provider if explicitly configured via environment.
+    """
+    import os
+
+    # Check if a specific provider is explicitly requested
+    explicit_provider = os.getenv("AGENTFARM_PROVIDER")
+
+    if explicit_provider:
+        # User explicitly requested a provider - use single-provider mode
+        provider = create_provider(config)
+        orchestrator = Orchestrator(provider, working_dir=config.working_dir, use_multi_provider=False)
+    else:
+        # Use multi-provider mode with automatic fallback
+        orchestrator = Orchestrator(provider=None, working_dir=config.working_dir, use_multi_provider=True)
 
     # Inject tools
     file_tools = FileTools(config.working_dir)
