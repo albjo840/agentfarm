@@ -15,6 +15,7 @@ from agentfarm.providers.base import (
     RetryConfig,
     ToolCall,
     ToolDefinition,
+    truncate_messages,
 )
 
 
@@ -31,14 +32,24 @@ class GroqProvider(LLMProvider):
 
     BASE_URL = "https://api.groq.com/openai/v1"
 
+    # Groq/Llama models typically support 8k-32k context
+    # Use conservative default to avoid 400 errors
+    DEFAULT_MAX_CONTEXT_TOKENS = 7000
+
     def __init__(
         self,
         model: str = "llama-3.3-70b-versatile",
         api_key: str | None = None,
         retry_config: RetryConfig | None = None,
+        max_context_tokens: int | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(model, retry_config=retry_config, **kwargs)
+        super().__init__(
+            model,
+            retry_config=retry_config,
+            max_context_tokens=max_context_tokens or self.DEFAULT_MAX_CONTEXT_TOKENS,
+            **kwargs,
+        )
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError(
@@ -75,9 +86,17 @@ class GroqProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> CompletionResponse:
         """Generate a completion using Groq with automatic retry on rate limits."""
+        # Truncate messages to fit within context limit
+        truncated_messages = truncate_messages(
+            messages,
+            max_tokens=self.max_context_tokens,
+            preserve_system=True,
+            preserve_recent=4,
+        )
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [{"role": m.role, "content": m.content} for m in truncated_messages],
             "temperature": temperature,
         }
 

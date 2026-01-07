@@ -23,11 +23,125 @@ class RetryConfig(BaseModel):
     exponential_base: float = Field(default=2.0, description="Exponential backoff base")
 
 
+def estimate_tokens(text: str) -> int:
+    """Estimate token count for text (roughly 4 chars per token for English)."""
+    return len(text) // 4 + 1
+
+
+def truncate_text(text: str, max_tokens: int, keep_end: bool = False) -> str:
+    """Truncate text to approximately max_tokens.
+
+    Args:
+        text: Text to truncate
+        max_tokens: Maximum tokens to keep
+        keep_end: If True, keep the end of the text; otherwise keep the start
+    """
+    max_chars = max_tokens * 4
+    if len(text) <= max_chars:
+        return text
+
+    if keep_end:
+        return "...[truncated]..." + text[-max_chars:]
+    return text[:max_chars] + "...[truncated]..."
+
+
 class Message(BaseModel):
     """A message in a conversation."""
 
     role: str = Field(..., description="user, assistant, or system")
     content: str
+
+    def token_estimate(self) -> int:
+        """Estimate tokens in this message."""
+        return estimate_tokens(self.content)
+
+
+def truncate_messages(
+    messages: list[Message],
+    max_tokens: int = 6000,
+    preserve_system: bool = True,
+    preserve_recent: int = 4,
+) -> list[Message]:
+    """Truncate message list to fit within token limit.
+
+    Strategy:
+    1. Always keep system message (if preserve_system=True)
+    2. Always keep the N most recent messages (preserve_recent)
+    3. Remove/truncate middle messages if needed
+    4. Truncate individual long messages
+
+    Args:
+        messages: List of messages to truncate
+        max_tokens: Maximum total tokens allowed
+        preserve_system: Whether to always keep system message
+        preserve_recent: Number of recent messages to always keep
+    """
+    if not messages:
+        return messages
+
+    # Separate system message and others
+    system_msg = None
+    other_msgs = []
+
+    for msg in messages:
+        if msg.role == "system" and preserve_system and system_msg is None:
+            system_msg = msg
+        else:
+            other_msgs.append(msg)
+
+    # Calculate available tokens
+    system_tokens = system_msg.token_estimate() if system_msg else 0
+    available_tokens = max_tokens - system_tokens
+
+    if available_tokens <= 0:
+        # System message alone exceeds limit - truncate it
+        if system_msg:
+            truncated_content = truncate_text(system_msg.content, max_tokens - 100)
+            system_msg = Message(role="system", content=truncated_content)
+        return [system_msg] if system_msg else []
+
+    # Preserve recent messages
+    recent_msgs = other_msgs[-preserve_recent:] if len(other_msgs) > preserve_recent else other_msgs
+    older_msgs = other_msgs[:-preserve_recent] if len(other_msgs) > preserve_recent else []
+
+    # Calculate tokens for recent messages
+    recent_tokens = sum(msg.token_estimate() for msg in recent_msgs)
+
+    # If recent messages exceed limit, truncate them individually
+    if recent_tokens > available_tokens:
+        max_per_msg = available_tokens // max(len(recent_msgs), 1)
+        truncated_recent = []
+        for msg in recent_msgs:
+            if msg.token_estimate() > max_per_msg:
+                truncated_content = truncate_text(msg.content, max_per_msg, keep_end=True)
+                truncated_recent.append(Message(role=msg.role, content=truncated_content))
+            else:
+                truncated_recent.append(msg)
+        recent_msgs = truncated_recent
+        recent_tokens = sum(msg.token_estimate() for msg in recent_msgs)
+
+    # Add older messages if space allows
+    remaining_tokens = available_tokens - recent_tokens
+    included_older = []
+
+    for msg in reversed(older_msgs):  # Most recent of older first
+        msg_tokens = msg.token_estimate()
+        if msg_tokens <= remaining_tokens:
+            included_older.insert(0, msg)
+            remaining_tokens -= msg_tokens
+        elif remaining_tokens > 200:  # Add truncated if enough space
+            truncated_content = truncate_text(msg.content, remaining_tokens - 50)
+            included_older.insert(0, Message(role=msg.role, content=truncated_content))
+            break
+
+    # Build final message list
+    result = []
+    if system_msg:
+        result.append(system_msg)
+    result.extend(included_older)
+    result.extend(recent_msgs)
+
+    return result
 
 
 class ToolCall(BaseModel):
@@ -91,14 +205,19 @@ class LLMProvider(ABC):
     ClaudeProvider, AzureOpenAIProvider, AzureMLProvider.
     """
 
+    # Default context limits per provider (can be overridden)
+    DEFAULT_MAX_CONTEXT_TOKENS = 6000
+
     def __init__(
         self,
         model: str,
         retry_config: RetryConfig | None = None,
+        max_context_tokens: int | None = None,
         **kwargs: Any,
     ) -> None:
         self.model = model
         self.retry_config = retry_config or RetryConfig()
+        self.max_context_tokens = max_context_tokens or self.DEFAULT_MAX_CONTEXT_TOKENS
         self._config = kwargs
         self._total_tokens_used = 0
 
