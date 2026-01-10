@@ -70,8 +70,12 @@ agentfarm/
 │   │   ├── verifier_prompt.py
 │   │   ├── reviewer_prompt.py
 │   │   └── ux_designer_prompt.py
+│   ├── events/                # Event bus system
+│   │   ├── __init__.py
+│   │   └── bus.py             # EventBus, Event, EventType, PriorityLevel
 │   ├── providers/             # LLM provider implementations
 │   │   ├── base.py            # LLMProvider ABC
+│   │   ├── router.py          # LLMRouter - multi-model routing + load balancing
 │   │   ├── groq.py            # Groq API (default, free tier)
 │   │   ├── gemini.py          # Google Gemini (free tier, 15 RPM)
 │   │   ├── siliconflow.py     # SiliconFlow/Qwen (free tier)
@@ -251,6 +255,72 @@ approved, feedback = await proactive.sanity_check(
 - `check_approach(approach)` - Sanity check with verifier
 - `share_knowledge(to_agent, knowledge, topic)` - Share context
 
+### Event Bus System
+
+The system uses an async pub/sub event bus for decoupled communication:
+
+```python
+from agentfarm.events import EventBus, Event, EventType, PriorityLevel
+
+bus = EventBus()
+
+# Subscribe to events
+async def on_code_generated(event: Event):
+    print(f"Code from {event.source}: {event.data['code']}")
+
+bus.subscribe(EventType.CODE_GENERATED, on_code_generated)
+
+# Emit events
+await bus.emit(Event(
+    type=EventType.CODE_GENERATED,
+    source="executor",
+    data={"code": "def hello(): pass", "file_path": "main.py"},
+))
+
+# Start event loop (background processing)
+asyncio.create_task(bus.run())
+```
+
+**Event Types:**
+- `WORKFLOW_START/COMPLETE/ERROR` - Workflow lifecycle
+- `STEP_START/COMPLETE/FAILED` - Step execution
+- `AGENT_MESSAGE/THINKING/TOOL_CALL` - Agent activity
+- `CODE_GENERATED/MODIFIED` - Code changes
+- `LLM_REQUEST/RESPONSE/STREAM_CHUNK` - LLM routing
+- `INTERRUPT` - Critical priority, interrupts processing
+
+**Priority Levels:** `LOW`, `NORMAL`, `HIGH`, `CRITICAL`
+
+### LLM Router (Multi-Model)
+
+Routes requests to optimal local Ollama models based on task type:
+
+```python
+from agentfarm.providers.router import LLMRouter, TaskType
+
+router = LLMRouter(ollama_base_url="http://localhost:11434")
+await router.initialize()  # Check model availability
+
+# Route code generation to best model
+response, model_used = await router.complete(
+    messages=[{"role": "user", "content": "Write a function..."}],
+    task_type=TaskType.CODE_GENERATION,
+)
+print(f"Used: {model_used}")  # e.g., "qwen-coder"
+```
+
+**Supported Models:**
+| Model | Best For | Priority |
+|-------|----------|----------|
+| qwen2.5-coder:7b | Code generation, review | 9 |
+| qwen3:14b | Complex reasoning, planning | 8 |
+| phi4 | Code + math | 7 |
+| gemma2:9b | Verification, general | 6 |
+| mistral-nemo | Swedish, planning | 6 |
+| nemotron-mini | Fast simple responses | 5 |
+
+**Task Types:** `CODE_GENERATION`, `CODE_REVIEW`, `PLANNING`, `REASONING`, `VERIFICATION`, `MATH`, `GENERAL`
+
 ### Web Interface Features
 
 The 80s sci-fi web interface includes:
@@ -271,6 +341,22 @@ The 80s sci-fi web interface includes:
 | `step_start/complete` | `{step_id, success}` | Step lifecycle |
 | `agent_collaboration` | `{initiator, participants, type, topic}` | Proactive collaboration |
 | `workflow_complete` | `{success, error}` | Workflow ends |
+| `LLM_REQUEST/RESPONSE` | `{model, task_type, latency_ms}` | Router events |
+
+**REST API Endpoints:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/providers` | GET | List available LLM providers |
+| `/api/events` | GET | Event bus metrics + history |
+| `/api/events?type=LLM_REQUEST` | GET | Filter events by type |
+| `/api/interrupt` | POST | Send interrupt `{"reason": "..."}` |
+| `/api/router` | GET | LLM router status + model health |
+| `/api/router/test` | POST | Test model `{"prompt": "...", "task_type": "code_generation"}` |
+
+**Mobile Access:**
+- Dashboard: `http://<server>:8080/`
+- Mobile UI: `http://<server>:8080/mobile` or `/m`
+- VPN access: `http://10.0.0.1:8080/mobile`
 
 ### Token Efficiency Strategy
 

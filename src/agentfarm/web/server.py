@@ -3,6 +3,8 @@ AgentFarm Web Server - 80s Sci-Fi Neural Interface
 
 Serves the retro dashboard and provides WebSocket connections
 for real-time agent communication visualization.
+
+Now powered by EventBus for decoupled pub/sub communication.
 """
 
 from __future__ import annotations
@@ -28,6 +30,12 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Import EventBus and persistence
+from agentfarm.events import Event, EventBus, EventType, PriorityLevel, WorkflowPersistence
+
+# Import LLM Router
+from agentfarm.providers.router import LLMRouter, TaskType, get_task_type_for_agent
 
 # Try to import aiohttp, fall back to basic HTTP server if not available
 try:
@@ -79,6 +87,27 @@ class WebSocketClients:
 # Global state
 ws_clients = WebSocketClients()
 current_working_dir = "."
+event_bus = EventBus(max_history=500)  # Global event bus
+llm_router: LLMRouter | None = None  # Global LLM router
+workflow_persistence: WorkflowPersistence | None = None  # Workflow state persistence
+_event_bus_task: asyncio.Task | None = None  # Background task for event processing
+
+
+async def _broadcast_event_handler(event: Event) -> None:
+    """Handler that broadcasts all events to WebSocket clients."""
+    await ws_clients.broadcast(event.to_dict())
+
+
+def setup_event_bus() -> None:
+    """Set up event bus with WebSocket broadcasting."""
+    global _event_bus_task
+
+    # Subscribe WebSocket broadcaster to ALL events
+    event_bus.subscribe_all(_broadcast_event_handler)
+
+    # Start event bus processing loop
+    _event_bus_task = asyncio.create_task(event_bus.run())
+    logger.info("EventBus started with WebSocket broadcasting")
 
 
 def create_provider(provider_type: str):
@@ -298,18 +327,43 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
     """Run AgentFarm workflow with multi-provider mode (each agent uses optimal provider)."""
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
+    import uuid
 
-    async def event_callback(event: str, data: dict[str, Any]) -> None:
-        """Callback to broadcast events to WebSocket clients."""
-        await ws_clients.broadcast({'type': event, **data})
+    # Create correlation ID for this workflow
+    correlation_id = str(uuid.uuid4())[:8]
+
+    async def event_callback(event_name: str, data: dict[str, Any]) -> None:
+        """Callback that emits events to the event bus."""
+        # Map old event names to EventType
+        event_type_map = {
+            'workflow_start': EventType.WORKFLOW_START,
+            'workflow_complete': EventType.WORKFLOW_COMPLETE,
+            'agent_message': EventType.AGENT_MESSAGE,
+            'step_start': EventType.STEP_START,
+            'step_complete': EventType.STEP_COMPLETE,
+            'parallel_execution_start': EventType.STEP_START,
+        }
+        event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
+        source = data.get('agent', 'orchestrator')
+
+        await event_bus.emit(Event(
+            type=event_type,
+            source=source,
+            data=data,
+            correlation_id=correlation_id,
+        ))
 
     try:
-        await ws_clients.broadcast({
-            'type': 'workflow_start',
-            'task': task,
-            'provider': 'multi-provider',
-            'working_dir': working_dir,
-        })
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_START,
+            source="orchestrator",
+            data={
+                'task': task,
+                'provider': 'multi-provider',
+                'working_dir': working_dir,
+            },
+            correlation_id=correlation_id,
+        ))
 
         # Create orchestrator in multi-provider mode (no single provider passed)
         orchestrator = Orchestrator(
@@ -329,46 +383,73 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
         # Run the workflow
         result = await orchestrator.run_workflow(task)
 
-        # Send final result
-        await ws_clients.broadcast({
-            'type': 'workflow_result',
-            'success': result.success,
-            'summary': result.pr_summary,
-            'tokens': orchestrator.get_total_tokens_used(),
-        })
+        # Send final result via event bus
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_COMPLETE,
+            source="orchestrator",
+            data={
+                'success': result.success,
+                'summary': result.pr_summary,
+                'tokens': orchestrator.get_total_tokens_used(),
+            },
+            correlation_id=correlation_id,
+        ))
 
     except Exception as e:
         import traceback
-        await ws_clients.broadcast({
-            'type': 'agent_message',
-            'agent': 'orchestrator',
-            'content': f"Error: {str(e)}",
-        })
-        await ws_clients.broadcast({
-            'type': 'workflow_complete',
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-        })
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_ERROR,
+            source="orchestrator",
+            data={
+                'error': str(e),
+                'traceback': traceback.format_exc(),
+            },
+            priority=PriorityLevel.HIGH,
+            correlation_id=correlation_id,
+        ))
 
 
 async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> None:
-    """Run a real AgentFarm workflow and broadcast updates."""
+    """Run a real AgentFarm workflow and broadcast updates via event bus."""
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
+    import uuid
 
-    async def event_callback(event: str, data: dict[str, Any]) -> None:
-        """Callback to broadcast events to WebSocket clients."""
-        await ws_clients.broadcast({'type': event, **data})
+    # Create correlation ID for this workflow
+    correlation_id = str(uuid.uuid4())[:8]
+
+    async def event_callback(event_name: str, data: dict[str, Any]) -> None:
+        """Callback that emits events to the event bus."""
+        event_type_map = {
+            'workflow_start': EventType.WORKFLOW_START,
+            'workflow_complete': EventType.WORKFLOW_COMPLETE,
+            'agent_message': EventType.AGENT_MESSAGE,
+            'step_start': EventType.STEP_START,
+            'step_complete': EventType.STEP_COMPLETE,
+            'parallel_execution_start': EventType.STEP_START,
+        }
+        event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
+        source = data.get('agent', 'orchestrator')
+
+        await event_bus.emit(Event(
+            type=event_type,
+            source=source,
+            data=data,
+            correlation_id=correlation_id,
+        ))
 
     try:
-        # Notify start
-        await ws_clients.broadcast({
-            'type': 'workflow_start',
-            'task': task,
-            'provider': provider_type,
-            'working_dir': working_dir,
-        })
+        # Notify start via event bus
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_START,
+            source="orchestrator",
+            data={
+                'task': task,
+                'provider': provider_type,
+                'working_dir': working_dir,
+            },
+            correlation_id=correlation_id,
+        ))
 
         # Create orchestrator - use multi-provider mode for "auto" or as fallback
         if provider_type == "auto":
@@ -413,27 +494,30 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> 
         # Run the workflow
         result = await orchestrator.run_workflow(task)
 
-        # Final result already sent via callback, but send summary too
-        await ws_clients.broadcast({
-            'type': 'workflow_result',
-            'success': result.success,
-            'summary': result.pr_summary,
-            'tokens': result.total_tokens_used,
-        })
+        # Final result via event bus
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_COMPLETE,
+            source="orchestrator",
+            data={
+                'success': result.success,
+                'summary': result.pr_summary,
+                'tokens': result.total_tokens_used,
+            },
+            correlation_id=correlation_id,
+        ))
 
     except Exception as e:
         import traceback
-        await ws_clients.broadcast({
-            'type': 'agent_message',
-            'agent': 'orchestrator',
-            'content': f"Error: {str(e)}",
-        })
-        await ws_clients.broadcast({
-            'type': 'workflow_complete',
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-        })
+        await event_bus.emit(Event(
+            type=EventType.WORKFLOW_ERROR,
+            source="orchestrator",
+            data={
+                'error': str(e),
+                'traceback': traceback.format_exc(),
+            },
+            priority=PriorityLevel.HIGH,
+            correlation_id=correlation_id,
+        ))
 
 
 async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
@@ -473,15 +557,173 @@ def setup_collaboration_events(orchestrator) -> None:
             agent.proactive_collaborator.add_listener(on_collaboration)
 
 
+async def api_events_handler(request: web.Request) -> web.Response:
+    """Return event bus metrics and recent history."""
+    limit = int(request.query.get('limit', '50'))
+    event_type = request.query.get('type')
+
+    filter_type = EventType[event_type] if event_type else None
+    history = event_bus.get_history(event_type=filter_type, limit=limit)
+
+    return web.json_response({
+        'metrics': event_bus.get_metrics(),
+        'history': [e.to_dict() for e in history],
+    })
+
+
+async def api_interrupt_handler(request: web.Request) -> web.Response:
+    """Send an interrupt event (for mobile/remote control)."""
+    data = await request.json()
+    reason = data.get('reason', 'User interrupt')
+
+    await event_bus.emit(Event(
+        type=EventType.INTERRUPT,
+        source="api",
+        data={'reason': reason},
+        priority=PriorityLevel.CRITICAL,
+    ))
+
+    return web.json_response({'status': 'interrupt_sent'})
+
+
+async def api_router_handler(request: web.Request) -> web.Response:
+    """Return LLM router status."""
+    if llm_router is None:
+        return web.json_response({"error": "Router not initialized"}, status=503)
+    return web.json_response(llm_router.get_status())
+
+
+async def api_router_test_handler(request: web.Request) -> web.Response:
+    """Test a model via the router."""
+    if llm_router is None:
+        return web.json_response({"error": "Router not initialized"}, status=503)
+
+    data = await request.json()
+    prompt = data.get("prompt", "Say hello in one word.")
+    task_type_str = data.get("task_type", "general")
+    model = data.get("model")  # Optional: force specific model
+
+    try:
+        task_type = TaskType[task_type_str.upper()]
+    except KeyError:
+        task_type = TaskType.GENERAL
+
+    try:
+        response, used_model = await llm_router.complete(
+            messages=[{"role": "user", "content": prompt}],
+            task_type=task_type,
+            preferred_model=model,
+        )
+        return web.json_response({
+            "model_used": used_model,
+            "response": response.get("message", {}).get("content", ""),
+            "task_type": task_type.value,
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_workflows_handler(request: web.Request) -> web.Response:
+    """List workflows with optional status filter."""
+    if workflow_persistence is None:
+        return web.json_response({"error": "Persistence not initialized"}, status=503)
+
+    status = request.query.get("status")
+    limit = int(request.query.get("limit", "50"))
+
+    workflows = workflow_persistence.list_workflows(status=status, limit=limit)
+    resumable = workflow_persistence.get_resumable_workflows()
+
+    return web.json_response({
+        "workflows": workflows,
+        "resumable_count": len(resumable),
+    })
+
+
+async def api_workflow_detail_handler(request: web.Request) -> web.Response:
+    """Get detailed workflow state."""
+    if workflow_persistence is None:
+        return web.json_response({"error": "Persistence not initialized"}, status=503)
+
+    workflow_id = request.match_info["id"]
+    state = workflow_persistence.load_workflow(workflow_id)
+
+    if state is None:
+        return web.json_response({"error": "Workflow not found"}, status=404)
+
+    return web.json_response(state.to_dict())
+
+
+async def api_workflow_pause_handler(request: web.Request) -> web.Response:
+    """Pause a running workflow."""
+    if workflow_persistence is None:
+        return web.json_response({"error": "Persistence not initialized"}, status=503)
+
+    workflow_id = request.match_info["id"]
+    success = workflow_persistence.pause_workflow(workflow_id)
+
+    if success:
+        return web.json_response({"status": "paused", "id": workflow_id})
+    return web.json_response({"error": "Could not pause workflow"}, status=400)
+
+
+async def on_startup(app: web.Application) -> None:
+    """Called when app starts - set up event bus, router, and persistence."""
+    global llm_router, workflow_persistence
+
+    setup_event_bus()
+
+    # Initialize workflow persistence
+    workflow_persistence = WorkflowPersistence(
+        storage_dir=Path(current_working_dir) / ".agentfarm" / "workflows"
+    )
+    workflow_persistence.connect(event_bus)
+    logger.info("Workflow persistence initialized")
+
+    # Initialize LLM router with event bus integration
+    llm_router = LLMRouter(event_bus=event_bus)
+    availability = await llm_router.initialize()
+
+    available_count = sum(1 for v in availability.values() if v)
+    logger.info(
+        "LLM Router initialized: %d/%d models available",
+        available_count,
+        len(availability),
+    )
+
+
+async def on_cleanup(app: web.Application) -> None:
+    """Called when app shuts down - stop event bus, router, and persistence."""
+    if workflow_persistence:
+        workflow_persistence.stop()
+    event_bus.stop()
+    if _event_bus_task:
+        _event_bus_task.cancel()
+    if llm_router:
+        await llm_router.close()
+
+
 def create_app() -> web.Application:
     """Create the aiohttp application."""
     app = web.Application()
 
+    # Lifecycle hooks
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
+
+    # Routes
     app.router.add_get('/', index_handler)
     app.router.add_get('/mobile', mobile_handler)
     app.router.add_get('/m', mobile_handler)  # Short alias
     app.router.add_get('/ws', websocket_handler)
     app.router.add_get('/api/providers', api_providers_handler)
+    app.router.add_get('/api/events', api_events_handler)
+    app.router.add_post('/api/interrupt', api_interrupt_handler)
+    app.router.add_get('/api/router', api_router_handler)
+    app.router.add_post('/api/router/test', api_router_test_handler)
+    app.router.add_get('/api/workflows', api_workflows_handler)
+    app.router.add_get('/api/workflows/{id}', api_workflow_detail_handler)
+    app.router.add_post('/api/workflows/{id}/pause', api_workflow_pause_handler)
     app.router.add_get('/static/{path:.*}', static_handler)
 
     return app
