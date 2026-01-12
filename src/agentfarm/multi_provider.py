@@ -34,13 +34,13 @@ class AgentProviderConfig:
 AGENT_PROVIDER_MAP: dict[str, AgentProviderConfig] = {
     "orchestrator": AgentProviderConfig(
         provider_type="ollama",
-        model="llama3.2",
-        description="Koordinering - lokal GPU"
+        model="qwen2.5-coder:7b",
+        description="Koordinering - Qwen2.5-Coder"
     ),
     "planner": AgentProviderConfig(
         provider_type="ollama",
-        model="llama3.2",
-        description="Planering - lokal GPU"
+        model="qwen2.5-coder:7b",
+        description="Planering - Qwen2.5-Coder (bättre instruktionsföljning)"
     ),
     "executor": AgentProviderConfig(
         provider_type="ollama",

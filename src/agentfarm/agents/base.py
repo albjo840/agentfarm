@@ -96,13 +96,15 @@ class RecursionGuard:
                 total_calls=self.total_calls,
             )
 
-        # Check for repeated identical calls (same agent + similar task)
-        task_hash = hash(task_summary[:100]) if task_summary else 0
+        # Check for repeated IDENTICAL calls (same agent + exact same task)
+        # Use full task hash to avoid false positives with similar but different steps
+        task_hash = hash(task_summary) if task_summary else 0
         recent_calls = self.call_history[-10:]  # Check last 10 calls
         identical_recent = sum(1 for a, t in recent_calls if a == agent_name and t == task_hash)
-        if identical_recent >= 3:
+        # Threshold of 5 for legitimate workflow patterns (steps may be retried)
+        if identical_recent >= 5:
             raise RecursionLimitError(
-                f"Agent '{agent_name}' called {identical_recent} times with similar task. "
+                f"Agent '{agent_name}' called {identical_recent} times with identical task. "
                 f"Possible infinite loop detected.",
                 depth=len(self.call_stack),
                 call_stack=self.call_stack.copy(),

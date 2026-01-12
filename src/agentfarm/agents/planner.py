@@ -26,34 +26,30 @@ class PlannerAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a task planning agent. Create executable plans quickly and efficiently.
+        return """You are a task planning agent. Create executable plans quickly.
 
-IMPORTANT: Generate your plan JSON IMMEDIATELY without excessive exploration.
-Only use tools when you NEED specific information about existing code.
-After 1-2 tool calls at most, output your plan.
+YOUR ONLY JOB: Output a JSON plan. Do NOT use tools unless absolutely necessary.
 
-Output your plan as JSON with this structure:
+Output format (JSON only, no markdown):
 {
-  "summary": "Brief approach description (1-2 sentences)",
+  "summary": "Brief description",
   "steps": [
-    {
-      "id": 1,
-      "description": "What this step does",
-      "agent": "ExecutorAgent|VerifierAgent|ReviewerAgent",
-      "tools": ["tool1", "tool2"],
-      "dependencies": []
-    }
+    {"id": 1, "description": "Create game.py with pygame code", "agent": "ExecutorAgent", "tools": ["write_file"], "dependencies": []}
   ]
 }
 
-RULES:
-- Keep plans SHORT: 3-5 steps typical, 8 steps maximum
-- Be decisive - don't overthink
-- Executor = code changes, Verifier = testing, Reviewer = code review
-- Output JSON directly - no markdown code blocks needed
-- If unsure about project structure, make reasonable assumptions
+CRITICAL RULES:
+1. Output the JSON plan IMMEDIATELY - do not explore or use tools first
+2. Keep plans SHORT: 2-4 steps maximum
+3. For new projects, assume empty directory - no need to check
+4. ExecutorAgent creates/edits files, VerifierAgent tests, ReviewerAgent reviews
+5. Use relative paths only (game.py, src/main.py) - NEVER /home/user/ paths
+6. Do NOT call list_directory or search_code for new projects
 
-After reading this prompt, generate your plan JSON immediately."""
+Example for "create a game":
+{"summary": "Create pygame game", "steps": [{"id": 1, "description": "Create game.py with complete game code", "agent": "ExecutorAgent", "tools": ["write_file"], "dependencies": []}]}
+
+NOW OUTPUT YOUR PLAN JSON:"""
 
     def _setup_tools(self) -> None:
         """Register tools for the planner."""
@@ -101,15 +97,15 @@ After reading this prompt, generate your plan JSON immediately."""
         """Return planner-specific tools."""
         return self._tools
 
-    async def _read_file(self, path: str) -> str:
+    async def _read_file(self, path: str, **kwargs) -> str:
         """Read file contents - placeholder, inject real implementation."""
         return f"[File contents of {path} would be here]"
 
-    async def _list_directory(self, path: str) -> str:
+    async def _list_directory(self, path: str = ".", **kwargs) -> str:
         """List directory - placeholder, inject real implementation."""
         return f"[Directory listing of {path} would be here]"
 
-    async def _search_code(self, pattern: str, path: str = ".") -> str:
+    async def _search_code(self, pattern: str, path: str = ".", **kwargs) -> str:
         """Search code - placeholder, inject real implementation."""
         return f"[Search results for '{pattern}' in {path} would be here]"
 
@@ -134,16 +130,35 @@ After reading this prompt, generate your plan JSON immediately."""
                 json_str = content[start:end]
                 data = json.loads(json_str)
 
-                steps = [
-                    PlanStep(
+                steps = []
+                for i, s in enumerate(data.get("steps", [])):
+                    # Validate required fields
+                    description = s.get("description")
+                    agent = s.get("agent")
+                    if not description or not agent:
+                        # Skip malformed steps
+                        continue
+
+                    # Parse dependencies - handle both int and string formats
+                    raw_deps = s.get("dependencies", [])
+                    deps = []
+                    for dep in raw_deps:
+                        if isinstance(dep, int):
+                            deps.append(dep)
+                        elif isinstance(dep, str):
+                            # Try to extract number from strings like "step1", "1", etc.
+                            import re
+                            match = re.search(r'\d+', dep)
+                            if match:
+                                deps.append(int(match.group()))
+
+                    steps.append(PlanStep(
                         id=s.get("id", i + 1),
-                        description=s["description"],
-                        agent=s["agent"],
+                        description=description,
+                        agent=agent,
                         tools=s.get("tools", []),
-                        dependencies=s.get("dependencies", []),
-                    )
-                    for i, s in enumerate(data.get("steps", []))
-                ]
+                        dependencies=deps,
+                    ))
 
                 plan = TaskPlan(
                     task_description="",  # Set by orchestrator

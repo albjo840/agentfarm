@@ -271,6 +271,158 @@
         .toast.error {
             border-color: #ff4444;
         }
+
+        /* Launch Button */
+        .launch-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .launch-container.visible {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .launch-btn {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, #00ff88 0%, #00fff2 100%);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-family: inherit;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+            animation: launch-pulse 2s ease-in-out infinite;
+        }
+
+        .launch-btn:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes launch-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(0, 255, 136, 0.6); }
+        }
+
+        .launch-path {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        /* QR Button in footer */
+        .footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .qr-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: rgba(157, 0, 255, 0.2);
+            border: 1px solid #9d00ff;
+            border-radius: 6px;
+            color: #9d00ff;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+
+        .qr-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* QR Modal */
+        .qr-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 2000;
+        }
+
+        .qr-modal.visible {
+            display: flex;
+        }
+
+        .qr-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 350px;
+            margin-bottom: 20px;
+        }
+
+        .qr-modal-header h3 {
+            font-size: 14px;
+            letter-spacing: 2px;
+            color: #00fff2;
+        }
+
+        .qr-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 32px;
+            cursor: pointer;
+        }
+
+        .qr-code {
+            font-family: monospace;
+            font-size: 3px;
+            line-height: 1;
+            background: #fff;
+            color: #000;
+            padding: 10px;
+            border-radius: 8px;
+            white-space: pre;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .qr-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #00ff88;
+            text-align: center;
+        }
+
+        .qr-footer {
+            margin-top: 20px;
+            font-size: 11px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -303,18 +455,39 @@ Exempel:
         <button class="submit-btn" id="submit-btn">SKAPA PROJEKT</button>
 
         <div class="log-section" id="log"></div>
+
+        <div class="launch-container" id="launch-container">
+            <button class="launch-btn" id="launch-btn">LAUNCH PROJEKT</button>
+            <div class="launch-path" id="launch-path"></div>
+        </div>
     </main>
 
     <footer class="footer">
-        AgentFarm Neural Interface
+        <span>AgentFarm</span>
+        <button class="qr-btn" id="qr-btn">
+            <span>&#9783;</span>
+            <span>NY VPN</span>
+        </button>
     </footer>
 
     <div class="toast" id="toast"></div>
+
+    <!-- QR Modal -->
+    <div class="qr-modal" id="qr-modal">
+        <div class="qr-modal-header">
+            <h3>NY VPN</h3>
+            <button class="qr-close" id="qr-close">&times;</button>
+        </div>
+        <pre class="qr-code" id="qr-code">Genererar...</pre>
+        <div class="qr-info" id="qr-info"></div>
+        <div class="qr-footer">Skanna med WireGuard-appen</div>
+    </div>
 
     <script>
         // State
         let ws = null;
         let isRunning = false;
+        let currentProjectPath = null;
 
         // DOM elements
         const statusEl = document.getElementById('status');
@@ -323,6 +496,9 @@ Exempel:
         const submitBtn = document.getElementById('submit-btn');
         const logSection = document.getElementById('log');
         const toastEl = document.getElementById('toast');
+        const launchContainer = document.getElementById('launch-container');
+        const launchBtn = document.getElementById('launch-btn');
+        const launchPath = document.getElementById('launch-path');
 
         // Connect to WebSocket
         function connect() {
@@ -358,8 +534,10 @@ Exempel:
                     break;
 
                 case 'project_created':
+                    currentProjectPath = data.path;
                     addLog(`Projekt skapat: ${data.path}`, 'success');
                     showToast(`Projekt "${data.name}" skapat!`, 'success');
+                    hideLaunchButton();
                     break;
 
                 case 'workflow_start':
@@ -385,6 +563,9 @@ Exempel:
                     if (data.success) {
                         showToast('Workflow klart!', 'success');
                         addLog('Workflow slutfort!', 'success');
+                        if (currentProjectPath) {
+                            showLaunchButton(currentProjectPath);
+                        }
                     } else {
                         showToast('Workflow misslyckades', 'error');
                         addLog(`Fel: ${data.error}`, 'error');
@@ -468,6 +649,89 @@ Exempel:
 
         // Submit button
         submitBtn.addEventListener('click', submitProject);
+
+        // Launch button functions
+        function showLaunchButton(projectPath) {
+            launchPath.textContent = projectPath;
+            launchContainer.classList.add('visible');
+        }
+
+        function hideLaunchButton() {
+            launchContainer.classList.remove('visible');
+        }
+
+        async function launchProject() {
+            if (!currentProjectPath) {
+                showToast('Ingen projektsökväg', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/launch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: currentProjectPath })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Projekt öppnat!', 'success');
+                    addLog(`Öppnade: ${result.path}`, 'success');
+                } else {
+                    showToast(`Kunde inte öppna: ${result.error}`, 'error');
+                }
+            } catch (err) {
+                showToast(`Fel: ${err.message}`, 'error');
+            }
+        }
+
+        // Launch button click
+        launchBtn.addEventListener('click', launchProject);
+
+        // QR Modal functions
+        const qrBtn = document.getElementById('qr-btn');
+        const qrModal = document.getElementById('qr-modal');
+        const qrClose = document.getElementById('qr-close');
+        const qrCode = document.getElementById('qr-code');
+        const qrInfoEl = document.getElementById('qr-info');
+
+        async function generateNewVPNQR() {
+            qrCode.textContent = 'Genererar...';
+            qrInfoEl.textContent = '';
+            qrModal.classList.add('visible');
+
+            try {
+                const response = await fetch('/api/wireguard/new-peer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    qrCode.textContent = result.qr_text;
+                    qrInfoEl.innerHTML = `IP: <strong>${result.ip}</strong>`;
+                    addLog(`Ny VPN-peer: ${result.ip}`, 'success');
+                } else {
+                    qrCode.textContent = 'Fel';
+                    qrInfoEl.textContent = result.error || 'Kunde inte generera';
+                }
+            } catch (err) {
+                qrCode.textContent = 'Fel';
+                qrInfoEl.textContent = err.message;
+            }
+        }
+
+        function closeQRModal() {
+            qrModal.classList.remove('visible');
+        }
+
+        qrBtn.addEventListener('click', generateNewVPNQR);
+        qrClose.addEventListener('click', closeQRModal);
+        qrModal.addEventListener('click', (e) => {
+            if (e.target === qrModal) closeQRModal();
+        });
 
         // Connect on load
         connect();

@@ -66,7 +66,20 @@ class UXReview(BaseModel):
     issues: list[str] = Field(default_factory=list)
     accessibility_issues: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
     improved_code: str | None = Field(default=None, description="Suggested improved code")
+
+
+class ComponentDesign(BaseModel):
+    """Result of component design task."""
+
+    name: str = Field(..., description="Component name")
+    description: str = Field(..., description="What the component does")
+    accessibility: list[str] = Field(default_factory=list, description="Accessibility features")
+    interactions: list[str] = Field(default_factory=list, description="User interactions")
+    visual_design: str = Field(default="", description="Visual design description")
+    code: str = Field(default="", description="Generated component code")
+    props: list[dict[str, Any]] = Field(default_factory=list, description="Component props")
 
 
 class UXDesignerAgent(BaseAgent):
@@ -495,4 +508,179 @@ Score 1-10 and list specific issues with suggestions."""
             issues=[],
             accessibility_issues=[],
             suggestions=[],
+            recommendations=[],
+        )
+
+    # === Methods called by OrchestratorAgent ===
+
+    async def design_component(
+        self,
+        context: AgentContext,
+        component_name: str,
+        requirements: str,
+    ) -> ComponentDesign:
+        """Design a UI component based on requirements.
+
+        Called by OrchestratorAgent when task_type is 'design_component'.
+
+        Args:
+            context: Agent context with task info
+            component_name: Name of the component to design (e.g., 'LoginForm')
+            requirements: Description of what the component should do
+
+        Returns:
+            ComponentDesign with name, description, accessibility features,
+            interactions, and generated code.
+        """
+        request = f"""Design a UI component named '{component_name}'.
+
+Requirements: {requirements}
+
+Framework: {self.default_framework.value}
+Component Library: {self.component_library.value}
+
+Please provide:
+1. Component description and purpose
+2. Accessibility features (ARIA labels, keyboard nav, focus states)
+3. User interactions (click, hover, keyboard shortcuts)
+4. Visual design guidelines
+5. Complete, production-ready code
+
+Output complete TypeScript/React code with Tailwind CSS styling.
+Include all imports, types, and a usage example."""
+
+        result = await self.run(context, request)
+
+        # Extract structured data from the LLM response
+        code_blocks = result.data.get("code_blocks", [])
+        code = code_blocks[0].get("code", "") if code_blocks else result.output
+
+        # Parse accessibility and interactions from the response
+        output_lower = result.output.lower()
+
+        accessibility = []
+        if "aria" in output_lower:
+            accessibility.append("ARIA labels")
+        if "keyboard" in output_lower:
+            accessibility.append("Keyboard navigation")
+        if "focus" in output_lower:
+            accessibility.append("Focus management")
+        if "screen reader" in output_lower:
+            accessibility.append("Screen reader support")
+        if not accessibility:
+            accessibility = ["Standard accessibility"]
+
+        interactions = []
+        if "click" in output_lower:
+            interactions.append("Click handlers")
+        if "hover" in output_lower:
+            interactions.append("Hover states")
+        if "submit" in output_lower:
+            interactions.append("Form submission")
+        if "input" in output_lower or "type" in output_lower:
+            interactions.append("Text input")
+        if not interactions:
+            interactions = ["Standard interactions"]
+
+        return ComponentDesign(
+            name=component_name,
+            description=requirements,
+            accessibility=accessibility,
+            interactions=interactions,
+            visual_design=f"Tailwind CSS with {self.component_library.value} patterns",
+            code=code,
+        )
+
+    async def review_ui(
+        self,
+        context: AgentContext,
+        requirements: str,
+    ) -> UXReview:
+        """Review UI/UX based on requirements or code.
+
+        Called by OrchestratorAgent when task_type is 'review_ux'.
+
+        Args:
+            context: Agent context with task info
+            requirements: Code to review or requirements to check against
+
+        Returns:
+            UXReview with score, strengths, issues, and recommendations.
+        """
+        request = f"""Review this UI/UX:
+
+{requirements}
+
+Evaluate:
+1. Accessibility (WCAG 2.1 compliance)
+2. Usability and user experience
+3. Visual design consistency
+4. Responsive design
+5. Performance considerations
+
+Provide:
+- Overall score (1-10)
+- Key strengths
+- Issues found
+- Specific recommendations for improvement
+
+Be specific and actionable in your feedback."""
+
+        result = await self.run(context, request)
+
+        # Parse response for structured feedback
+        output = result.output
+        output_lower = output.lower()
+
+        # Try to extract score (look for patterns like "score: 8" or "8/10")
+        score = 7  # Default
+        import re
+        score_match = re.search(r'(?:score[:\s]*)?(\d+)\s*(?:/\s*10|out of 10)?', output_lower)
+        if score_match:
+            try:
+                parsed_score = int(score_match.group(1))
+                if 1 <= parsed_score <= 10:
+                    score = parsed_score
+            except ValueError:
+                pass
+
+        # Extract strengths
+        strengths = []
+        if "✓" in output or "strength" in output_lower or "good" in output_lower:
+            strengths.append("Generally well-structured")
+        if "accessible" in output_lower:
+            strengths.append("Good accessibility consideration")
+        if "responsive" in output_lower:
+            strengths.append("Responsive design")
+
+        # Extract issues
+        issues = []
+        if "missing" in output_lower:
+            issues.append("Missing elements identified")
+        if "contrast" in output_lower:
+            issues.append("Color contrast issues")
+        if "error" in output_lower:
+            issues.append("Error handling needs improvement")
+
+        # Extract accessibility issues
+        accessibility_issues = []
+        if "aria" in output_lower and ("missing" in output_lower or "add" in output_lower):
+            accessibility_issues.append("ARIA labels need improvement")
+        if "keyboard" in output_lower and ("missing" in output_lower or "add" in output_lower):
+            accessibility_issues.append("Keyboard navigation incomplete")
+
+        # Extract recommendations
+        recommendations = []
+        if "recommend" in output_lower or "suggest" in output_lower or "should" in output_lower:
+            recommendations.append("See detailed feedback in output")
+        if "improve" in output_lower:
+            recommendations.append("Improvements suggested")
+
+        return UXReview(
+            score=score,
+            strengths=strengths if strengths else ["Reviewed successfully"],
+            issues=issues,
+            accessibility_issues=accessibility_issues,
+            suggestions=[],
+            recommendations=recommendations if recommendations else ["Review complete"],
         )

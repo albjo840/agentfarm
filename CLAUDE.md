@@ -4,7 +4,7 @@ This file provides guidance for Claude Code when working with this repository.
 
 ## Project Overview
 
-AgentFarm is a token-efficient multi-agent orchestration system for code tasks. It implements a structured workflow: **PLAN → EXECUTE → VERIFY → REVIEW → SUMMARY**.
+AgentFarm is a token-efficient multi-agent orchestration system for code tasks. It implements a structured workflow: **PLAN → UX DESIGN (conditional) → EXECUTE → VERIFY → REVIEW → SUMMARY**.
 
 ### Key Design Principles
 
@@ -159,6 +159,15 @@ User Task
 - The OrchestratorAgent is an LLM that decides dynamically which agents to call
 - Can adapt strategy based on results (retry, adjust approach, etc.)
 - Uses memory to track progress and learnings
+
+**Fixed Workflow (Orchestrator class):**
+The main `Orchestrator` class also supports UX Designer with automatic detection:
+```
+PLAN → [UX DESIGN] → EXECUTE → VERIFY → REVIEW → SUMMARY
+           ↑
+    Activated if task contains UI keywords:
+    ui, ux, frontend, component, pygame, game, sprite, graphics, etc.
+```
 
 ### Memory System
 
@@ -508,7 +517,7 @@ Test files:
 ## Policy Compliance
 
 All changes must follow `policies/AGENTS.md`:
-- Use the PLAN→EXECUTE→VERIFY→REVIEW workflow
+- Use the PLAN→[UX DESIGN]→EXECUTE→VERIFY→REVIEW workflow
 - Type hints required on all functions
 - Async/await for I/O operations
 - Pydantic for data models
@@ -574,6 +583,64 @@ Dev:
 - `pytest`, `pytest-asyncio` - Testing
 - `ruff` - Linting/formatting
 
+## Changelog
+
+### 2026-01-12: UX Designer Integration & Bug Fixes
+
+#### New Features
+- **UX Designer Agent in Workflow**: Added `UXDesignerAgent` to the main `Orchestrator` class
+  - New workflow phase: `PLAN → UX DESIGN → EXECUTE → VERIFY → REVIEW`
+  - Automatically activates for UI/frontend/game tasks (detected via keywords)
+  - Skips gracefully for backend-only tasks with "SKIPPED" status in UI
+  - Passes UX guidance to ExecutorAgent via `context.previous_step_output`
+
+- **New UXDesignerAgent Methods** (`agents/ux_designer.py`):
+  - `design_component(context, component_name, requirements)` → `ComponentDesign`
+  - `review_ui(context, requirements)` → `UXReview`
+  - Both methods properly connected to LLM providers
+
+- **Web UI Updates**:
+  - New "UX" stage in workflow status bar (between PLAN and EXECUTE)
+  - "SKIPPED" status with dimmed styling for non-UI tasks
+  - Red UX Designer robot activates during UX phase
+
+#### Bug Fixes
+- **RecursionGuard False Positives** (`agents/base.py`):
+  - Changed from `hash(task_summary[:100])` to `hash(task_summary)` (full hash)
+  - Increased threshold from 3 to 5 identical calls
+  - Fixes: ExecutorAgent no longer blocked on step 4+ of multi-step workflows
+
+- **Planner JSON Parsing** (`agents/planner.py`):
+  - Dependencies now handle both `[1, 2]` and `["step1", "step2"]` formats
+  - Gracefully skips malformed steps instead of crashing (KeyError protection)
+
+- **Nested JSON in Files** (`providers/ollama.py`):
+  - Added `validate_write_file_content()` to detect nested tool calls in content
+  - Extracts actual code when content looks like `{"name": "write_file", ...}`
+
+- **Executor Prompt** (`prompts/executor_prompt.py`):
+  - Added explicit instructions to ALWAYS call tools, never just describe actions
+  - Clear examples of wrong vs correct behavior
+
+- **UX Phase Status** (`orchestrator.py`):
+  - Now correctly emits "error" on failure instead of always "complete"
+  - Emits "skipped" for non-UI tasks
+
+#### Files Modified
+| File | Changes |
+|------|---------|
+| `orchestrator.py` | Added UXDesignerAgent, UX phase, `_task_involves_ui()`, `_run_ux_design_phase()` |
+| `agents/ux_designer.py` | Added `ComponentDesign` model, `design_component()`, `review_ui()` methods |
+| `agents/planner.py` | Fixed dependency parsing, added KeyError protection |
+| `agents/base.py` | Fixed RecursionGuard hash and threshold |
+| `providers/ollama.py` | Added nested JSON validation for write_file |
+| `prompts/executor_prompt.py` | Enforced tool usage |
+| `web/templates/index.html` | Added UX stage to workflow status |
+| `web/static/js/app.js` | Added ux_design to stageToAgent mapping |
+| `web/static/css/retro.css` | Added .skipped styling |
+
+---
+
 ## Roadmap / TODO
 
 ### Priority 1: Core Functionality
@@ -602,5 +669,14 @@ Dev:
 - [x] Robot idle behavior (wandering, thinking, scanning)
 - [x] Collaboration visualization (robots gravitate together)
 - [x] WebSocket events for parallel execution
+- [x] UX Designer stage in workflow status
+- [x] "SKIPPED" status styling for conditional phases
 - [ ] Streaming output for real-time feedback
 - [ ] Token usage dashboard per agent
+
+### Priority 6: UX Designer Integration
+- [x] UXDesignerAgent in main Orchestrator workflow
+- [x] `design_component()` and `review_ui()` methods
+- [x] Automatic UI task detection via keywords
+- [x] UX guidance passed to ExecutorAgent context
+- [ ] UXDesignerAgent steps in parallel execution

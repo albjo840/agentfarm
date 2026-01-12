@@ -64,21 +64,26 @@ class WebSocketClients:
     async def broadcast(self, message: dict[str, Any]) -> None:
         """Broadcast message to all connected clients."""
         if not self.clients:
+            logger.debug("No WebSocket clients connected, skipping broadcast")
             return
 
         data = json.dumps(message)
         dead_clients = set()
 
+        logger.info("Broadcasting to %d clients: %s", len(self.clients), message.get('type', 'unknown'))
+
         for ws in self.clients:
             try:
                 await ws.send_str(data)
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to send to client: %s", e)
                 dead_clients.add(ws)
 
         self.clients -= dead_clients
 
     def add(self, ws: web.WebSocketResponse) -> None:
         self.clients.add(ws)
+        logger.info("WebSocket client connected. Total clients: %d", len(self.clients))
 
     def remove(self, ws: web.WebSocketResponse) -> None:
         self.clients.discard(ws)
@@ -94,8 +99,19 @@ _event_bus_task: asyncio.Task | None = None  # Background task for event process
 
 
 async def _broadcast_event_handler(event: Event) -> None:
-    """Handler that broadcasts all events to WebSocket clients."""
-    await ws_clients.broadcast(event.to_dict())
+    """Handler that broadcasts all events to WebSocket clients.
+
+    Flattens the event structure for frontend compatibility:
+    - Converts type to lowercase (AGENT_MESSAGE -> agent_message)
+    - Merges data fields to top level
+    """
+    # Flatten event for frontend
+    flat_event = {
+        "type": event.type.name.lower(),  # Frontend expects lowercase
+        "source": event.source,
+        **event.data,  # Merge data fields to top level
+    }
+    await ws_clients.broadcast(flat_event)
 
 
 def setup_event_bus() -> None:
@@ -334,6 +350,15 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
 
     async def event_callback(event_name: str, data: dict[str, Any]) -> None:
         """Callback that emits events to the event bus."""
+        # Handle stage_change specially - broadcast directly to WebSocket
+        if event_name == 'stage_change':
+            await ws_clients.broadcast({
+                'type': 'stage_change',
+                'stage': data.get('stage'),
+                'status': data.get('status'),
+            })
+            return
+
         # Map old event names to EventType
         event_type_map = {
             'workflow_start': EventType.WORKFLOW_START,
@@ -342,6 +367,7 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
             'step_start': EventType.STEP_START,
             'step_complete': EventType.STEP_COMPLETE,
             'parallel_execution_start': EventType.STEP_START,
+            'tokens_update': EventType.AGENT_MESSAGE,
         }
         event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
         source = data.get('agent', 'orchestrator')
@@ -420,6 +446,15 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> 
 
     async def event_callback(event_name: str, data: dict[str, Any]) -> None:
         """Callback that emits events to the event bus."""
+        # Handle stage_change specially - broadcast directly to WebSocket
+        if event_name == 'stage_change':
+            await ws_clients.broadcast({
+                'type': 'stage_change',
+                'stage': data.get('stage'),
+                'status': data.get('status'),
+            })
+            return
+
         event_type_map = {
             'workflow_start': EventType.WORKFLOW_START,
             'workflow_complete': EventType.WORKFLOW_COMPLETE,
@@ -427,6 +462,7 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> 
             'step_start': EventType.STEP_START,
             'step_complete': EventType.STEP_COMPLETE,
             'parallel_execution_start': EventType.STEP_START,
+            'tokens_update': EventType.AGENT_MESSAGE,
         }
         event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
         source = data.get('agent', 'orchestrator')
@@ -667,6 +703,119 @@ async def api_workflow_pause_handler(request: web.Request) -> web.Response:
     return web.json_response({"error": "Could not pause workflow"}, status=400)
 
 
+async def api_launch_handler(request: web.Request) -> web.Response:
+    """Open a project folder in the system file manager."""
+    import subprocess
+    import sys
+
+    data = await request.json()
+    path = data.get("path", "")
+
+    if not path:
+        return web.json_response({"error": "No path provided"}, status=400)
+
+    project_path = Path(path)
+    if not project_path.exists():
+        return web.json_response({"error": "Path does not exist"}, status=404)
+
+    try:
+        if sys.platform == "linux":
+            subprocess.Popen(["xdg-open", str(project_path)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(project_path)])
+        elif sys.platform == "win32":
+            subprocess.Popen(["explorer", str(project_path)])
+
+        return web.json_response({"status": "launched", "path": str(project_path)})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_wireguard_qr_handler(request: web.Request) -> web.Response:
+    """Generate a new WireGuard peer and return QR code."""
+    import subprocess
+    import re
+
+    try:
+        # Get server public key
+        result = subprocess.run(
+            ["sudo", "wg", "show", "wg0", "public-key"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return web.json_response({"error": "WireGuard not running"}, status=500)
+        server_pubkey = result.stdout.strip()
+
+        # Get existing peers to find next IP
+        result = subprocess.run(
+            ["sudo", "wg", "show", "wg0", "allowed-ips"],
+            capture_output=True, text=True, timeout=5
+        )
+        existing_ips = re.findall(r'10\.0\.0\.(\d+)', result.stdout)
+        existing_nums = [int(ip) for ip in existing_ips]
+        next_num = max(existing_nums + [2]) + 1  # Start from 3 if only server (1) and first peer (2)
+
+        if next_num > 254:
+            return web.json_response({"error": "No more IPs available"}, status=400)
+
+        # Generate new key pair
+        result = subprocess.run(["wg", "genkey"], capture_output=True, text=True, timeout=5)
+        private_key = result.stdout.strip()
+
+        result = subprocess.run(
+            ["wg", "pubkey"],
+            input=private_key, capture_output=True, text=True, timeout=5
+        )
+        public_key = result.stdout.strip()
+
+        # Get endpoint (DuckDNS or public IP)
+        endpoint = "taborsen.duckdns.org:51820"
+
+        # Create client config
+        client_config = f"""[Interface]
+PrivateKey = {private_key}
+Address = 10.0.0.{next_num}/24
+DNS = 1.1.1.1, 8.8.8.8
+
+[Peer]
+PublicKey = {server_pubkey}
+Endpoint = {endpoint}
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25"""
+
+        # Add peer to WireGuard
+        subprocess.run(
+            ["sudo", "wg", "set", "wg0", "peer", public_key, "allowed-ips", f"10.0.0.{next_num}/32"],
+            capture_output=True, timeout=5
+        )
+
+        # Save to config file
+        peer_config = f"\n[Peer]\nPublicKey = {public_key}\nAllowedIPs = 10.0.0.{next_num}/32\n"
+        subprocess.run(
+            ["sudo", "tee", "-a", "/etc/wireguard/wg0.conf"],
+            input=peer_config, capture_output=True, text=True, timeout=5
+        )
+
+        # Generate QR code as text (ANSI)
+        result = subprocess.run(
+            ["qrencode", "-t", "UTF8"],
+            input=client_config, capture_output=True, text=True, timeout=5
+        )
+        qr_text = result.stdout
+
+        return web.json_response({
+            "success": True,
+            "ip": f"10.0.0.{next_num}",
+            "qr_text": qr_text,
+            "config": client_config,
+        })
+
+    except subprocess.TimeoutExpired:
+        return web.json_response({"error": "Command timed out"}, status=500)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
     global llm_router, workflow_persistence
@@ -724,6 +873,8 @@ def create_app() -> web.Application:
     app.router.add_get('/api/workflows', api_workflows_handler)
     app.router.add_get('/api/workflows/{id}', api_workflow_detail_handler)
     app.router.add_post('/api/workflows/{id}/pause', api_workflow_pause_handler)
+    app.router.add_post('/api/launch', api_launch_handler)
+    app.router.add_post('/api/wireguard/new-peer', api_wireguard_qr_handler)
     app.router.add_get('/static/{path:.*}', static_handler)
 
     return app

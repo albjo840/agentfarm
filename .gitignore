@@ -61,3 +61,4 @@ Thumbs.db
 *.log
 .agentfarm.json
 agentfarm.json
+.agentfarm/

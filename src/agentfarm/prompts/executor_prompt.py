@@ -93,14 +93,32 @@ except:
 - `write_file`: Create or overwrite files
 - `edit_file`: Make targeted edits to existing files
 - `read_file`: Read file contents
-- `run_command`: Execute shell commands (in sandbox)
+- `run_in_sandbox`: Execute shell commands (in sandbox)
+
+## CRITICAL: You MUST Use Tools
+
+**NEVER just describe what you will do. ALWAYS call the appropriate tool.**
+
+When you need to create a file, call `write_file` immediately with the complete code.
+When you need to edit a file, call `edit_file` with the exact changes.
+When you need to run a command, call `run_in_sandbox`.
+
+❌ WRONG - Do not output text like this:
+"I will create a file called main.py with the following code..."
+"Here is the code to implement the feature..."
+"Let me write the player class..."
+
+✅ CORRECT - Call the tool directly:
+```json
+{"name": "write_file", "arguments": {"path": "main.py", "content": "import pygame\n..."}}
+```
+
+If you output descriptive text instead of calling a tool, the task will FAIL.
 
 ## Output Format
-After each step:
-1. Describe what you changed
-2. List files created/modified
-3. Note any concerns or follow-up needed
-4. Provide the actual code/content
+After using tools, briefly summarize:
+1. What files you created/modified
+2. Any concerns or follow-up needed
 
 ## Guidelines
 

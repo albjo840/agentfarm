@@ -15,6 +15,7 @@ from agentfarm.agents.collaboration import AgentCollaborator
 from agentfarm.agents.executor import ExecutorAgent
 from agentfarm.agents.planner import PlannerAgent
 from agentfarm.agents.reviewer import ReviewerAgent
+from agentfarm.agents.ux_designer import UXDesignerAgent
 from agentfarm.agents.verifier import VerifierAgent
 from agentfarm.models.schemas import (
     ExecutionResult,
@@ -78,12 +79,14 @@ class Orchestrator:
             self.executor = ExecutorAgent(provider)
             self.verifier = VerifierAgent(provider)
             self.reviewer = ReviewerAgent(provider)
+            self.ux_designer = UXDesignerAgent(provider)
 
         # Set recursion guard on all agents
         self.planner.set_recursion_guard(self._recursion_guard)
         self.executor.set_recursion_guard(self._recursion_guard)
         self.verifier.set_recursion_guard(self._recursion_guard)
         self.reviewer.set_recursion_guard(self._recursion_guard)
+        self.ux_designer.set_recursion_guard(self._recursion_guard)
 
         # Track token usage across all providers
         self._total_tokens = 0
@@ -94,6 +97,7 @@ class Orchestrator:
             "executor": self.executor,
             "verifier": self.verifier,
             "reviewer": self.reviewer,
+            "ux_designer": self.ux_designer,
         }
 
         # Set up collaboration system
@@ -112,6 +116,7 @@ class Orchestrator:
         executor_provider = create_provider_for_agent("executor")
         verifier_provider = create_provider_for_agent("verifier")
         reviewer_provider = create_provider_for_agent("reviewer")
+        designer_provider = create_provider_for_agent("designer")
 
         # Use orchestrator's provider as the main one for token tracking
         self.provider = create_provider_for_agent("orchestrator")
@@ -121,6 +126,7 @@ class Orchestrator:
         self.executor = ExecutorAgent(executor_provider)
         self.verifier = VerifierAgent(verifier_provider)
         self.reviewer = ReviewerAgent(reviewer_provider)
+        self.ux_designer = UXDesignerAgent(designer_provider)
 
         # Store providers for token tracking
         self._agent_providers = {
@@ -129,6 +135,7 @@ class Orchestrator:
             "executor": executor_provider,
             "verifier": verifier_provider,
             "reviewer": reviewer_provider,
+            "ux_designer": designer_provider,
         }
 
         # Print status at startup
@@ -282,6 +289,25 @@ class Orchestrator:
         await self._emit("agent_message", {"agent": "planner", "content": f"Plan created: {plan.summary}"})
         await self._emit("stage_change", {"stage": "plan", "status": "complete"})
         await self._emit("tokens_update", {"tokens": self.get_total_tokens_used()})
+
+        # PHASE 1.5: UX DESIGN (if task involves UI/frontend)
+        ux_result = None
+        if self._task_involves_ui(task, plan):
+            await self._emit("stage_change", {"stage": "ux_design", "status": "active"})
+            await self._emit("agent_message", {"agent": "ux", "content": "Analyzing UI/UX requirements..."})
+            ux_result = await self._run_ux_design_phase(context, task, plan)
+            if ux_result and ux_result.get("success"):
+                await self._emit("agent_message", {"agent": "ux", "content": f"UI design complete: {ux_result.get('summary', 'Design ready')}"})
+                await self._emit("stage_change", {"stage": "ux_design", "status": "complete"})
+                # Pass UX guidance to executor via context
+                context.previous_step_output = f"UX Design: {ux_result.get('summary', '')}"
+            else:
+                await self._emit("agent_message", {"agent": "ux", "content": "UX design phase skipped or failed"})
+                await self._emit("stage_change", {"stage": "ux_design", "status": "error"})
+            await self._emit("tokens_update", {"tokens": self.get_total_tokens_used()})
+        else:
+            # Skip UX phase - emit skipped status for UI clarity
+            await self._emit("stage_change", {"stage": "ux_design", "status": "skipped"})
 
         # PHASE 2: EXECUTE
         await self._emit("stage_change", {"stage": "execute", "status": "active"})
@@ -471,6 +497,72 @@ class Orchestrator:
 
         return await self.reviewer.review_changes(context, changed_files)
 
+    def _task_involves_ui(self, task: str, plan: TaskPlan) -> bool:
+        """Check if the task involves UI/UX work."""
+        task_lower = task.lower()
+        plan_lower = plan.summary.lower() if plan.summary else ""
+
+        ui_keywords = [
+            "ui", "ux", "frontend", "front-end", "interface", "design",
+            "component", "button", "form", "modal", "dialog", "menu",
+            "layout", "style", "css", "html", "react", "vue", "svelte",
+            "tailwind", "responsive", "mobile", "desktop", "visual",
+            "animation", "icon", "color", "theme", "dark mode", "light mode",
+            "pygame", "game", "sprite", "graphics", "render", "display",
+            "window", "screen", "gui", "widget", "canvas"
+        ]
+
+        for keyword in ui_keywords:
+            if keyword in task_lower or keyword in plan_lower:
+                return True
+
+        # Also check plan steps
+        for step in plan.steps:
+            step_lower = step.description.lower()
+            for keyword in ui_keywords:
+                if keyword in step_lower:
+                    return True
+
+        return False
+
+    async def _run_ux_design_phase(
+        self,
+        context: AgentContext,
+        task: str,
+        plan: TaskPlan,
+    ) -> dict[str, Any] | None:
+        """Run the UX design phase for UI-related tasks."""
+        # Build a design request from the task and plan
+        ui_steps = []
+        for step in plan.steps:
+            step_lower = step.description.lower()
+            if any(kw in step_lower for kw in ["ui", "component", "interface", "display", "visual", "sprite", "graphics"]):
+                ui_steps.append(step.description)
+
+        if not ui_steps:
+            # Generate general UI guidance for the task
+            design_request = f"Provide UI/UX design guidance for: {task}"
+        else:
+            design_request = f"Design UI components for:\n" + "\n".join(f"- {s}" for s in ui_steps)
+
+        # Call UX designer
+        ux_context = AgentContext(
+            task_summary=f"UX Design: {task}",
+            relevant_files=context.relevant_files,
+            previous_step_output=plan.summary,
+        )
+
+        try:
+            result = await self.ux_designer.run(ux_context, design_request)
+            return {
+                "success": result.success,
+                "summary": result.summary_for_next_agent or "Design guidance provided",
+                "output": result.output,
+            }
+        except Exception as e:
+            logger.warning("UX design phase failed: %s", e)
+            return None
+
     def _collect_changed_files(self, results: list[ExecutionResult]) -> list[str]:
         """Collect all files changed during execution."""
         files: set[str] = set()
@@ -548,6 +640,7 @@ class Orchestrator:
             "executor": self.executor,
             "verifier": self.verifier,
             "reviewer": self.reviewer,
+            "ux_designer": self.ux_designer,
         }
 
         agent = agents.get(agent_type)

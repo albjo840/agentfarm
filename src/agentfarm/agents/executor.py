@@ -31,6 +31,12 @@ class ExecutorAgent(BaseAgent):
 2. Make minimal, focused changes
 3. Follow existing code patterns
 
+CRITICAL PATH RULES:
+- ALWAYS use RELATIVE paths (e.g., "main.py", "src/game.py")
+- NEVER use absolute paths like /home/user/ or /home/albin/
+- Files are created in the current working directory automatically
+- Example: write_file(path="game.py", content="...") - NOT /home/user/game.py
+
 IMPORTANT: Use the write_file tool to create new files. Use edit_file to modify existing files.
 Do NOT just describe what to do - actually call the tools to make changes.
 
@@ -39,7 +45,8 @@ Guidelines:
 - Preserve existing style
 - Add minimal necessary code
 - No unnecessary refactoring
-- Always use tools to make file changes"""
+- Always use tools to make file changes
+- ONLY use relative paths like "file.py" or "src/file.py\""""
 
     def _setup_tools(self) -> None:
         """Register tools for the executor."""

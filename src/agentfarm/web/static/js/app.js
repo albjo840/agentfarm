@@ -33,6 +33,7 @@ let ws = null;
 let workingDir = '.';
 let availableProviders = [];
 let robotVisualizer = null;
+let currentProjectPath = null;
 
 // DOM Elements
 const messagesContainer = document.getElementById('messages');
@@ -91,14 +92,17 @@ function handleServerMessage(data) {
             break;
 
         case 'project_created':
+            currentProjectPath = data.path;
             addMessage('orchestrator', `📁 Projekt skapat: ${data.path}`);
+            // Hide launch button when new project starts
+            hideLaunchButton();
             break;
 
         case 'workflow_start':
             isRunning = true;
             executeBtn.disabled = true;
             executeBtn.querySelector('span').textContent = 'RUNNING...';
-            ['plan', 'execute', 'verify', 'review'].forEach(s => setStageStatus(s, null));
+            ['plan', 'ux_design', 'execute', 'verify', 'review'].forEach(s => setStageStatus(s, null));
             addMessage('orchestrator', `Initiating workflow: "${data.task}" via ${data.provider.toUpperCase()}`);
             // Start idle behavior for visual life
             if (robotVisualizer) {
@@ -112,6 +116,7 @@ function handleServerMessage(data) {
                 // Set active agent based on stage
                 const stageToAgent = {
                     'plan': 'planner',
+                    'ux_design': 'ux',
                     'execute': 'executor',
                     'verify': 'verifier',
                     'review': 'reviewer'
@@ -161,6 +166,10 @@ function handleServerMessage(data) {
             }
             if (data.success) {
                 addMessage('orchestrator', '✓ Workflow completed successfully.');
+                // Show launch button if we have a project path
+                if (currentProjectPath) {
+                    showLaunchButton(currentProjectPath);
+                }
             } else {
                 addMessage('orchestrator', `✗ Workflow failed: ${data.error || 'Unknown error'}`);
             }
@@ -351,7 +360,7 @@ function setStageStatus(stageId, status) {
     const stage = document.getElementById(`stage-${stageId}`);
     if (!stage) return;
 
-    stage.classList.remove('active', 'complete', 'error');
+    stage.classList.remove('active', 'complete', 'error', 'skipped');
     if (status) stage.classList.add(status);
 
     const statusEl = stage.querySelector('.stage-status');
@@ -364,6 +373,9 @@ function setStageStatus(stageId, status) {
             break;
         case 'error':
             statusEl.textContent = 'ERROR';
+            break;
+        case 'skipped':
+            statusEl.textContent = 'SKIPPED';
             break;
         default:
             statusEl.textContent = 'STANDBY';
@@ -484,8 +496,117 @@ setInterval(() => {
     }
 }, 30000);
 
+// Launch button functions
+function showLaunchButton(projectPath) {
+    const container = document.getElementById('launch-container');
+    const pathEl = document.getElementById('launch-path');
+
+    if (container && pathEl) {
+        pathEl.textContent = projectPath;
+        container.classList.remove('hidden');
+    }
+}
+
+function hideLaunchButton() {
+    const container = document.getElementById('launch-container');
+    if (container) {
+        container.classList.add('hidden');
+    }
+}
+
+async function launchProject() {
+    if (!currentProjectPath) {
+        addMessage('orchestrator', '✗ No project path available');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: currentProjectPath })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            addMessage('orchestrator', `🚀 Launched: ${result.path}`);
+        } else {
+            addMessage('orchestrator', `✗ Launch failed: ${result.error}`);
+        }
+    } catch (err) {
+        addMessage('orchestrator', `✗ Launch error: ${err.message}`);
+    }
+}
+
+// QR Code Modal functions
+async function generateNewVPNQR() {
+    const qrModal = document.getElementById('qr-modal');
+    const qrCode = document.getElementById('qr-code');
+    const qrInfo = document.getElementById('qr-info');
+
+    // Show modal with loading state
+    qrCode.textContent = 'Genererar...';
+    qrInfo.textContent = '';
+    qrModal.classList.remove('hidden');
+
+    try {
+        const response = await fetch('/api/wireguard/new-peer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            qrCode.textContent = result.qr_text;
+            qrInfo.innerHTML = `IP: <strong>${result.ip}</strong><br>Skanna QR-koden med WireGuard-appen`;
+            addMessage('orchestrator', `🔐 Ny VPN-peer skapad: ${result.ip}`);
+        } else {
+            qrCode.textContent = '❌ Fel';
+            qrInfo.textContent = result.error || 'Kunde inte generera QR-kod';
+        }
+    } catch (err) {
+        qrCode.textContent = '❌ Fel';
+        qrInfo.textContent = err.message;
+    }
+}
+
+function closeQRModal() {
+    const qrModal = document.getElementById('qr-modal');
+    qrModal.classList.add('hidden');
+}
+
 // Start
 document.addEventListener('DOMContentLoaded', () => {
     init();
     musicController.init();
+
+    // Wire up launch button
+    const launchBtn = document.getElementById('launch-btn');
+    if (launchBtn) {
+        launchBtn.addEventListener('click', launchProject);
+    }
+
+    // Wire up QR button
+    const qrBtn = document.getElementById('qr-btn');
+    if (qrBtn) {
+        qrBtn.addEventListener('click', generateNewVPNQR);
+    }
+
+    // Wire up QR modal close
+    const qrClose = document.getElementById('qr-close');
+    if (qrClose) {
+        qrClose.addEventListener('click', closeQRModal);
+    }
+
+    // Close modal on backdrop click
+    const qrModal = document.getElementById('qr-modal');
+    if (qrModal) {
+        qrModal.addEventListener('click', (e) => {
+            if (e.target === qrModal) {
+                closeQRModal();
+            }
+        });
+    }
 });

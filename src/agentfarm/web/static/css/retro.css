@@ -564,6 +564,19 @@ section {
     box-shadow: 0 0 10px var(--red);
 }
 
+.stage.skipped {
+    border-color: var(--text-dim);
+    opacity: 0.5;
+}
+
+.stage.skipped .stage-icon {
+    color: var(--text-dim);
+}
+
+.stage.skipped .stage-status {
+    color: var(--text-dim);
+}
+
 .stage-icon {
     font-size: 1.5rem;
     color: var(--text-dim);
@@ -719,4 +732,206 @@ section {
 @keyframes pulse-glow {
     0%, 100% { opacity: 0.7; text-shadow: 0 0 5px var(--cyan); }
     50% { opacity: 1; text-shadow: 0 0 15px var(--cyan); }
+}
+
+/* Launch Button */
+.launch-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--cyan);
+    animation: fadeIn 0.5s ease;
+}
+
+.launch-container.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.launch-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 2.5rem;
+    background: linear-gradient(135deg, var(--green), var(--cyan));
+    border: none;
+    color: var(--bg-dark);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 20px var(--green), 0 0 40px rgba(0, 255, 136, 0.3);
+    animation: launch-pulse 2s ease-in-out infinite;
+}
+
+.launch-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px var(--green), 0 0 60px rgba(0, 255, 136, 0.5);
+}
+
+.launch-btn:active {
+    transform: scale(0.98);
+}
+
+@keyframes launch-pulse {
+    0%, 100% { box-shadow: 0 0 20px var(--green), 0 0 40px rgba(0, 255, 136, 0.3); }
+    50% { box-shadow: 0 0 30px var(--green), 0 0 60px rgba(0, 255, 136, 0.5); }
+}
+
+.launch-icon {
+    font-size: 1.3rem;
+}
+
+.launch-path {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--text-dim);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Footer center */
+.footer-center {
+    display: flex;
+    align-items: center;
+}
+
+/* QR Button */
+.qr-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--purple);
+    color: var(--purple);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.qr-btn:hover {
+    background: rgba(157, 0, 255, 0.2);
+    box-shadow: 0 0 15px var(--purple);
+}
+
+.qr-icon {
+    font-size: 1.2rem;
+}
+
+/* QR Modal */
+.qr-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: modalFadeIn 0.3s ease;
+}
+
+.qr-modal.hidden {
+    display: none;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.qr-modal-content {
+    background: var(--bg-panel);
+    border: 2px solid var(--cyan);
+    box-shadow: var(--glow-cyan);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.qr-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--cyan);
+    background: rgba(0, 255, 242, 0.1);
+}
+
+.qr-modal-header h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+}
+
+.qr-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 2rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.3s;
+}
+
+.qr-close:hover {
+    color: var(--red);
+}
+
+.qr-modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.qr-code {
+    font-family: monospace;
+    font-size: 4px;
+    line-height: 1;
+    letter-spacing: 0;
+    background: #fff;
+    color: #000;
+    padding: 10px;
+    border-radius: 4px;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.qr-info {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--green);
+    text-align: center;
+}
+
+.qr-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
 }

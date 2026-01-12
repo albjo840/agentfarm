@@ -25,7 +25,7 @@ class FileTools:
             raise ValueError(f"Path {path} is outside working directory")
         return resolved
 
-    async def read_file(self, path: str) -> str:
+    async def read_file(self, path: str, **kwargs) -> str:
         """Read contents of a file."""
         file_path = self._validate_path(path)
         if not file_path.exists():
@@ -34,7 +34,7 @@ class FileTools:
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
             return await f.read()
 
-    async def write_file(self, path: str, content: str) -> str:
+    async def write_file(self, path: str, content: str, **kwargs) -> str:
         """Write content to a file (create or overwrite)."""
         file_path = self._validate_path(path)
 
@@ -46,9 +46,21 @@ class FileTools:
 
         return f"Wrote {len(content)} bytes to {path}"
 
-    async def edit_file(self, path: str, old_content: str, new_content: str) -> str:
-        """Replace old_content with new_content in a file."""
+    async def edit_file(self, path: str, old_content: str, new_content: str, **kwargs) -> str:
+        """Replace old_content with new_content in a file.
+
+        If old_content is empty and file doesn't exist, creates the file.
+        """
         file_path = self._validate_path(path)
+
+        # Special case: empty old_content means create new file
+        if not old_content or old_content.strip() == "":
+            # Create parent directories if needed
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+                await f.write(new_content)
+            return f"Created {path}"
+
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
@@ -65,7 +77,7 @@ class FileTools:
 
         return f"Edited {path}"
 
-    async def list_directory(self, path: str = ".") -> str:
+    async def list_directory(self, path: str = ".", **kwargs) -> str:
         """List contents of a directory."""
         dir_path = self._validate_path(path)
         if not dir_path.is_dir():
@@ -79,7 +91,7 @@ class FileTools:
 
         return "\n".join(entries) if entries else "(empty directory)"
 
-    async def search_code(self, pattern: str, path: str = ".") -> str:
+    async def search_code(self, pattern: str, path: str = ".", **kwargs) -> str:
         """Search for pattern in files (simple grep-like)."""
         search_path = self._validate_path(path)
         results: list[str] = []
