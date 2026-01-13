@@ -95,6 +95,10 @@ agentfarm/
 │       └── schemas.py         # Pydantic models for all data
 ├── docker/
 │   └── Dockerfile.sandbox     # Sandbox container image
+├── evals/                     # Evaluation suite
+│   ├── suite.py               # Full eval with 11 test cases
+│   ├── quick_test.py          # Fast sanity checks
+│   └── results/               # Saved eval reports (JSON)
 ├── tests/                     # pytest test suite (60 tests)
 ├── .env                       # API keys (not in git)
 └── pyproject.toml             # Project configuration
@@ -122,6 +126,12 @@ agentfarm workflow "task description"
 # Run the 80s sci-fi web interface
 agentfarm web                    # Default: http://127.0.0.1:8080
 agentfarm web --port 3000        # Custom port
+
+# Run evaluation suite
+python -m evals.quick_test       # Fast sanity check (~5s)
+python -m evals.suite --list     # List all tests
+python -m evals.suite            # Run full eval (~8 min)
+python -m evals.suite -c codegen # Run specific category
 
 # Run MCP server
 agentfarm mcp
@@ -582,6 +592,118 @@ Optional:
 Dev:
 - `pytest`, `pytest-asyncio` - Testing
 - `ruff` - Linting/formatting
+
+## Evaluation Suite
+
+The `evals/` directory contains a comprehensive evaluation suite for testing agent capabilities.
+
+### Structure
+
+```
+evals/
+├── __init__.py
+├── suite.py          # Full evaluation suite with 11 test cases
+├── quick_test.py     # Fast sanity checks (~5 seconds)
+├── cases/            # (for future test case files)
+└── results/          # Saved evaluation reports (JSON)
+```
+
+### Usage
+
+```bash
+# Quick sanity check - tests components without LLM calls
+python -m evals.quick_test
+
+# List all evaluation tests
+python -m evals.suite --list
+
+# Run full evaluation (requires Ollama or API keys)
+python -m evals.suite
+
+# Run specific category
+python -m evals.suite --category codegen
+python -m evals.suite --category bugfix
+python -m evals.suite --category refactor
+python -m evals.suite --category multistep
+```
+
+### Test Categories
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| `codegen` | 4 | Create new code (functions, classes, APIs) |
+| `bugfix` | 3 | Fix bugs in provided code snippets |
+| `refactor` | 2 | Refactor code (extract methods, polymorphism) |
+| `multistep` | 2 | Complex multi-file projects |
+
+### Test Cases (11 total, 210 points)
+
+| ID | Name | Category | Points |
+|----|------|----------|--------|
+| codegen-001 | Simple Function (is_prime) | codegen | 10 |
+| codegen-002 | Calculator Class | codegen | 15 |
+| codegen-003 | REST API Endpoint | codegen | 20 |
+| codegen-004 | Data Processing Pipeline | codegen | 20 |
+| bugfix-001 | Fix Off-by-One Error | bugfix | 10 |
+| bugfix-002 | Fix Race Condition | bugfix | 15 |
+| bugfix-003 | Fix SQL Injection | bugfix | 15 |
+| refactor-001 | Extract Method | refactor | 20 |
+| refactor-002 | Replace Conditionals with Polymorphism | refactor | 20 |
+| multistep-001 | CLI Todo App | multistep | 30 |
+| multistep-002 | Web Scraper with Tests | multistep | 35 |
+
+### Validators
+
+Each test uses validators to check results:
+- `file_exists` - Check if file was created
+- `file_contains` - Regex pattern match in file
+- `python_syntax` - Valid Python syntax
+- `function_exists` - Function defined in file
+- `class_exists` - Class defined in file
+- `tests_pass` - pytest passes
+
+### Baseline Results (2026-01-13)
+
+**Configuration:** Ollama local models (qwen2.5-coder:7b, llama3.2)
+
+```
+============================================================
+  RESULTS SUMMARY
+============================================================
+  Passed: 6/11
+  Score:  137.8/210 (65.6%)
+  Time:   459.4s (7.6 minutes)
+
+  By Category:
+    codegen:   2/4 (50%)
+    bugfix:    1/3 (33%)
+    refactor:  1/2 (68%)
+    multistep: 2/2 (94%)  ⭐ Best performance
+============================================================
+```
+
+**Key Insights:**
+- **Multistep tasks perform best** (94%) - agents excel at complex multi-file projects
+- **Bugfix tests need adjustment** - agents expect files to exist for editing
+- **Local LLMs work well** - Ollama models sufficient for most code generation
+
+### Adding New Tests
+
+```python
+# In evals/suite.py
+TestCase(
+    id="codegen-005",
+    name="My New Test",
+    category=CATEGORY_CODEGEN,
+    prompt="Create a function that...",
+    validators=[
+        {"type": "file_exists", "filename": "my_file.py"},
+        {"type": "function_exists", "filename": "my_file.py", "function_name": "my_func"},
+    ],
+    difficulty="medium",
+    points=15,
+)
+```
 
 ## Changelog
 

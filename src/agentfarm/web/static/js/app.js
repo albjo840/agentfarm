@@ -520,23 +520,179 @@ async function launchProject() {
         return;
     }
 
+    // Open file browser instead of local file manager
+    openFileBrowser(currentProjectPath);
+}
+
+// ===========================================
+// File Browser Functions
+// ===========================================
+
+let fileBrowserCurrentPath = null;
+
+function openFileBrowser(path) {
+    fileBrowserCurrentPath = path || null;
+    const modal = document.getElementById('file-browser-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadDirectory(path);
+    }
+}
+
+function closeFileBrowser() {
+    const modal = document.getElementById('file-browser-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    closeFilePreview();
+}
+
+async function loadDirectory(path) {
+    const fileList = document.getElementById('file-list');
+    const pathEl = document.getElementById('file-browser-path');
+    const upBtn = document.getElementById('file-browser-up');
+
+    // Show loading
+    fileList.innerHTML = '<div class="file-browser-loading">Laddar filer...</div>';
+
     try {
-        const response = await fetch('/api/launch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: currentProjectPath })
-        });
+        const url = path ? `/api/files?path=${encodeURIComponent(path)}` : '/api/files';
+        const response = await fetch(url);
+        const data = await response.json();
 
-        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Kunde inte ladda filer');
+        }
 
-        if (response.ok) {
-            addMessage('orchestrator', `🚀 Launched: ${result.path}`);
+        fileBrowserCurrentPath = data.path;
+        pathEl.textContent = data.path;
+
+        // Enable/disable up button
+        upBtn.disabled = !data.can_go_up;
+        upBtn.dataset.parentPath = data.parent_path || '';
+
+        // Render files
+        if (data.files.length === 0) {
+            fileList.innerHTML = '<div class="file-list-empty">Mappen är tom</div>';
         } else {
-            addMessage('orchestrator', `✗ Launch failed: ${result.error}`);
+            fileList.innerHTML = data.files.map(file => {
+                const icon = file.is_dir ? '📁' : getFileIcon(file.name);
+                const sizeStr = file.is_dir ? '' : formatFileSize(file.size);
+                const dateStr = formatDate(file.modified);
+                const typeClass = file.is_dir ? 'directory' : 'file';
+
+                return `
+                    <div class="file-item ${typeClass}"
+                         data-path="${escapeAttr(file.path)}"
+                         data-is-dir="${file.is_dir}">
+                        <span class="file-icon">${icon}</span>
+                        <span class="file-name">${escapeHtml(file.name)}</span>
+                        <span class="file-size">${sizeStr}</span>
+                        <span class="file-date">${dateStr}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Add click handlers
+            fileList.querySelectorAll('.file-item').forEach(item => {
+                item.addEventListener('click', () => handleFileClick(item));
+            });
         }
     } catch (err) {
-        addMessage('orchestrator', `✗ Launch error: ${err.message}`);
+        fileList.innerHTML = `<div class="file-list-empty">Fel: ${escapeHtml(err.message)}</div>`;
     }
+}
+
+function handleFileClick(item) {
+    const path = item.dataset.path;
+    const isDir = item.dataset.isDir === 'true';
+
+    if (isDir) {
+        loadDirectory(path);
+    } else {
+        openFilePreview(path);
+    }
+}
+
+async function openFilePreview(path) {
+    const preview = document.getElementById('file-preview');
+    const nameEl = document.getElementById('file-preview-name');
+    const contentEl = document.getElementById('file-preview-content');
+    const downloadLink = document.getElementById('file-preview-download');
+
+    preview.classList.remove('hidden');
+    nameEl.textContent = path.split('/').pop();
+    contentEl.textContent = 'Laddar...';
+    downloadLink.href = `/api/files/download?path=${encodeURIComponent(path)}`;
+
+    try {
+        const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Kunde inte läsa fil');
+        }
+
+        if (data.binary) {
+            contentEl.innerHTML = `
+                <div class="file-preview-binary">
+                    <div class="binary-icon">📦</div>
+                    <div>Binärfil (${formatFileSize(data.size)})</div>
+                    <div>Typ: ${data.mime_type || 'okänd'}</div>
+                </div>
+            `;
+        } else {
+            contentEl.textContent = data.content || '(tom fil)';
+        }
+    } catch (err) {
+        contentEl.textContent = `Fel: ${err.message}`;
+    }
+}
+
+function closeFilePreview() {
+    const preview = document.getElementById('file-preview');
+    if (preview) {
+        preview.classList.add('hidden');
+    }
+}
+
+function navigateUp() {
+    const upBtn = document.getElementById('file-browser-up');
+    const parentPath = upBtn.dataset.parentPath;
+    if (parentPath) {
+        loadDirectory(parentPath);
+    }
+}
+
+// File browser utility functions
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'py': '🐍', 'js': '📜', 'ts': '📘', 'html': '🌐', 'css': '🎨',
+        'json': '📋', 'md': '📝', 'txt': '📄', 'yml': '⚙️', 'yaml': '⚙️',
+        'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️', 'svg': '🖼️',
+        'pdf': '📕', 'zip': '📦', 'tar': '📦', 'gz': '📦',
+        'sh': '⚡', 'bash': '⚡', 'sql': '🗃️', 'db': '🗃️',
+    };
+    return icons[ext] || '📄';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === null || bytes === undefined) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+function formatDate(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString('sv-SE') + ' ' + date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeAttr(str) {
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // QR Code Modal functions
@@ -606,6 +762,32 @@ document.addEventListener('DOMContentLoaded', () => {
         qrModal.addEventListener('click', (e) => {
             if (e.target === qrModal) {
                 closeQRModal();
+            }
+        });
+    }
+
+    // Wire up file browser
+    const fileBrowserClose = document.getElementById('file-browser-close');
+    if (fileBrowserClose) {
+        fileBrowserClose.addEventListener('click', closeFileBrowser);
+    }
+
+    const fileBrowserUp = document.getElementById('file-browser-up');
+    if (fileBrowserUp) {
+        fileBrowserUp.addEventListener('click', navigateUp);
+    }
+
+    const filePreviewClose = document.getElementById('file-preview-close');
+    if (filePreviewClose) {
+        filePreviewClose.addEventListener('click', closeFilePreview);
+    }
+
+    // Close file browser on backdrop click
+    const fileBrowserModal = document.getElementById('file-browser-modal');
+    if (fileBrowserModal) {
+        fileBrowserModal.addEventListener('click', (e) => {
+            if (e.target === fileBrowserModal) {
+                closeFileBrowser();
             }
         });
     }

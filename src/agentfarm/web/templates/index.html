@@ -178,6 +178,35 @@
         </div>
     </div>
 
+    <!-- File Browser Modal -->
+    <div id="file-browser-modal" class="file-browser-modal hidden">
+        <div class="file-browser-content">
+            <div class="file-browser-header">
+                <h3 id="file-browser-title">PROJEKT FILER</h3>
+                <button id="file-browser-close" class="file-browser-close">&times;</button>
+            </div>
+            <div class="file-browser-toolbar">
+                <button id="file-browser-up" class="file-browser-btn" title="Upp en nivå">
+                    <span>&#8593; UPP</span>
+                </button>
+                <span id="file-browser-path" class="file-browser-path"></span>
+            </div>
+            <div class="file-browser-body">
+                <div id="file-list" class="file-list">
+                    <!-- Files rendered by JS -->
+                </div>
+                <div id="file-preview" class="file-preview hidden">
+                    <div class="file-preview-header">
+                        <span id="file-preview-name"></span>
+                        <button id="file-preview-close" class="file-preview-close-btn">&times;</button>
+                        <a id="file-preview-download" class="file-preview-download" download>LADDA NER</a>
+                    </div>
+                    <pre id="file-preview-content" class="file-preview-content"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/robots.js"></script>
     <script src="/static/js/app.js"></script>
 </body>

@@ -1,0 +1,140 @@
+{
+  "timestamp": "2026-01-13T21:36:24.098463",
+  "total_tests": 11,
+  "passed": 6,
+  "failed": 5,
+  "total_score": 137.76785714285714,
+  "max_score": 210,
+  "percentage": 65.60374149659863,
+  "duration": 459.37741899490356,
+  "by_category": {
+    "codegen": {
+      "total": 4,
+      "passed": 2,
+      "avg_score": 0.5
+    },
+    "bugfix": {
+      "total": 3,
+      "passed": 1,
+      "avg_score": 0.3333333333333333
+    },
+    "refactor": {
+      "total": 2,
+      "passed": 1,
+      "avg_score": 0.6785714285714286
+    },
+    "multistep": {
+      "total": 2,
+      "passed": 2,
+      "avg_score": 0.9375
+    }
+  },
+  "results": [
+    {
+      "test_id": "codegen-001",
+      "passed": false,
+      "score": 0.0,
+      "duration": 29.504668951034546,
+      "errors": [
+        "File prime.py not found",
+        "File prime.py not found",
+        "File prime.py not found",
+        "File prime.py not found",
+        "File prime.py not found"
+      ]
+    },
+    {
+      "test_id": "codegen-002",
+      "passed": true,
+      "score": 1.0,
+      "duration": 12.83698582649231,
+      "errors": []
+    },
+    {
+      "test_id": "codegen-003",
+      "passed": true,
+      "score": 1.0,
+      "duration": 61.36214900016785,
+      "errors": []
+    },
+    {
+      "test_id": "codegen-004",
+      "passed": false,
+      "score": 0.0,
+      "duration": 73.07549524307251,
+      "errors": [
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found"
+      ]
+    },
+    {
+      "test_id": "bugfix-001",
+      "passed": false,
+      "score": 0.0,
+      "duration": 4.256479024887085,
+      "errors": [
+        "File buggy.py not found",
+        "File buggy.py not found",
+        "File buggy.py not found"
+      ]
+    },
+    {
+      "test_id": "bugfix-002",
+      "passed": true,
+      "score": 1.0,
+      "duration": 20.525310516357422,
+      "errors": []
+    },
+    {
+      "test_id": "bugfix-003",
+      "passed": false,
+      "score": 0.0,
+      "duration": 3.1100587844848633,
+      "errors": [
+        "File db.py not found",
+        "File db.py not found",
+        "File db.py not found",
+        "File db.py not found"
+      ]
+    },
+    {
+      "test_id": "refactor-001",
+      "passed": false,
+      "score": 0.5,
+      "duration": 32.90019774436951,
+      "errors": [
+        "Function calculate_subtotal not found in messy.py",
+        "Function apply_discount not found in messy.py",
+        "Function format_receipt not found in messy.py"
+      ]
+    },
+    {
+      "test_id": "refactor-002",
+      "passed": true,
+      "score": 0.8571428571428571,
+      "duration": 91.19669604301453,
+      "errors": [
+        "Pattern 'def area\\(self\\)' not found in shapes.py"
+      ]
+    },
+    {
+      "test_id": "multistep-001",
+      "passed": true,
+      "score": 1.0,
+      "duration": 55.99607014656067,
+      "errors": []
+    },
+    {
+      "test_id": "multistep-002",
+      "passed": true,
+      "score": 0.875,
+      "duration": 74.61303234100342,
+      "errors": [
+        "Syntax error:   File \"/tmp/eval_multistep-002_frr3hote/scraper.py\", line 28\n    time.sleep(1 / self.rate_limit)}\n                                   ^\nSyntaxError: unmatched '}'\n"
+      ]
+    }
+  ]
+}

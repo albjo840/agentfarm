@@ -704,7 +704,7 @@ async def api_workflow_pause_handler(request: web.Request) -> web.Response:
 
 
 async def api_launch_handler(request: web.Request) -> web.Response:
-    """Open a project folder in the system file manager."""
+    """Open a project folder in the system file manager (local only)."""
     import subprocess
     import sys
 
@@ -729,6 +729,159 @@ async def api_launch_handler(request: web.Request) -> web.Response:
         return web.json_response({"status": "launched", "path": str(project_path)})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_files_list_handler(request: web.Request) -> web.Response:
+    """List files in a directory for the web file browser."""
+    import mimetypes
+
+    path = request.query.get("path", "")
+
+    if not path:
+        # Default to projects directory
+        path = str(Path.home() / "nya projekt")
+
+    target_path = Path(path)
+
+    # Security: Only allow access to projects directory and subdirectories
+    projects_base = Path.home() / "nya projekt"
+    try:
+        target_path = target_path.resolve()
+        if not str(target_path).startswith(str(projects_base.resolve())):
+            return web.json_response({"error": "Access denied"}, status=403)
+    except Exception:
+        return web.json_response({"error": "Invalid path"}, status=400)
+
+    if not target_path.exists():
+        return web.json_response({"error": "Path does not exist"}, status=404)
+
+    if not target_path.is_dir():
+        return web.json_response({"error": "Not a directory"}, status=400)
+
+    files = []
+    for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+        try:
+            stat = item.stat()
+            mime_type, _ = mimetypes.guess_type(str(item))
+            files.append({
+                "name": item.name,
+                "path": str(item),
+                "is_dir": item.is_dir(),
+                "size": stat.st_size if not item.is_dir() else None,
+                "modified": stat.st_mtime,
+                "mime_type": mime_type,
+            })
+        except (PermissionError, OSError):
+            continue
+
+    # Check if we can go up
+    can_go_up = target_path != projects_base.resolve()
+    parent_path = str(target_path.parent) if can_go_up else None
+
+    return web.json_response({
+        "path": str(target_path),
+        "files": files,
+        "can_go_up": can_go_up,
+        "parent_path": parent_path,
+    })
+
+
+async def api_files_content_handler(request: web.Request) -> web.Response:
+    """Get file content for viewing in browser."""
+    import mimetypes
+
+    path = request.query.get("path", "")
+
+    if not path:
+        return web.json_response({"error": "No path provided"}, status=400)
+
+    target_path = Path(path)
+
+    # Security: Only allow access to projects directory
+    projects_base = Path.home() / "nya projekt"
+    try:
+        target_path = target_path.resolve()
+        if not str(target_path).startswith(str(projects_base.resolve())):
+            return web.json_response({"error": "Access denied"}, status=403)
+    except Exception:
+        return web.json_response({"error": "Invalid path"}, status=400)
+
+    if not target_path.exists():
+        return web.json_response({"error": "File does not exist"}, status=404)
+
+    if target_path.is_dir():
+        return web.json_response({"error": "Cannot read directory"}, status=400)
+
+    mime_type, _ = mimetypes.guess_type(str(target_path))
+
+    # For text files, return content directly
+    text_types = [
+        'text/', 'application/json', 'application/javascript',
+        'application/xml', 'application/x-python', 'application/x-sh',
+    ]
+    is_text = any(mime_type and mime_type.startswith(t) for t in text_types)
+
+    # Also check common extensions
+    text_extensions = {'.py', '.js', '.ts', '.html', '.css', '.json', '.md', '.txt',
+                       '.yml', '.yaml', '.toml', '.ini', '.cfg', '.sh', '.bash',
+                       '.sql', '.xml', '.svg', '.env', '.gitignore', '.dockerfile'}
+    if target_path.suffix.lower() in text_extensions:
+        is_text = True
+
+    if is_text:
+        try:
+            content = target_path.read_text(encoding='utf-8', errors='replace')
+            # Limit content size for browser
+            if len(content) > 500000:
+                content = content[:500000] + "\n\n... (file truncated, too large to display)"
+            return web.json_response({
+                "path": str(target_path),
+                "name": target_path.name,
+                "content": content,
+                "mime_type": mime_type or "text/plain",
+                "size": target_path.stat().st_size,
+            })
+        except Exception as e:
+            return web.json_response({"error": f"Cannot read file: {e}"}, status=500)
+    else:
+        # For binary files, return info only
+        return web.json_response({
+            "path": str(target_path),
+            "name": target_path.name,
+            "content": None,
+            "mime_type": mime_type or "application/octet-stream",
+            "size": target_path.stat().st_size,
+            "binary": True,
+        })
+
+
+async def api_files_download_handler(request: web.Request) -> web.Response:
+    """Download a file."""
+    path = request.query.get("path", "")
+
+    if not path:
+        return web.json_response({"error": "No path provided"}, status=400)
+
+    target_path = Path(path)
+
+    # Security: Only allow access to projects directory
+    projects_base = Path.home() / "nya projekt"
+    try:
+        target_path = target_path.resolve()
+        if not str(target_path).startswith(str(projects_base.resolve())):
+            return web.json_response({"error": "Access denied"}, status=403)
+    except Exception:
+        return web.json_response({"error": "Invalid path"}, status=400)
+
+    if not target_path.exists() or target_path.is_dir():
+        return web.json_response({"error": "File not found"}, status=404)
+
+    return web.FileResponse(
+        target_path,
+        headers={
+            "Content-Disposition": f'attachment; filename="{target_path.name}"'
+        }
+    )
 
 
 async def api_wireguard_qr_handler(request: web.Request) -> web.Response:
@@ -874,6 +1027,9 @@ def create_app() -> web.Application:
     app.router.add_get('/api/workflows/{id}', api_workflow_detail_handler)
     app.router.add_post('/api/workflows/{id}/pause', api_workflow_pause_handler)
     app.router.add_post('/api/launch', api_launch_handler)
+    app.router.add_get('/api/files', api_files_list_handler)
+    app.router.add_get('/api/files/content', api_files_content_handler)
+    app.router.add_get('/api/files/download', api_files_download_handler)
     app.router.add_post('/api/wireguard/new-peer', api_wireguard_qr_handler)
     app.router.add_get('/static/{path:.*}', static_handler)
 
