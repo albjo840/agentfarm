@@ -21,6 +21,7 @@ När användaren säger "fortsätt" eller "get context", läs dessa filer i ordn
 | [WEB.md](./WEB.md) | Web interface och API endpoints |
 | [CURRENT_STATE.md](./CURRENT_STATE.md) | Pågående arbete och nästa steg |
 | [ROCM_SETUP.md](./ROCM_SETUP.md) | ROCm 6.4.3 + Ollama installation (testad config) |
+| [WIREGUARD_SETUP.md](./WIREGUARD_SETUP.md) | WireGuard VPN + DuckDNS (testad config) |
 
 ## Projekt-översikt
 
