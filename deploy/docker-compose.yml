@@ -1,0 +1,76 @@
+version: "3.8"
+
+# AgentFarm Production Stack
+# Ubuntu 22.04 LTS recommended for ROCm compatibility
+
+services:
+  agentfarm:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: agentfarm-app
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+    volumes:
+      - agentfarm_data:/app/.agentfarm
+      - projects_data:/root/nya\ projekt
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/providers"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    container_name: agentfarm-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      agentfarm:
+        condition: service_healthy
+    networks:
+      - internal
+      - external
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: agentfarm-certbot
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+    depends_on:
+      - nginx
+
+volumes:
+  agentfarm_data:
+    name: agentfarm_data
+  projects_data:
+    name: agentfarm_projects
+  certbot_certs:
+    name: agentfarm_certs
+  certbot_www:
+    name: agentfarm_certbot_www
+
+networks:
+  internal:
+    name: agentfarm_internal
+  external:
+    name: agentfarm_external

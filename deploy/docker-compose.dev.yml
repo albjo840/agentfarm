@@ -1,0 +1,30 @@
+version: "3.8"
+
+# AgentFarm Development Stack
+# For local development without SSL
+
+services:
+  agentfarm:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: agentfarm-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+    volumes:
+      - ../src:/app/src:ro
+      - agentfarm_data:/app/.agentfarm
+      - projects_data:/root/nya\ projekt
+    restart: unless-stopped
+
+volumes:
+  agentfarm_data:
+  projects_data:

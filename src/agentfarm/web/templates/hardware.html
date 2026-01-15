@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentFarm :: Hardware Terminal</title>
+    <link rel="stylesheet" href="/static/css/retro.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* Hardware Terminal Specific Styles */
+        .hardware-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .hardware-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            border: 2px solid var(--cyan);
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
+            position: relative;
+        }
+
+        .hardware-header::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 1px solid var(--magenta);
+            opacity: 0.5;
+        }
+
+        .hardware-header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            color: var(--cyan);
+            text-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan);
+            margin: 0 0 10px 0;
+            letter-spacing: 0.3em;
+        }
+
+        .hardware-header .subtitle {
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-dim);
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        .hardware-header .rocm-badge {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: linear-gradient(90deg, var(--magenta), var(--cyan));
+            color: var(--bg);
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.2em;
+            animation: badge-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes badge-glow {
+            0%, 100% { box-shadow: 0 0 10px var(--magenta); }
+            50% { box-shadow: 0 0 20px var(--cyan), 0 0 30px var(--magenta); }
+        }
+
+        /* Category tabs */
+        .category-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .category-tab {
+            padding: 10px 25px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 0.1em;
+        }
+
+        .category-tab:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .category-tab.active {
+            background: var(--cyan);
+            color: var(--bg);
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px var(--cyan);
+        }
+
+        /* Product grid */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .product-card {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(20, 20, 40, 0.8) 100%);
+            border: 1px solid var(--border);
+            padding: 25px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .product-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.2);
+        }
+
+        .product-card:hover::before {
+            opacity: 1;
+        }
+
+        .product-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            padding: 5px 15px;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--bg);
+        }
+
+        .product-badge.recommended {
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan);
+        }
+
+        .product-badge.best-value {
+            background: var(--green);
+            box-shadow: 0 0 15px var(--green);
+        }
+
+        .product-badge.edge-ai {
+            background: var(--magenta);
+            box-shadow: 0 0 15px var(--magenta);
+        }
+
+        .product-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.1rem;
+            color: var(--text);
+            margin: 0 0 10px 0;
+            letter-spacing: 0.05em;
+        }
+
+        .product-description {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin: 0 0 20px 0;
+            line-height: 1.5;
+        }
+
+        .product-specs {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .spec-item {
+            padding: 5px 12px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+        }
+
+        .product-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .retailer-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            color: var(--text);
+            text-decoration: none;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .retailer-link:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .retailer-link .retailer-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .retailer-link .retailer-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--border);
+            font-size: 0.7rem;
+        }
+
+        .retailer-link .arrow {
+            color: var(--cyan);
+            font-size: 1.2rem;
+        }
+
+        /* Info section */
+        .info-section {
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.05) 0%, rgba(0, 255, 255, 0.05) 100%);
+            border: 1px solid var(--border);
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+
+        .info-section h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.3rem;
+            color: var(--magenta);
+            margin: 0 0 20px 0;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 10px var(--magenta);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--cyan);
+        }
+
+        .info-item h3 {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.9rem;
+            color: var(--cyan);
+            margin: 0 0 8px 0;
+        }
+
+        .info-item p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* Back link */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 25px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            text-decoration: none;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .back-link:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Footer */
+        .hardware-footer {
+            text-align: center;
+            padding: 30px;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+
+        .hardware-footer p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin: 0;
+        }
+
+        .hardware-footer a {
+            color: var(--cyan);
+            text-decoration: none;
+        }
+
+        .hardware-footer a:hover {
+            text-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-dim);
+        }
+
+        .loading::after {
+            content: '';
+            animation: loading-dots 1.5s infinite;
+        }
+
+        @keyframes loading-dots {
+            0% { content: '.'; }
+            33% { content: '..'; }
+            66% { content: '...'; }
+        }
+
+        /* No products */
+        .no-products {
+            text-align: center;
+            padding: 60px;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-dim);
+            border: 1px dashed var(--border);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hardware-header h1 {
+                font-size: 1.5rem;
+                letter-spacing: 0.1em;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .category-tabs {
+                gap: 5px;
+            }
+
+            .category-tab {
+                padding: 8px 15px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Scanline overlay -->
+    <div class="scanlines"></div>
+
+    <!-- CRT flicker effect -->
+    <div class="crt-effect"></div>
+
+    <div class="hardware-container">
+        <!-- Back link -->
+        <a href="/" class="back-link">
+            <span>&larr;</span>
+            <span>TILLBAKA TILL TERMINAL</span>
+        </a>
+
+        <!-- Header -->
+        <header class="hardware-header">
+            <h1>HARDWARE TERMINAL</h1>
+            <p class="subtitle">REKOMMENDERAD UTRUSTNING FOR AI/ML-ARBETE</p>
+            <span class="rocm-badge">AMD ROCm OPTIMERAT</span>
+        </header>
+
+        <!-- Category tabs -->
+        <div class="category-tabs">
+            <button class="category-tab active" data-category="all">ALLA</button>
+            <button class="category-tab" data-category="gpu">GPU</button>
+            <button class="category-tab" data-category="sbc">EDGE / SBC</button>
+            <button class="category-tab" data-category="cpu">CPU</button>
+            <button class="category-tab" data-category="ram">MINNE</button>
+        </div>
+
+        <!-- Products grid -->
+        <div id="products-grid" class="products-grid">
+            <div class="loading">LADDAR PRODUKTER</div>
+        </div>
+
+        <!-- Info section -->
+        <section class="info-section">
+            <h2>VARFOR AMD FOR AI/ML?</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <h3>ROCm 6.x SUPPORT</h3>
+                    <p>Full PyTorch och TensorFlow-kompatibilitet via ROCm. Kor lokala LLMs utan CUDA-beroende.</p>
+                </div>
+                <div class="info-item">
+                    <h3>VRAM MATTERS</h3>
+                    <p>24GB VRAM pa 7900 XTX klarar 70B-modeller med kvantisering. 16GB pa 7900 GRE racker for de flesta 7B-13B modeller.</p>
+                </div>
+                <div class="info-item">
+                    <h3>UBUNTU 22.04 LTS</h3>
+                    <p>ROCm fungerar bast pa Ubuntu 22.04 LTS. Debian och andra distros har begransat stod.</p>
+                </div>
+                <div class="info-item">
+                    <h3>KOSTNADSEFFEKTIVT</h3>
+                    <p>AMD-kort ger ofta mer VRAM per krona jamfort med NVIDIA. Perfekt for hobbyprojekt och startups.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="hardware-footer">
+            <p>
+                Affiliate-lankar - vi far en liten provision om du koper via vara lankar.
+                <br>
+                <a href="/">&larr; Tillbaka till AgentFarm</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Hardware Terminal JavaScript
+        const HardwareTerminal = {
+            products: [],
+            currentCategory: 'all',
+
+            async init() {
+                await this.loadProducts();
+                this.setupCategoryTabs();
+                this.renderProducts();
+            },
+
+            async loadProducts() {
+                try {
+                    const response = await fetch('/api/affiliates/products');
+                    if (!response.ok) throw new Error('Failed to load products');
+                    this.products = await response.json();
+                } catch (error) {
+                    console.error('Error loading products:', error);
+                    this.products = [];
+                }
+            },
+
+            setupCategoryTabs() {
+                document.querySelectorAll('.category-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        this.currentCategory = tab.dataset.category;
+                        this.renderProducts();
+                    });
+                });
+            },
+
+            renderProducts() {
+                const grid = document.getElementById('products-grid');
+
+                let filtered = this.products;
+                if (this.currentCategory !== 'all') {
+                    filtered = this.products.filter(p => p.category === this.currentCategory);
+                }
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = '<div class="no-products">INGA PRODUKTER I DENNA KATEGORI</div>';
+                    return;
+                }
+
+                grid.innerHTML = filtered.map(product => this.renderProductCard(product)).join('');
+            },
+
+            renderProductCard(product) {
+                const badgeClass = this.getBadgeClass(product.badge);
+                const badgeHtml = product.badge
+                    ? `<div class="product-badge ${badgeClass}">${product.badge}</div>`
+                    : '';
+
+                const linksHtml = Object.entries(product.links || {}).map(([retailerId, url]) => {
+                    const retailerName = this.getRetailerName(retailerId);
+                    return `
+                        <a href="/api/affiliates/${product.id}/click/${retailerId}"
+                           class="retailer-link"
+                           target="_blank"
+                           rel="noopener">
+                            <span class="retailer-name">
+                                <span class="retailer-icon">${retailerName.charAt(0)}</span>
+                                ${retailerName}
+                            </span>
+                            <span class="arrow">&rarr;</span>
+                        </a>
+                    `;
+                }).join('');
+
+                const specsHtml = this.getSpecs(product);
+
+                return `
+                    <div class="product-card">
+                        ${badgeHtml}
+                        <h3 class="product-name">${product.name}</h3>
+                        <p class="product-description">${product.description}</p>
+                        ${specsHtml}
+                        <div class="product-links">
+                            ${linksHtml}
+                        </div>
+                    </div>
+                `;
+            },
+
+            getBadgeClass(badge) {
+                if (!badge) return '';
+                const lower = badge.toLowerCase();
+                if (lower.includes('recommend')) return 'recommended';
+                if (lower.includes('value')) return 'best-value';
+                if (lower.includes('edge')) return 'edge-ai';
+                return 'recommended';
+            },
+
+            getRetailerName(retailerId) {
+                const names = {
+                    'dustin': 'Dustin',
+                    'komplett': 'Komplett',
+                    'inet': 'Inet',
+                    'electrokit': 'Electrokit',
+                    'amazon': 'Amazon.se'
+                };
+                return names[retailerId] || retailerId;
+            },
+
+            getSpecs(product) {
+                // Extract specs from description or category
+                const specs = [];
+                const desc = product.description.toLowerCase();
+
+                // VRAM detection
+                const vramMatch = desc.match(/(\d+)\s*gb\s*vram/i);
+                if (vramMatch) {
+                    specs.push(`${vramMatch[1]}GB VRAM`);
+                }
+
+                // ROCm detection
+                if (desc.includes('rocm')) {
+                    specs.push('ROCm');
+                }
+
+                // Category-based specs
+                if (product.category === 'gpu') {
+                    if (!specs.some(s => s.includes('ROCm'))) {
+                        specs.push('GPU');
+                    }
+                } else if (product.category === 'sbc') {
+                    specs.push('SBC');
+                    specs.push('Edge AI');
+                }
+
+                if (specs.length === 0) return '';
+
+                return `
+                    <div class="product-specs">
+                        ${specs.map(s => `<span class="spec-item">${s}</span>`).join('')}
+                    </div>
+                `;
+            }
+        };
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            HardwareTerminal.init();
+        });
+    </script>
+</body>
+</html>

@@ -37,6 +37,9 @@ from agentfarm.events import Event, EventBus, EventType, PriorityLevel, Workflow
 # Import LLM Router
 from agentfarm.providers.router import LLMRouter, TaskType, get_task_type_for_agent
 
+# Import Affiliate Manager
+from agentfarm.monetization.affiliates import AffiliateManager
+
 # Try to import aiohttp, fall back to basic HTTP server if not available
 try:
     from aiohttp import web
@@ -95,6 +98,7 @@ current_working_dir = "."
 event_bus = EventBus(max_history=500)  # Global event bus
 llm_router: LLMRouter | None = None  # Global LLM router
 workflow_persistence: WorkflowPersistence | None = None  # Workflow state persistence
+affiliate_manager: AffiliateManager | None = None  # Affiliate link manager
 _event_bus_task: asyncio.Task | None = None  # Background task for event processing
 
 
@@ -224,6 +228,83 @@ async def mobile_handler(request: web.Request) -> web.Response:
     """Serve the mobile interface."""
     mobile_path = TEMPLATES_DIR / "mobile.html"
     return web.FileResponse(mobile_path)
+
+
+async def hardware_handler(request: web.Request) -> web.Response:
+    """Serve the hardware terminal page."""
+    hardware_path = TEMPLATES_DIR / "hardware.html"
+    return web.FileResponse(hardware_path)
+
+
+async def api_affiliates_products_handler(request: web.Request) -> web.Response:
+    """Return list of affiliate products."""
+    if affiliate_manager is None:
+        return web.json_response({"error": "Affiliate manager not initialized"}, status=503)
+
+    category = request.query.get("category")
+    products = affiliate_manager.get_products(category=category)
+
+    return web.json_response([
+        {
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "category": p.category,
+            "badge": p.badge,
+            "image_url": p.image_url,
+            "links": p.links,
+        }
+        for p in products
+    ])
+
+
+async def api_affiliates_categories_handler(request: web.Request) -> web.Response:
+    """Return list of product categories."""
+    if affiliate_manager is None:
+        return web.json_response({"error": "Affiliate manager not initialized"}, status=503)
+
+    categories = affiliate_manager.get_categories()
+    return web.json_response(categories)
+
+
+async def api_affiliates_click_handler(request: web.Request) -> web.Response:
+    """Track affiliate click and redirect to retailer."""
+    if affiliate_manager is None:
+        return web.json_response({"error": "Affiliate manager not initialized"}, status=503)
+
+    product_id = request.match_info["product_id"]
+    retailer_id = request.match_info["retailer_id"]
+
+    # Get tracking info from request
+    device_id = request.cookies.get("device_id")
+    referrer = request.headers.get("Referer")
+    user_agent = request.headers.get("User-Agent")
+
+    # Track the click and get redirect URL
+    url, click = affiliate_manager.track_click(
+        product_id=product_id,
+        retailer_id=retailer_id,
+        device_id=device_id,
+        referrer=referrer,
+        user_agent=user_agent,
+    )
+
+    if not url:
+        return web.json_response({"error": "Product or retailer not found"}, status=404)
+
+    # Redirect to affiliate URL
+    raise web.HTTPFound(location=url)
+
+
+async def api_affiliates_stats_handler(request: web.Request) -> web.Response:
+    """Return affiliate click statistics."""
+    if affiliate_manager is None:
+        return web.json_response({"error": "Affiliate manager not initialized"}, status=503)
+
+    days = int(request.query.get("days", "30"))
+    stats = affiliate_manager.get_click_stats(days=days)
+
+    return web.json_response(stats)
 
 
 async def static_handler(request: web.Request) -> web.Response:
@@ -971,9 +1052,14 @@ PersistentKeepalive = 25"""
 
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
-    global llm_router, workflow_persistence
+    global llm_router, workflow_persistence, affiliate_manager
 
     setup_event_bus()
+
+    # Initialize affiliate manager
+    storage_dir = Path(current_working_dir) / ".agentfarm"
+    affiliate_manager = AffiliateManager(storage_dir=storage_dir)
+    logger.info("Affiliate manager initialized")
 
     # Initialize workflow persistence
     workflow_persistence = WorkflowPersistence(
@@ -1017,8 +1103,14 @@ def create_app() -> web.Application:
     app.router.add_get('/', index_handler)
     app.router.add_get('/mobile', mobile_handler)
     app.router.add_get('/m', mobile_handler)  # Short alias
+    app.router.add_get('/hardware', hardware_handler)
     app.router.add_get('/ws', websocket_handler)
     app.router.add_get('/api/providers', api_providers_handler)
+    # Affiliate routes
+    app.router.add_get('/api/affiliates/products', api_affiliates_products_handler)
+    app.router.add_get('/api/affiliates/categories', api_affiliates_categories_handler)
+    app.router.add_get('/api/affiliates/{product_id}/click/{retailer_id}', api_affiliates_click_handler)
+    app.router.add_get('/api/affiliates/stats', api_affiliates_stats_handler)
     app.router.add_get('/api/events', api_events_handler)
     app.router.add_post('/api/interrupt', api_interrupt_handler)
     app.router.add_get('/api/router', api_router_handler)
@@ -1048,6 +1140,7 @@ def run_server(host: str = '0.0.0.0', port: int = 8080, workdir: str = '.') -> N
         print(f"{'='*60}")
         print(f"  Dashboard:    http://{host}:{port}")
         print(f"  Mobile:       http://{host}:{port}/mobile")
+        print(f"  Hardware:     http://{host}:{port}/hardware")
         print(f"  VPN access:   http://10.0.0.1:{port}/mobile")
         print(f"  Working dir:  {workdir}")
         print()
