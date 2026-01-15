@@ -18,6 +18,9 @@ from agentfarm.monetization.users import UserManager, UserProfile, SubscriptionT
 from agentfarm.monetization.feedback import FeedbackManager, FeedbackEntry
 from agentfarm.monetization.stripe_integration import StripeIntegration
 
+# Unified tier management
+from agentfarm.monetization.tiers import TierManager, TierLimits, AccessLevel
+
 __all__ = [
     # Affiliates
     "AffiliateManager",
@@ -32,4 +35,8 @@ __all__ = [
     "FeedbackEntry",
     # Payments
     "StripeIntegration",
+    # Tier Management
+    "TierManager",
+    "TierLimits",
+    "AccessLevel",
 ]

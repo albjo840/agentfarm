@@ -117,15 +117,16 @@ class TestRecursionGuard:
         guard = RecursionGuard(max_total_calls=100)
 
         # Call same agent with same task multiple times
-        for i in range(3):
+        # Threshold was increased from 3 to 5 to avoid false positives in multi-step workflows
+        for i in range(5):
             guard.enter("AgentA", "same task")
             guard.exit("AgentA")
 
-        # Fourth identical call should raise
+        # Sixth identical call should raise
         with pytest.raises(RecursionLimitError) as exc_info:
             guard.enter("AgentA", "same task")
 
-        assert "called 3 times with similar task" in str(exc_info.value)
+        assert "called 5 times with identical task" in str(exc_info.value)
 
     def test_different_tasks_not_blocked(self):
         """Test that different tasks from same agent are not blocked."""
