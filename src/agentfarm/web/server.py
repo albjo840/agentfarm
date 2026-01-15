@@ -51,6 +51,11 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 from agentfarm.config import AgentFarmConfig, ProviderConfig, ProviderType
 
+# Import monetization module
+from agentfarm.monetization.users import UserManager, SubscriptionTier
+from agentfarm.monetization.feedback import FeedbackManager, FeedbackEntry
+from agentfarm.monetization.stripe_integration import StripeIntegration
+
 
 # Paths
 WEB_DIR = Path(__file__).parent
@@ -100,6 +105,11 @@ llm_router: LLMRouter | None = None  # Global LLM router
 workflow_persistence: WorkflowPersistence | None = None  # Workflow state persistence
 affiliate_manager: AffiliateManager | None = None  # Affiliate link manager
 _event_bus_task: asyncio.Task | None = None  # Background task for event processing
+
+# Monetization globals
+user_manager: UserManager | None = None
+feedback_manager: FeedbackManager | None = None
+stripe_integration: StripeIntegration | None = None
 
 
 async def _broadcast_event_handler(event: Event) -> None:
@@ -1050,9 +1060,217 @@ PersistentKeepalive = 25"""
         return web.json_response({"error": str(e)}, status=500)
 
 
+# =============================================================================
+# MONETIZATION API HANDLERS
+# =============================================================================
+
+def _get_device_id(request: web.Request) -> str:
+    """Extract device ID from cookie or create new one."""
+    device_id = request.cookies.get("device_id")
+    if not device_id:
+        import uuid
+        device_id = str(uuid.uuid4())
+    return device_id
+
+
+async def api_user_handler(request: web.Request) -> web.Response:
+    """Get current user profile."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    user = user_manager.get_or_create_user(device_id)
+
+    response = web.json_response({
+        "device_id": user.device_id,
+        "tier": user.tier.value,
+        "tokens_remaining": user.tokens_remaining,
+        "tokens_used_total": user.tokens_used_total,
+        "has_company_context": bool(user.company_context),
+        "stripe_enabled": stripe_integration.enabled if stripe_integration else False,
+    })
+
+    # Set device_id cookie if not present
+    if "device_id" not in request.cookies:
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+
+    return response
+
+
+async def api_user_context_handler(request: web.Request) -> web.Response:
+    """Save company context for the user."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    data = await request.json()
+    context = data.get("context", "")
+
+    if len(context) > 50000:
+        return web.json_response({"error": "Context too long (max 50000 chars)"}, status=400)
+
+    user_manager.set_company_context(device_id, context)
+    return web.json_response({"status": "saved", "length": len(context)})
+
+
+async def api_tokens_handler(request: web.Request) -> web.Response:
+    """Get token balance for current user."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    user = user_manager.get_or_create_user(device_id)
+
+    return web.json_response({
+        "tokens_remaining": user.tokens_remaining,
+        "tokens_used_total": user.tokens_used_total,
+        "tier": user.tier.value,
+        "unlimited": user.tier == SubscriptionTier.EARLY_ACCESS,
+    })
+
+
+async def api_subscription_checkout_handler(request: web.Request) -> web.Response:
+    """Create Stripe checkout session."""
+    if not stripe_integration or not stripe_integration.enabled:
+        return web.json_response({"error": "Stripe not configured"}, status=503)
+
+    device_id = _get_device_id(request)
+    data = await request.json()
+    product_type = data.get("product_type", "early_access")
+
+    session = await stripe_integration.create_checkout_session(device_id, product_type)
+    if session:
+        return web.json_response({
+            "checkout_url": session.url,
+            "session_id": session.id,
+        })
+    else:
+        # Fallback to simple URL
+        url = stripe_integration.create_checkout_url(device_id, product_type)
+        return web.json_response({"checkout_url": url})
+
+
+async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
+    """Handle Stripe webhook events."""
+    if not stripe_integration or not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    payload = await request.read()
+    signature = request.headers.get("Stripe-Signature", "")
+
+    result = await stripe_integration.handle_webhook(payload, signature)
+    action = result.get("action", "")
+
+    logger.info("Stripe webhook action: %s", action)
+
+    # Process the action
+    if action == "upgrade_tier":
+        device_id = result.get("device_id", "")
+        tier_str = result.get("tier", "early_access")
+        tier = SubscriptionTier.EARLY_ACCESS if tier_str == "early_access" else SubscriptionTier.FREE
+        customer_id = result.get("stripe_customer_id")
+        if device_id:
+            user_manager.upgrade_tier(device_id, tier, customer_id)
+            logger.info("Upgraded user %s to %s", device_id[:8], tier.value)
+
+    elif action == "add_tokens":
+        device_id = result.get("device_id", "")
+        tokens = result.get("tokens", 0)
+        if device_id and tokens:
+            user_manager.update_tokens(device_id, tokens, f"purchase_{result.get('product_type', 'unknown')}")
+            logger.info("Added %d tokens to user %s", tokens, device_id[:8])
+
+    elif action == "downgrade_tier":
+        device_id = result.get("device_id", "")
+        if device_id:
+            user_manager.upgrade_tier(device_id, SubscriptionTier.FREE)
+            logger.info("Downgraded user %s to free", device_id[:8])
+
+    elif action == "subscription_renewed":
+        # Find user by stripe customer ID and refresh tokens
+        customer_id = result.get("stripe_customer_id", "")
+        if customer_id:
+            # Would need to look up user by customer ID
+            logger.info("Subscription renewed for customer %s", customer_id[:8])
+
+    elif action == "invalid_signature":
+        return web.json_response({"error": "Invalid signature"}, status=400)
+
+    return web.json_response({"received": True, "action": action})
+
+
+async def api_feedback_handler(request: web.Request) -> web.Response:
+    """Submit user feedback."""
+    if not feedback_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    data = await request.json()
+
+    message = data.get("message", "").strip()
+    if not message:
+        return web.json_response({"error": "Message required"}, status=400)
+    if len(message) > 10000:
+        return web.json_response({"error": "Message too long"}, status=400)
+
+    feedback = feedback_manager.create_feedback(
+        device_id=device_id,
+        message=message,
+        category=data.get("category", "general"),
+        workflow_id=data.get("workflow_id"),
+        contact_email=data.get("email"),
+        user_agent=request.headers.get("User-Agent"),
+        rating=data.get("rating"),
+    )
+
+    logger.info("Feedback received: %s from %s", feedback.id, device_id[:8])
+    return web.json_response({"status": "submitted", "id": feedback.id})
+
+
+async def api_feedback_list_handler(request: web.Request) -> web.Response:
+    """List feedback (admin endpoint)."""
+    if not feedback_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    # Simple admin check via query param (should use proper auth in production)
+    if request.query.get("admin_key") != os.getenv("AGENTFARM_ADMIN_KEY", ""):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    status = request.query.get("status")
+    category = request.query.get("category")
+    limit = int(request.query.get("limit", "100"))
+
+    entries = feedback_manager.list_feedback(status=status, category=category, limit=limit)
+    stats = feedback_manager.get_stats()
+
+    return web.json_response({
+        "feedback": [e.model_dump() for e in entries],
+        "stats": stats,
+    })
+
+
+async def api_monetization_stats_handler(request: web.Request) -> web.Response:
+    """Get monetization stats (admin endpoint)."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    # Simple admin check
+    if request.query.get("admin_key") != os.getenv("AGENTFARM_ADMIN_KEY", ""):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    user_stats = user_manager.get_stats()
+    feedback_stats = feedback_manager.get_stats() if feedback_manager else {}
+
+    return web.json_response({
+        "users": user_stats,
+        "feedback": feedback_stats,
+        "stripe_enabled": stripe_integration.enabled if stripe_integration else False,
+    })
+
+
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
-    global llm_router, workflow_persistence, affiliate_manager
+    global llm_router, workflow_persistence, affiliate_manager, user_manager, feedback_manager, stripe_integration
 
     setup_event_bus()
 
@@ -1067,6 +1285,13 @@ async def on_startup(app: web.Application) -> None:
     )
     workflow_persistence.connect(event_bus)
     logger.info("Workflow persistence initialized")
+
+    # Initialize monetization
+    agentfarm_dir = Path(current_working_dir) / ".agentfarm"
+    user_manager = UserManager(agentfarm_dir)
+    feedback_manager = FeedbackManager(agentfarm_dir)
+    stripe_integration = StripeIntegration()
+    logger.info("Monetization initialized (Stripe enabled: %s)", stripe_integration.enabled)
 
     # Initialize LLM router with event bus integration
     llm_router = LLMRouter(event_bus=event_bus)
@@ -1123,6 +1348,17 @@ def create_app() -> web.Application:
     app.router.add_get('/api/files/content', api_files_content_handler)
     app.router.add_get('/api/files/download', api_files_download_handler)
     app.router.add_post('/api/wireguard/new-peer', api_wireguard_qr_handler)
+
+    # Monetization routes
+    app.router.add_get('/api/user', api_user_handler)
+    app.router.add_post('/api/user/context', api_user_context_handler)
+    app.router.add_get('/api/tokens', api_tokens_handler)
+    app.router.add_post('/api/subscription/checkout', api_subscription_checkout_handler)
+    app.router.add_post('/webhook/stripe', api_stripe_webhook_handler)
+    app.router.add_post('/api/feedback', api_feedback_handler)
+    app.router.add_get('/api/feedback', api_feedback_list_handler)
+    app.router.add_get('/api/monetization/stats', api_monetization_stats_handler)
+
     app.router.add_get('/static/{path:.*}', static_handler)
 
     return app

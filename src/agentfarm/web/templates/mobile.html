@@ -330,9 +330,64 @@
         /* QR Button in footer */
         .footer {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            gap: 20px;
+            padding: 10px 20px;
+        }
+
+        .credits-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+        }
+
+        .credits-label {
+            color: #666;
+        }
+
+        .credits-value {
+            color: #00fff2;
+            font-weight: bold;
+        }
+
+        .footer-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .footer-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #888;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .footer-btn:active {
+            transform: scale(0.95);
+        }
+
+        .footer-btn.qr-btn {
+            border-color: #9d00ff;
+            color: #9d00ff;
+        }
+
+        .footer-btn.upgrade-btn {
+            border-color: #ff00ff;
+            color: #ff00ff;
+        }
+
+        .footer-btn.feedback-btn {
+            border-color: #00fff2;
+            color: #00fff2;
         }
 
         .qr-btn {
@@ -659,11 +714,21 @@ Exempel:
     </main>
 
     <footer class="footer">
-        <span>AgentFarm</span>
-        <button class="qr-btn" id="qr-btn">
-            <span>&#9783;</span>
-            <span>NY VPN</span>
-        </button>
+        <span class="credits-display">
+            <span class="credits-label">CREDITS:</span>
+            <span class="credits-value" id="credits-balance">100</span>
+        </span>
+        <div class="footer-buttons">
+            <button class="footer-btn qr-btn" id="qr-btn">
+                <span>&#9783;</span>
+            </button>
+            <button class="footer-btn upgrade-btn" id="upgrade-btn">
+                <span>★</span>
+            </button>
+            <button class="footer-btn feedback-btn" id="feedback-btn">
+                <span>✉</span>
+            </button>
+        </div>
     </footer>
 
     <div class="toast" id="toast"></div>
@@ -1095,6 +1160,65 @@ Exempel:
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
         }, 30000);
+
+        // ===========================================
+        // Monetization Functions
+        // ===========================================
+
+        const upgradeBtn = document.getElementById('upgrade-btn');
+        const feedbackBtn = document.getElementById('feedback-btn');
+        const creditsBalance = document.getElementById('credits-balance');
+
+        // Load user data
+        async function loadUserData() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.tier === 'early_access') {
+                        creditsBalance.textContent = '∞';
+                    } else {
+                        creditsBalance.textContent = data.tokens_remaining;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load user data:', e);
+            }
+        }
+
+        // Upgrade button - redirect to desktop for full upgrade modal
+        upgradeBtn.addEventListener('click', () => {
+            showToast('Öppna desktop-versionen för upgrade', 'info');
+            // Could also open a simple checkout URL directly:
+            // window.location.href = '/api/subscription/checkout?product_type=early_access';
+        });
+
+        // Feedback button - simple prompt on mobile
+        feedbackBtn.addEventListener('click', async () => {
+            const message = prompt('Din feedback:');
+            if (message && message.trim()) {
+                try {
+                    const response = await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            category: 'general',
+                            message: message.trim()
+                        })
+                    });
+                    if (response.ok) {
+                        showToast('Tack för din feedback!', 'success');
+                    } else {
+                        showToast('Kunde inte skicka', 'error');
+                    }
+                } catch (e) {
+                    showToast('Ett fel uppstod', 'error');
+                }
+            }
+        });
+
+        // Load user data on startup
+        loadUserData();
     </script>
 </body>
 </html>

@@ -1279,3 +1279,431 @@ section {
         display: none;
     }
 }
+
+/* =============================================================================
+   MONETIZATION UI COMPONENTS
+   ============================================================================= */
+
+/* Credits display in header */
+.credits-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tier-badge {
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    background: var(--text-dim);
+    color: var(--bg-dark);
+}
+
+.tier-badge.early_access {
+    background: var(--cyan);
+    color: var(--bg-dark);
+    animation: glow-pulse 2s infinite;
+}
+
+.tier-badge.pro {
+    background: linear-gradient(135deg, var(--magenta), var(--cyan));
+    color: var(--bg-dark);
+}
+
+/* Footer buttons */
+.upgrade-btn,
+.feedback-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upgrade-btn {
+    border-color: var(--magenta);
+    color: var(--magenta);
+}
+
+.upgrade-btn:hover {
+    background: rgba(255, 0, 255, 0.15);
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+}
+
+.feedback-btn:hover {
+    background: rgba(0, 255, 242, 0.15);
+    box-shadow: 0 0 15px rgba(0, 255, 242, 0.4);
+}
+
+.upgrade-icon,
+.feedback-icon {
+    font-size: 0.9rem;
+}
+
+/* Generic Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    border: 1px solid var(--cyan);
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 0 40px rgba(0, 255, 242, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    color: var(--cyan);
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.modal-close:hover {
+    color: var(--magenta);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Tier Comparison */
+.tier-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.tier-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    position: relative;
+}
+
+.tier-card h4 {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+}
+
+.tier-price {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    color: var(--cyan);
+    margin-bottom: 1rem;
+}
+
+.tier-price span {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+
+.tier-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+.tier-features li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.tier-features li:last-child {
+    border-bottom: none;
+}
+
+.tier-features li::before {
+    content: "▸ ";
+    color: var(--cyan);
+}
+
+.tier-card.tier-early-access {
+    border-color: var(--magenta);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+.tier-badge-hot {
+    position: absolute;
+    top: -10px;
+    right: 10px;
+    background: var(--magenta);
+    color: var(--bg-dark);
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    letter-spacing: 0.1em;
+}
+
+.tier-current {
+    text-align: center;
+    padding: 0.5rem;
+    background: var(--text-dim);
+    color: var(--bg-dark);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+.checkout-btn {
+    width: 100%;
+    padding: 0.8rem;
+    background: var(--magenta);
+    border: none;
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.checkout-btn:hover {
+    background: var(--cyan);
+    box-shadow: 0 0 20px rgba(0, 255, 242, 0.5);
+}
+
+/* Token Packs */
+.token-packs {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.token-packs h4 {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.token-pack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.token-pack {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.token-pack:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 15px rgba(0, 255, 242, 0.3);
+}
+
+.pack-amount {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    color: var(--cyan);
+}
+
+.pack-price {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+}
+
+/* Feedback Form */
+.feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-group label {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+}
+
+.form-group select,
+.form-group input,
+.form-group textarea {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.6rem 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-group select:focus,
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--cyan);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Star Rating */
+.star-rating {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.star {
+    font-size: 1.5rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.star:hover,
+.star.active {
+    color: var(--yellow);
+}
+
+.star-rating:hover .star {
+    color: var(--text-dim);
+}
+
+.star-rating:hover .star:hover,
+.star-rating:hover .star:hover ~ .star {
+    color: var(--text-dim);
+}
+
+.star-rating .star:hover,
+.star-rating .star:hover ~ .star {
+    color: var(--text-dim);
+}
+
+.star-rating:hover .star:hover,
+.star-rating:hover .star.hovered {
+    color: var(--yellow);
+}
+
+/* Submit Button */
+.submit-btn {
+    padding: 0.7rem 1.5rem;
+    background: var(--cyan);
+    border: none;
+    color: var(--bg-dark);
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+    background: var(--magenta);
+    color: white;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+}
+
+.submit-btn:disabled {
+    background: var(--text-dim);
+    cursor: not-allowed;
+}
+
+/* Context Modal */
+.context-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+/* Mobile responsive for modals */
+@media (max-width: 768px) {
+    .tier-comparison {
+        grid-template-columns: 1fr;
+    }
+
+    .token-pack-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+}
+
+/* Glow pulse animation */
+@keyframes glow-pulse {
+    0%, 100% {
+        box-shadow: 0 0 5px currentColor;
+    }
+    50% {
+        box-shadow: 0 0 15px currentColor;
+    }
+}

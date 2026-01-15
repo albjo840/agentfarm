@@ -791,4 +791,281 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Initialize monetization UI
+    initMonetization();
 });
+
+// =============================================================================
+// MONETIZATION UI
+// =============================================================================
+
+let currentUserData = null;
+let selectedRating = null;
+
+async function initMonetization() {
+    // Load user data
+    await loadUserData();
+
+    // Wire up upgrade button
+    const upgradeBtn = document.getElementById('upgrade-btn');
+    if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', () => openModal('upgrade-modal'));
+    }
+
+    // Wire up feedback button
+    const feedbackBtn = document.getElementById('feedback-btn');
+    if (feedbackBtn) {
+        feedbackBtn.addEventListener('click', () => openModal('feedback-modal'));
+    }
+
+    // Wire up modal close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const modalId = btn.getAttribute('data-modal');
+            if (modalId) closeModal(modalId);
+        });
+    });
+
+    // Close modals on backdrop click
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    });
+
+    // Wire up checkout button
+    const checkoutBtn = document.getElementById('checkout-early-access');
+    if (checkoutBtn) {
+        checkoutBtn.addEventListener('click', () => startCheckout('early_access'));
+    }
+
+    // Wire up token pack buttons
+    document.querySelectorAll('.token-pack').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const pack = btn.getAttribute('data-pack');
+            startCheckout(`token_pack_${pack}`);
+        });
+    });
+
+    // Wire up feedback submit
+    const submitFeedbackBtn = document.getElementById('submit-feedback');
+    if (submitFeedbackBtn) {
+        submitFeedbackBtn.addEventListener('click', submitFeedback);
+    }
+
+    // Wire up star rating
+    const starRating = document.getElementById('star-rating');
+    if (starRating) {
+        starRating.querySelectorAll('.star').forEach(star => {
+            star.addEventListener('click', () => {
+                selectedRating = parseInt(star.getAttribute('data-rating'));
+                updateStarDisplay();
+            });
+            star.addEventListener('mouseenter', () => {
+                highlightStars(parseInt(star.getAttribute('data-rating')));
+            });
+        });
+        starRating.addEventListener('mouseleave', () => {
+            updateStarDisplay();
+        });
+    }
+
+    // Wire up context save
+    const saveContextBtn = document.getElementById('save-context');
+    if (saveContextBtn) {
+        saveContextBtn.addEventListener('click', saveCompanyContext);
+    }
+}
+
+async function loadUserData() {
+    try {
+        const response = await fetch('/api/user');
+        if (response.ok) {
+            currentUserData = await response.json();
+            updateCreditsDisplay();
+        }
+    } catch (e) {
+        console.error('Failed to load user data:', e);
+    }
+}
+
+function updateCreditsDisplay() {
+    if (!currentUserData) return;
+
+    const creditsEl = document.getElementById('credits-balance');
+    const tierBadge = document.getElementById('tier-badge');
+    const freeCurrent = document.getElementById('free-current');
+    const checkoutBtn = document.getElementById('checkout-early-access');
+
+    if (creditsEl) {
+        if (currentUserData.tier === 'early_access') {
+            creditsEl.textContent = '∞';
+        } else {
+            creditsEl.textContent = currentUserData.tokens_remaining;
+        }
+    }
+
+    if (tierBadge) {
+        tierBadge.textContent = currentUserData.tier.toUpperCase().replace('_', ' ');
+        tierBadge.className = 'tier-badge ' + currentUserData.tier;
+    }
+
+    // Update tier comparison in upgrade modal
+    if (currentUserData.tier === 'early_access') {
+        if (freeCurrent) freeCurrent.style.display = 'none';
+        if (checkoutBtn) {
+            checkoutBtn.textContent = 'AKTIV';
+            checkoutBtn.disabled = true;
+        }
+    }
+}
+
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+async function startCheckout(productType) {
+    try {
+        const response = await fetch('/api/subscription/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_type: productType })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.checkout_url) {
+                window.location.href = data.checkout_url;
+            }
+        } else {
+            const error = await response.json();
+            alert('Kunde inte starta checkout: ' + (error.error || 'Okänt fel'));
+        }
+    } catch (e) {
+        console.error('Checkout error:', e);
+        alert('Ett fel uppstod vid checkout');
+    }
+}
+
+async function submitFeedback() {
+    const category = document.getElementById('feedback-category').value;
+    const message = document.getElementById('feedback-message').value.trim();
+    const email = document.getElementById('feedback-email').value.trim();
+
+    if (!message) {
+        alert('Skriv ett meddelande');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submit-feedback');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'SKICKAR...';
+
+    try {
+        const response = await fetch('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category,
+                message,
+                email: email || null,
+                rating: selectedRating
+            })
+        });
+
+        if (response.ok) {
+            // Clear form
+            document.getElementById('feedback-message').value = '';
+            document.getElementById('feedback-email').value = '';
+            selectedRating = null;
+            updateStarDisplay();
+
+            // Close modal
+            closeModal('feedback-modal');
+
+            // Show success message
+            addMessage('system', 'Tack för din feedback!', 'success');
+        } else {
+            const error = await response.json();
+            alert('Kunde inte skicka feedback: ' + (error.error || 'Okänt fel'));
+        }
+    } catch (e) {
+        console.error('Feedback error:', e);
+        alert('Ett fel uppstod');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'SKICKA';
+    }
+}
+
+function highlightStars(rating) {
+    document.querySelectorAll('#star-rating .star').forEach((star, idx) => {
+        star.classList.toggle('hovered', idx < rating);
+    });
+}
+
+function updateStarDisplay() {
+    document.querySelectorAll('#star-rating .star').forEach((star, idx) => {
+        star.classList.remove('hovered');
+        star.classList.toggle('active', selectedRating && idx < selectedRating);
+    });
+}
+
+async function saveCompanyContext() {
+    const context = document.getElementById('company-context').value.trim();
+    const saveBtn = document.getElementById('save-context');
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'SPARAR...';
+
+    try {
+        const response = await fetch('/api/user/context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context })
+        });
+
+        if (response.ok) {
+            closeModal('context-modal');
+            addMessage('system', 'Företagskontext sparad', 'success');
+        } else {
+            const error = await response.json();
+            alert('Kunde inte spara: ' + (error.error || 'Okänt fel'));
+        }
+    } catch (e) {
+        console.error('Save context error:', e);
+        alert('Ett fel uppstod');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'SPARA';
+    }
+}
+
+// Check for payment result in URL
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('payment') === 'success') {
+    setTimeout(() => {
+        addMessage('system', 'Betalning genomförd! Välkommen till Early Access.', 'success');
+        loadUserData(); // Refresh user data
+    }, 1000);
+    // Clear URL params
+    window.history.replaceState({}, document.title, window.location.pathname);
+} else if (urlParams.get('payment') === 'cancelled') {
+    setTimeout(() => {
+        addMessage('system', 'Betalning avbruten.', 'warning');
+    }, 1000);
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
