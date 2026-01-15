@@ -59,7 +59,29 @@ src/agentfarm/monetization/
   - Integration med LLM Router för latency-mätning
   - Live dashboard på /hardware
 
-### Prioritet 3: Kompletteringar
+### Prioritet 3: Proxmox & Infrastruktur
+
+- [ ] **GPU Passthrough Guide** - AMD 7800XT till VM
+  - IOMMU-grupper och vfio-pci konfiguration
+  - ROCm installation i VM
+  - Proxmox host-konfiguration
+
+- [ ] **Nätverksisolering** - Dual interface setup
+  - vmbr0: WireGuard (extern trafik)
+  - vmbr1: Internal only (LLM-trafik, ingen internet)
+  - Brandväggsregler
+
+- [ ] **WireGuard Server Setup** - Komplett script
+  - Initial wg0.conf generering
+  - DuckDNS/DDNS integration
+  - Automatisk peer-hantering
+
+- [ ] **Ollama + ROCm Setup** - Ubuntu 22.04
+  - ROCm 6.x installation
+  - Ollama med AMD GPU support
+  - Modell-optimering för 7800XT
+
+### Prioritet 4: Kompletteringar
 
 - [ ] Fler affiliate-retailers (Proshop, Amazon/Adtraction)
 - [ ] Streaming output i web UI
