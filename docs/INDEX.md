@@ -20,6 +20,7 @@ När användaren säger "fortsätt" eller "get context", läs dessa filer i ordn
 | [SECURITY.md](./SECURITY.md) | Säkerhetsarkitektur (Vault, VPN, isolation) |
 | [WEB.md](./WEB.md) | Web interface och API endpoints |
 | [CURRENT_STATE.md](./CURRENT_STATE.md) | Pågående arbete och nästa steg |
+| [ROCM_SETUP.md](./ROCM_SETUP.md) | ROCm 6.4.3 + Ollama installation (testad config) |
 
 ## Projekt-översikt
 
