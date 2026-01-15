@@ -41,6 +41,11 @@
                     <span class="label">TOKENS</span>
                     <span class="value" id="token-count">0</span>
                 </div>
+                <div class="status-item credits-display">
+                    <span class="label">CREDITS</span>
+                    <span class="value" id="credits-balance">100</span>
+                    <span class="tier-badge" id="tier-badge">FREE</span>
+                </div>
                 <div class="status-item music-control">
                     <button id="music-toggle" class="music-btn" title="Toggle Synthwave Music">
                         <span class="music-icon">♪</span>
@@ -152,7 +157,15 @@
             <div class="footer-center">
                 <button id="qr-btn" class="qr-btn" title="Generera VPN QR-kod">
                     <span class="qr-icon">&#9783;</span>
-                    <span class="qr-label">NY VPN</span>
+                    <span class="qr-label">VPN</span>
+                </button>
+                <button id="upgrade-btn" class="upgrade-btn" title="Uppgradera till Early Access">
+                    <span class="upgrade-icon">★</span>
+                    <span class="upgrade-label">UPGRADE</span>
+                </button>
+                <button id="feedback-btn" class="feedback-btn" title="Skicka feedback">
+                    <span class="feedback-icon">✉</span>
+                    <span class="feedback-label">FEEDBACK</span>
                 </button>
             </div>
             <div class="footer-right">
@@ -203,6 +216,122 @@
                     </div>
                     <pre id="file-preview-content" class="file-preview-content"></pre>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upgrade Modal -->
+    <div id="upgrade-modal" class="modal hidden">
+        <div class="modal-content upgrade-modal-content">
+            <div class="modal-header">
+                <h3>EARLY ACCESS</h3>
+                <button class="modal-close" data-modal="upgrade-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tier-comparison">
+                    <div class="tier-card tier-free">
+                        <h4>FREE</h4>
+                        <div class="tier-price">0 kr</div>
+                        <ul class="tier-features">
+                            <li>100 credits/month</li>
+                            <li>Basic agents</li>
+                            <li>Community support</li>
+                        </ul>
+                        <div class="tier-current" id="free-current">CURRENT</div>
+                    </div>
+                    <div class="tier-card tier-early-access">
+                        <div class="tier-badge-hot">EARLY BIRD</div>
+                        <h4>EARLY ACCESS</h4>
+                        <div class="tier-price">79 kr<span>/mån</span></div>
+                        <ul class="tier-features">
+                            <li>Obegränsade credits</li>
+                            <li>Alla agenter</li>
+                            <li>Prioriterad support</li>
+                            <li>Företagskontext</li>
+                            <li>Påverka roadmap</li>
+                        </ul>
+                        <button id="checkout-early-access" class="checkout-btn">UPPGRADERA</button>
+                    </div>
+                </div>
+                <div class="token-packs hidden" id="token-packs">
+                    <h4>TOKEN PACKS</h4>
+                    <div class="token-pack-grid">
+                        <button class="token-pack" data-pack="small">
+                            <span class="pack-amount">500</span>
+                            <span class="pack-price">29 kr</span>
+                        </button>
+                        <button class="token-pack" data-pack="medium">
+                            <span class="pack-amount">2000</span>
+                            <span class="pack-price">99 kr</span>
+                        </button>
+                        <button class="token-pack" data-pack="large">
+                            <span class="pack-amount">5000</span>
+                            <span class="pack-price">199 kr</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="feedback-modal" class="modal hidden">
+        <div class="modal-content feedback-modal-content">
+            <div class="modal-header">
+                <h3>SKICKA FEEDBACK</h3>
+                <button class="modal-close" data-modal="feedback-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="feedback-form">
+                    <div class="form-group">
+                        <label>KATEGORI</label>
+                        <select id="feedback-category">
+                            <option value="general">Allmänt</option>
+                            <option value="bug">Bugg</option>
+                            <option value="feature">Ny funktion</option>
+                            <option value="ux">UX/Design</option>
+                            <option value="performance">Prestanda</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>MEDDELANDE</label>
+                        <textarea id="feedback-message" rows="5" placeholder="Beskriv din feedback..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>E-POST (valfritt)</label>
+                        <input type="email" id="feedback-email" placeholder="din@email.se">
+                    </div>
+                    <div class="form-group rating-group">
+                        <label>BETYG (valfritt)</label>
+                        <div class="star-rating" id="star-rating">
+                            <span class="star" data-rating="1">★</span>
+                            <span class="star" data-rating="2">★</span>
+                            <span class="star" data-rating="3">★</span>
+                            <span class="star" data-rating="4">★</span>
+                            <span class="star" data-rating="5">★</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="submit-feedback" class="submit-btn">SKICKA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Modal -->
+    <div id="context-modal" class="modal hidden">
+        <div class="modal-content context-modal-content">
+            <div class="modal-header">
+                <h3>FÖRETAGSKONTEXT</h3>
+                <button class="modal-close" data-modal="context-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="context-info">Lägg till bakgrundinformation om ditt företag eller projekt. Agenterna kommer att ta hänsyn till detta i sina svar.</p>
+                <textarea id="company-context" rows="10" placeholder="T.ex: Vi är ett startup som bygger en app för..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button id="save-context" class="submit-btn">SPARA</button>
             </div>
         </div>
     </div>
