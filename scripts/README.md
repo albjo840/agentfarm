@@ -60,6 +60,44 @@ When adding new scripts:
 4. Check for root if elevated privileges needed
 5. Document in this README
 
+## Troubleshooting
+
+### WireGuard QR-kod skannas inte
+
+**Problem:** "Kan inte importera tunnel: QR-kod hittas inte i bilden"
+
+**Orsak:** Terminal-QR-koden (ANSI-format) skannas inte bra via screenshots.
+
+**Lösning:**
+
+1. **Använd PNG-filen direkt:**
+   ```bash
+   # Hitta PNG-filen
+   sudo ls /etc/wireguard/peers/
+
+   # Kopiera till din home
+   sudo cp /etc/wireguard/peers/<peer>/qr.png ~/wireguard-qr.png
+   sudo chown $USER ~/wireguard-qr.png
+
+   # Visa bilden (eller överför till telefon)
+   xdg-open ~/wireguard-qr.png
+   ```
+
+2. **Regenerera QR-koden med bättre kvalitet:**
+   ```bash
+   # Skapa större QR-kod
+   sudo qrencode -s 10 -o ~/wireguard-qr.png < /etc/wireguard/peers/<peer>/<peer>.conf
+   ```
+
+3. **Importera config-filen manuellt:**
+   - Kopiera `.conf`-filen till telefonen
+   - I WireGuard app: (+) → "Import from file"
+
+4. **Kontrollera att qrencode är installerat:**
+   ```bash
+   which qrencode || sudo apt install qrencode
+   ```
+
 ## Security Notes
 
 - All scripts should validate inputs
