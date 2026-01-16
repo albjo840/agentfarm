@@ -1,6 +1,6 @@
 # AgentFarm - Current State
 
-> **Uppdaterad:** 2026-01-15
+> **Uppdaterad:** 2026-01-16
 >
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -8,80 +8,153 @@
 
 ```
 Branch: feature/affiliate-ads
-Status: Unified monetization (merged from feature/early-access)
+Status: Security + Monitoring moduler tillagda
 ```
 
-## Senaste Commits
+## Senaste Commits (före dagens session)
 
 ```
+143908b docs: Add WireGuard + DuckDNS setup guide
+37d9e62 docs: Add ROCm 6.4.3 + Ollama setup guide
 71b3d68 feat: Add TierManager for unified access control
-944f43d feat: Merge early-access into affiliate-ads for unified monetization
-1ae19ac feat: Add affiliate system and deployment infrastructure
 ```
 
-## Nyligen Slutfört
+## Session 2026-01-16: Security, Monitoring & Infrastructure
 
-### 2026-01-15: Unified Monetization
+### Slutfört denna session
 
-- [x] Mergat `feature/early-access` → `feature/affiliate-ads`
-- [x] Skapat `TierManager` för unified access control
-- [x] Löst merge-konflikter i `__init__.py` och `server.py`
-- [x] Fixat RecursionGuard test (threshold 3 → 5)
-- [x] Alla 111 tester passerar
+- [x] **SecureVault** - Docker-baserad säker lagring (`security/vault.py`)
+  - Isolerade Docker volumes per session
+  - Automatisk cleanup efter timeout
+  - Lazy-loading av Docker client
+  - Session management med expiry
 
-### Unified Monetization Module
+- [x] **ContextInjector** - RAG med ChromaDB (`security/context_injector.py`)
+  - Semantic search för företagsdokument
+  - Chunking med overlap
+  - Token-estimering för context injection
+  - Återanvänder mönster från GraphRAG-projekt
+
+- [x] **GPUMonitor** - Real-time GPU stats (`monitoring/gpu_monitor.py`)
+  - Stöd för AMD (rocm-smi) och NVIDIA (nvidia-smi)
+  - Temperatur (edge, junction, memory)
+  - VRAM-användning
+  - Power consumption och GPU utilization
+  - Async watch-loop för kontinuerlig övervakning
+
+- [x] **PerformanceTracker** - LLM metrics (`monitoring/performance.py`)
+  - Tokens per second tracking
+  - Latency (p50, p95, p99)
+  - Per-model och per-agent statistik
+  - EventBus-integration för automatisk tracking
+
+- [x] **Hardware API Endpoints** - Nya REST endpoints
+  - `GET /api/hardware` - Full stats (GPU + performance)
+  - `GET /api/hardware/gpu` - Endast GPU info
+  - `GET /api/hardware/performance` - Endast LLM metrics
+
+- [x] **Infrastruktur-dokumentation**
+  - `docs/GPU_PASSTHROUGH.md` - AMD 7800XT till Proxmox VM
+  - `docs/NETWORK_ISOLATION.md` - Dual interface (vmbr0/vmbr1)
+  - `scripts/wireguard-setup.sh` - Komplett installations- och peer-script
+
+### Nya Moduler
 
 ```
-src/agentfarm/monetization/
-├── __init__.py              # Exporterar allt
-├── tiers.py                 # NY: TierManager (unified)
-├── affiliates.py            # Hårdvaru-affiliates
-├── stripe_integration.py    # Stripe betalningar
-├── users.py                 # Användarprofiler
-└── feedback.py              # Feedback-system
+src/agentfarm/
+├── security/                   # NY MODUL
+│   ├── __init__.py
+│   ├── vault.py                # SecureVault (Docker volumes)
+│   └── context_injector.py     # RAG med ChromaDB
+└── monitoring/                 # NY MODUL
+    ├── __init__.py
+    ├── gpu_monitor.py          # AMD/NVIDIA stats
+    └── performance.py          # Tokens/sek tracking
+
+scripts/
+└── wireguard-setup.sh          # NY: WireGuard server setup
+
+docs/
+├── GPU_PASSTHROUGH.md          # NY: Proxmox passthrough guide
+└── NETWORK_ISOLATION.md        # NY: Dual interface setup
+```
+
+### Nya API Endpoints
+
+| Endpoint | Metod | Beskrivning |
+|----------|-------|-------------|
+| `/api/hardware` | GET | Full hardware + performance stats |
+| `/api/hardware/gpu` | GET | GPU stats (temp, VRAM, power) |
+| `/api/hardware/performance` | GET | LLM metrics (tokens/sek, latency) |
+
+### Nya Dependencies (pyproject.toml)
+
+```toml
+[project.optional-dependencies]
+rag = [
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+]
+```
+
+## Arkitekturella Beslut
+
+### Security Module
+
+```
+Beslut: Separera security från monetization
+Motivering: Tydligare separation of concerns
+
+SecureVault
+├── Docker volumes för isolerad lagring
+├── Session-baserad expiry (4h default)
+└── Integrerar med TierManager för access control
+
+ContextInjector
+├── ChromaDB för vector search
+├── sentence-transformers för embeddings
+└── Återanvänder mönster från GraphRAG-projekt
+```
+
+### Monitoring Module
+
+```
+Beslut: Lazy-loading av GPU monitoring
+Motivering: Undvik startup-overhead om GPU ej tillgänglig
+
+GPUMonitor
+├── Automatisk detection av rocm-smi/nvidia-smi
+├── Async watch() för kontinuerlig övervakning
+└── Fallback till "No GPU found" vid fel
+
+PerformanceTracker
+├── Rolling window (1000 requests default)
+├── Per-model och per-agent aggregation
+└── EventBus integration för automatisk tracking
+```
+
+### Dual Network Architecture
+
+```
+Beslut: Separera VPN-trafik från intern LLM-trafik
+Motivering: Säkerhet - Ollama ska ej ha internetåtkomst
+
+vmbr0 (10.0.0.0/24) ─► WireGuard VPN
+                       AgentFarm Web
+
+vmbr1 (192.168.100.0/24) ─► Ollama (INGEN INTERNET)
+                            Intern kommunikation
 ```
 
 ## Pågående TODO
 
-### Prioritet 1: Säkerhet & Enterprise
+### Prioritet 1: Integration
 
-- [ ] **Secure Vault** - Docker-volymer för företagsdata
-  - `security/vault.py` - SecureVault class
-  - `security/context_injector.py` - RAG med ChromaDB
-  - Temporära volymer som rensas efter session
-  - Early Access only
+- [ ] Koppla PerformanceTracker till LLMRouter events
+- [ ] Integrera ContextInjector med agents (system prompt injection)
+- [ ] Koppla SecureVault till TierManager för Early Access
 
-### Prioritet 2: Hardware & Monitoring
-
-- [ ] **GPU Monitoring** - Real-time stats för hardware-sidan
-  - `monitoring/gpu_monitor.py` - AMD ROCm stats (rocm-smi)
-  - `monitoring/performance.py` - Tokens/sek tracking
-  - Integration med LLM Router för latency-mätning
-  - Live dashboard på /hardware
-
-### Prioritet 3: Proxmox & Infrastruktur
-
-- [ ] **GPU Passthrough Guide** - AMD 7800XT till VM
-  - IOMMU-grupper och vfio-pci konfiguration
-  - ROCm installation i VM
-  - Proxmox host-konfiguration
-
-- [ ] **Nätverksisolering** - Dual interface setup
-  - vmbr0: WireGuard (extern trafik)
-  - vmbr1: Internal only (LLM-trafik, ingen internet)
-  - Brandväggsregler
-
-- [ ] **WireGuard Server Setup** - Komplett script
-  - Initial wg0.conf generering
-  - DuckDNS/DDNS integration
-  - Automatisk peer-hantering
-
-- [ ] **Ollama + ROCm Setup** - Ubuntu 22.04
-  - ROCm 6.x installation
-  - Ollama med AMD GPU support
-  - Modell-optimering för 7800XT
-
-### Prioritet 4: Kompletteringar
+### Prioritet 2: Kompletteringar
 
 - [ ] Fler affiliate-retailers (Proshop, Amazon/Adtraction)
 - [ ] Streaming output i web UI
@@ -89,44 +162,11 @@ src/agentfarm/monetization/
 - [ ] MCP server test med Claude Desktop
 - [ ] Docker sandbox integration tests
 
-## Arkitekturella Beslut
+### Prioritet 3: Dokumentation
 
-### Dual Revenue Model
-
-```
-Beslut: Två separata men integrerade intäktsströmmar
-Motivering: Täcker både DIY-community och enterprise
-
-Branch 1 (Affiliates):
-- /hardware sida med GPU-rekommendationer
-- Click tracking för svenska retailers
-- Ingen inloggning krävs
-
-Branch 2 (Early Access):
-- Stripe-prenumeration
-- Company context injection (Vault)
-- VPN-access via WireGuard
-```
-
-### TierManager som Controller
-
-```
-Beslut: Central TierManager koordinerar alla monetization-komponenter
-Motivering: Single source of truth för access control
-
-TierManager
-├── UserManager (profiler, tokens)
-├── AffiliateManager (produkter, clicks)
-└── StripeIntegration (betalningar)
-```
-
-### RecursionGuard Threshold
-
-```
-Beslut: Ökat threshold från 3 → 5 identiska calls
-Motivering: Multi-step workflows triggade false positives
-Fil: agents/base.py:RecursionGuard
-```
+- [ ] Uppdatera SECURITY.md med nya moduler
+- [ ] Uppdatera WEB.md med nya endpoints
+- [ ] README för scripts/
 
 ## Kända Begränsningar
 
@@ -134,11 +174,29 @@ Fil: agents/base.py:RecursionGuard
    - Bugfix-tester förväntar sig att filer finns
    - Behöver justering av test setup
 
-2. **Gemini Rate Limit** - 15 RPM är väldigt strikt
-   - Använd Ollama/Groq som primär
+2. **RAG Dependencies** - Ej installerade som default
+   - Kräver `pip install agentfarm[rag]`
+   - sentence-transformers är stor (~500MB)
 
 3. **Docker Sandbox** - Implementerad men otestad
-   - Behöver integrationstester
+   - SecureVault kräver Docker SDK
+
+## Verifiering
+
+```bash
+# Alla tester passerar
+python -m pytest tests/ -v
+# 111 passed in 0.42s
+
+# Security module
+python -c "from agentfarm.security import SecureVault, ContextInjector; print('OK')"
+
+# Monitoring module
+python -c "from agentfarm.monitoring import GPUMonitor, PerformanceTracker; print('OK')"
+
+# Web server med nya endpoints
+python -c "from agentfarm.web.server import create_app; print('OK')"
+```
 
 ## Nästa Session
 
@@ -147,23 +205,6 @@ När användaren säger "fortsätt":
 1. Läs denna fil för kontext
 2. Kolla git status för uncommitted changes
 3. Fortsätt med TODO-listan ovan
-
-## Kommandon för Snabbstart
-
-```bash
-# Kör tester
-python -m pytest tests/ -v
-
-# Starta web UI
-agentfarm web --port 8080
-
-# Verifiera imports
-python -c "from agentfarm.monetization import TierManager; print('OK')"
-
-# Git status
-git log --oneline -5
-git status
-```
 
 ---
 

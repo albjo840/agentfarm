@@ -22,6 +22,8 @@ När användaren säger "fortsätt" eller "get context", läs dessa filer i ordn
 | [CURRENT_STATE.md](./CURRENT_STATE.md) | Pågående arbete och nästa steg |
 | [ROCM_SETUP.md](./ROCM_SETUP.md) | ROCm 6.4.3 + Ollama installation (testad config) |
 | [WIREGUARD_SETUP.md](./WIREGUARD_SETUP.md) | WireGuard VPN + DuckDNS (testad config) |
+| [GPU_PASSTHROUGH.md](./GPU_PASSTHROUGH.md) | AMD 7800XT passthrough till Proxmox VM |
+| [NETWORK_ISOLATION.md](./NETWORK_ISOLATION.md) | Dual interface setup (vmbr0/vmbr1) |
 
 ## Projekt-översikt
 
@@ -66,6 +68,12 @@ src/agentfarm/
 │   ├── affiliates.py        # Hårdvaru-affiliates
 │   ├── stripe_integration.py
 │   └── users.py
+├── security/                # Enterprise säkerhet
+│   ├── vault.py             # SecureVault (Docker volumes)
+│   └── context_injector.py  # RAG med ChromaDB
+├── monitoring/              # Hårdvaruövervakning
+│   ├── gpu_monitor.py       # AMD ROCm / NVIDIA stats
+│   └── performance.py       # Tokens/sek tracking
 ├── providers/               # Se PROVIDERS.md
 │   ├── base.py              # LLMProvider ABC
 │   ├── router.py            # Multi-model routing
@@ -75,6 +83,8 @@ src/agentfarm/
 │   └── collaboration.py     # ProactiveCollaborator
 └── web/                     # Se WEB.md
     └── server.py            # aiohttp + WebSocket
+scripts/
+└── wireguard-setup.sh       # WireGuard installation & peer-hantering
 ```
 
 ## Senaste ändringar
@@ -87,4 +97,4 @@ Se [CURRENT_STATE.md](./CURRENT_STATE.md) för:
 
 ---
 
-*Uppdaterad: 2026-01-15*
+*Uppdaterad: 2026-01-16*

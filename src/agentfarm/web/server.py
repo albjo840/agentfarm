@@ -40,6 +40,9 @@ from agentfarm.providers.router import LLMRouter, TaskType, get_task_type_for_ag
 # Import Affiliate Manager
 from agentfarm.monetization.affiliates import AffiliateManager
 
+# Import Monitoring
+from agentfarm.monitoring import GPUMonitor, PerformanceTracker
+
 # Try to import aiohttp, fall back to basic HTTP server if not available
 try:
     from aiohttp import web
@@ -110,6 +113,10 @@ _event_bus_task: asyncio.Task | None = None  # Background task for event process
 user_manager: UserManager | None = None
 feedback_manager: FeedbackManager | None = None
 stripe_integration: StripeIntegration | None = None
+
+# Monitoring globals
+gpu_monitor: GPUMonitor | None = None
+performance_tracker: PerformanceTracker | None = None
 
 
 async def _broadcast_event_handler(event: Event) -> None:
@@ -244,6 +251,43 @@ async def hardware_handler(request: web.Request) -> web.Response:
     """Serve the hardware terminal page."""
     hardware_path = TEMPLATES_DIR / "hardware.html"
     return web.FileResponse(hardware_path)
+
+
+async def api_hardware_stats_handler(request: web.Request) -> web.Response:
+    """Return real-time GPU stats."""
+    if gpu_monitor is None:
+        return web.json_response({"error": "GPU monitor not initialized"}, status=503)
+
+    try:
+        stats = await gpu_monitor.get_stats()
+        perf_stats = performance_tracker.get_stats() if performance_tracker else {}
+
+        return web.json_response({
+            "gpu": stats.to_dict(),
+            "performance": perf_stats,
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_hardware_gpu_handler(request: web.Request) -> web.Response:
+    """Return GPU info only."""
+    if gpu_monitor is None:
+        return web.json_response({"available": False})
+
+    try:
+        stats = await gpu_monitor.get_stats()
+        return web.json_response(stats.to_dict())
+    except Exception as e:
+        return web.json_response({"error": str(e), "available": False})
+
+
+async def api_hardware_performance_handler(request: web.Request) -> web.Response:
+    """Return LLM performance metrics."""
+    if performance_tracker is None:
+        return web.json_response({"error": "Performance tracker not initialized"}, status=503)
+
+    return web.json_response(performance_tracker.get_stats())
 
 
 async def api_affiliates_products_handler(request: web.Request) -> web.Response:
@@ -1271,8 +1315,14 @@ async def api_monetization_stats_handler(request: web.Request) -> web.Response:
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
     global llm_router, workflow_persistence, affiliate_manager, user_manager, feedback_manager, stripe_integration
+    global gpu_monitor, performance_tracker
 
     setup_event_bus()
+
+    # Initialize hardware monitoring
+    gpu_monitor = GPUMonitor()
+    performance_tracker = PerformanceTracker()
+    logger.info("Hardware monitoring initialized (GPU available: %s)", gpu_monitor.is_available)
 
     # Initialize affiliate manager
     storage_dir = Path(current_working_dir) / ".agentfarm"
@@ -1329,6 +1379,9 @@ def create_app() -> web.Application:
     app.router.add_get('/mobile', mobile_handler)
     app.router.add_get('/m', mobile_handler)  # Short alias
     app.router.add_get('/hardware', hardware_handler)
+    app.router.add_get('/api/hardware', api_hardware_stats_handler)
+    app.router.add_get('/api/hardware/gpu', api_hardware_gpu_handler)
+    app.router.add_get('/api/hardware/performance', api_hardware_performance_handler)
     app.router.add_get('/ws', websocket_handler)
     app.router.add_get('/api/providers', api_providers_handler)
     # Affiliate routes
