@@ -84,95 +84,200 @@ PublicKey = <client_public_key>
 AllowedIPs = 10.0.0.2/32
 ```
 
-## 2. Secure Vault (TODO)
+## 2. Secure Vault
 
-### Målarkitektur
+> **Status:** Implementerad i `src/agentfarm/security/vault.py`
 
-Temporär Docker-volym för företagsdata:
+### Arkitektur
+
+Temporär Docker-volym för företagsdata med automatisk cleanup:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      SECURE VAULT                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Upload Flow:                                                          │
+│  Session Creation (Early Access only):                                 │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐        │
-│  │  Client  │───►│  Upload  │───►│  Encrypt │───►│  Docker  │        │
-│  │  (HTTPS) │    │  API     │    │  at Rest │    │  Volume  │        │
+│  │  Client  │───►│  Tier    │───►│  Create  │───►│  Docker  │        │
+│  │  Request │    │  Check   │    │  Session │    │  Volume  │        │
 │  └──────────┘    └──────────┘    └──────────┘    └──────────┘        │
 │                                                                         │
-│  Access Flow:                                                          │
+│  Document Storage:                                                     │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐                         │
-│  │  Agent   │───►│  Mount   │───►│  Read    │                         │
-│  │  Process │    │  Volume  │    │  Context │                         │
+│  │  Upload  │───►│  Alpine  │───►│  /vault/ │                         │
+│  │  Content │    │  Container│    │  Directory│                        │
 │  └──────────┘    └──────────┘    └──────────┘                         │
 │                                                                         │
-│  Cleanup (efter session):                                              │
-│  ┌──────────┐    ┌──────────┐                                         │
-│  │  Delete  │───►│  Verify  │                                         │
-│  │  Volume  │    │  Removed │                                         │
-│  └──────────┘    └──────────┘                                         │
+│  Automatic Cleanup (session expiry = 4h):                              │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐                         │
+│  │  Expired │───►│  Stop    │───►│  Remove  │                         │
+│  │  Session │    │  Container│    │  Volume  │                         │
+│  └──────────┘    └──────────┘    └──────────┘                         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Planerad Implementation
+### Implementation
 
 ```python
-# src/agentfarm/security/vault.py (TODO)
+from agentfarm.security import SecureVault, VaultSession
 
-class SecureVault:
-    """Manages temporary Docker volumes for company data."""
+# Initialize vault
+vault = SecureVault(
+    session_duration=timedelta(hours=4),
+    cleanup_interval=300,  # 5 min cleanup cycle
+)
 
-    async def create_vault(self, session_id: str) -> str:
-        """Create isolated Docker volume."""
-        volume_name = f"agentfarm_vault_{session_id}"
-        # docker volume create ...
-        return volume_name
+# Create session (via TierManager for Early Access check)
+session = await vault.create_session(device_id)
+# -> Creates Docker volume: agentfarm_vault_<hash>
 
-    async def upload_file(self, session_id: str, file: bytes, filename: str):
-        """Upload file to vault."""
-        # Encrypt file
-        # Store in volume
-        pass
+# Store document
+await vault.store_document(session, "context.md", content)
 
-    async def get_context(self, session_id: str) -> str:
-        """Read context.txt from vault."""
-        # Mount volume read-only
-        # Read context
-        pass
+# List documents
+docs = await vault.list_documents(session)
 
-    async def destroy_vault(self, session_id: str):
-        """Remove vault and all data."""
-        # docker volume rm ...
-        # Verify deletion
-        pass
+# Retrieve document
+content = await vault.retrieve_document(session, "context.md")
+
+# Manual cleanup (automatic cleanup also runs)
+await vault.destroy_session(session)
 ```
 
-### Data Drop (Vector DB)
-
-Framtida implementation med ChromaDB/FAISS:
+### TierManager Integration
 
 ```python
-# src/agentfarm/security/context_injector.py (TODO)
+from agentfarm.monetization import TierManager
 
-class ContextInjector:
-    """RAG-baserad context injection från Vault."""
+tier_mgr = TierManager(storage_dir=".agentfarm", enable_vault=True)
 
-    def __init__(self, vault: SecureVault):
-        self.vault = vault
-        self.vector_db = None  # ChromaDB eller FAISS
+# Get vault session (Early Access only)
+session = await tier_mgr.get_vault_session(device_id)
+if session:
+    # User has Early Access - vault available
+    await tier_mgr.store_in_vault(device_id, "readme.md", content)
+    docs = await tier_mgr.list_vault_documents(device_id)
+else:
+    # Free tier - no vault access
+    pass
 
-    async def ingest_documents(self, session_id: str, files: list[Path]):
-        """Chunka och indexera dokument."""
-        pass
-
-    async def query_context(self, query: str, k: int = 5) -> list[str]:
-        """Hämta relevanta chunks."""
-        pass
+# Stats include vault info
+stats = tier_mgr.get_stats()
+# {"vault": {"available": True, "active_sessions": 3, ...}}
 ```
 
-## 3. Access Control
+### VaultSession Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `session_id` | str | Unique session identifier |
+| `volume_name` | str | Docker volume name |
+| `created_at` | datetime | Session start time |
+| `expires_at` | datetime | Auto-cleanup time (4h default) |
+| `is_expired` | bool | True if session should be cleaned |
+
+## 3. Context Injector (RAG)
+
+> **Status:** Implementerad i `src/agentfarm/security/context_injector.py`
+
+### Arkitektur
+
+RAG-baserad context injection med ChromaDB för semantisk sökning:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     CONTEXT INJECTOR                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Document Ingestion:                                                   │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐        │
+│  │  Upload  │───►│  Chunk   │───►│  Embed   │───►│ ChromaDB │        │
+│  │  Doc     │    │  Text    │    │  Vectors │    │  Store   │        │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘        │
+│                                                                         │
+│  Query Flow:                                                           │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐        │
+│  │  Agent   │───►│  Embed   │───►│  Search  │───►│  Inject  │        │
+│  │  Task    │    │  Query   │    │  Top-K   │    │  Context │        │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘        │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation
+
+```python
+from agentfarm.security import ContextInjector
+
+# Initialize (requires: pip install chromadb sentence-transformers)
+injector = ContextInjector(
+    storage_path=".agentfarm/context",
+    embedding_model="all-MiniLM-L6-v2",
+)
+
+# Check availability
+if injector.is_available:
+    # Add documents (chunked automatically)
+    chunks = await injector.add_document(
+        filename="api_guide.md",
+        content=api_docs,
+        metadata={"type": "api"},
+        chunk_size=1000,
+        chunk_overlap=200,
+    )
+
+    # Add text snippets directly
+    doc_id = await injector.add_text(
+        text="Our API uses JSON-RPC 2.0",
+        source="api_notes",
+    )
+
+    # Search for relevant context
+    results = await injector.search(
+        query="How do I format API responses?",
+        n_results=5,
+    )
+    # -> [ContextResult(text=..., source=..., score=0.85, metadata=...)]
+
+    # Get context for agent injection
+    result = await injector.get_context_for_query(
+        query="Add user authentication",
+        max_tokens=2000,
+    )
+    print(result.context)  # Formatted context with sources
+    print(result.token_estimate)  # ~1850 tokens
+```
+
+### Agent Integration
+
+BaseAgent automatically injects company context via ContextInjector:
+
+```python
+from agentfarm.agents.base import BaseAgent
+
+class MyAgent(BaseAgent):
+    def __init__(self, provider, context_injector=None):
+        super().__init__(provider, context_injector=context_injector)
+
+# When agent.run() is called:
+# 1. Fetches relevant company context via RAG
+# 2. Injects into agent's context window
+# 3. Agent sees "# Company Context" section in prompt
+```
+
+### Dependencies
+
+```bash
+# Install RAG dependencies
+pip install "agentfarm[rag]"
+
+# Or manually:
+pip install chromadb>=0.4.0 sentence-transformers>=2.2.0
+```
+
+## 4. Access Control
 
 ### TierManager Integration
 
@@ -204,7 +309,7 @@ def _get_device_id(request: web.Request) -> str:
     return device_id
 ```
 
-## 4. Execution Sandbox
+## 5. Execution Sandbox
 
 ### Docker Sandbox (`tools/sandbox.py`)
 
@@ -238,7 +343,7 @@ class SandboxConfig:
     read_only_root: bool = True
 ```
 
-## 5. Stripe Webhook Security
+## 6. Stripe Webhook Security
 
 Webhook-verifiering i `stripe_integration.py`:
 
@@ -274,4 +379,6 @@ def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
 
 ---
 
-*Status: Delvis implementerat. Se [CURRENT_STATE.md](./CURRENT_STATE.md) för TODO.*
+*Status: SecureVault, ContextInjector, TierManager implementerade. Se [CURRENT_STATE.md](./CURRENT_STATE.md) för aktuellt läge.*
+
+*Senast uppdaterad: 2026-01-16*

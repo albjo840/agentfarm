@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TYPE_CHECKING
@@ -269,6 +270,7 @@ class LLMRouter:
         preferred_model: str | None = None,
         max_retries: int = 3,
         retry_backoff: float = 1.0,
+        agent: str | None = None,
         **kwargs: Any,
     ) -> tuple[dict[str, Any], str]:
         """Route and execute a completion request with retry logic.
@@ -279,6 +281,7 @@ class LLMRouter:
             preferred_model: Force a specific model (optional)
             max_retries: Max retry attempts (default 3)
             retry_backoff: Backoff multiplier between retries (default 1.0s)
+            agent: Agent making the request (for metrics tracking)
             **kwargs: Additional parameters for Ollama
 
         Returns:
@@ -299,6 +302,9 @@ class LLMRouter:
         model_name = state.config.name
         state.current_load += 1
 
+        # Generate unique request ID for metrics correlation
+        request_id = str(uuid.uuid4())
+
         # Emit event
         if self.event_bus:
             from agentfarm.events import Event, EventType as ET
@@ -306,8 +312,10 @@ class LLMRouter:
                 type=ET.LLM_REQUEST,
                 source="router",
                 data={
+                    "request_id": request_id,
                     "model": model_name,
                     "task_type": task_type.value,
+                    "agent": agent,
                     "messages_count": len(messages),
                 },
             ))
@@ -332,16 +340,24 @@ class LLMRouter:
                 latency_ms = (time.time() - start_time) * 1000
                 state.record_request(latency_ms, success=True)
 
+                # Extract token counts from Ollama response
+                input_tokens = response.get("prompt_eval_count", 0)
+                output_tokens = response.get("eval_count", 0)
+
                 if self.event_bus:
                     from agentfarm.events import Event, EventType as ET
                     await self.event_bus.emit(Event(
                         type=ET.LLM_RESPONSE,
                         source="router",
                         data={
+                            "request_id": request_id,
                             "model": model_name,
+                            "agent": agent,
                             "success": True,
                             "latency_ms": latency_ms,
                             "attempts": attempt + 1,
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
                         },
                     ))
 
@@ -394,10 +410,15 @@ class LLMRouter:
                 type=ET.LLM_RESPONSE,
                 source="router",
                 data={
+                    "request_id": request_id,
                     "model": model_name,
+                    "agent": agent,
                     "success": False,
                     "latency_ms": latency_ms,
                     "retries_exhausted": True,
+                    "error": str(last_error) if last_error else None,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
                 },
             ))
 

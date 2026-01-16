@@ -20,6 +20,7 @@ from agentfarm.providers.base import (
 if TYPE_CHECKING:
     from agentfarm.memory.base import MemoryManager
     from agentfarm.agents.collaboration import AgentCollaborator, ProactiveCollaborator
+    from agentfarm.security.context_injector import ContextInjector
 
 logger = logging.getLogger(__name__)
 
@@ -210,12 +211,14 @@ class BaseAgent(ABC):
         collaborator: AgentCollaborator | None = None,
         recursion_guard: RecursionGuard | None = None,
         proactive_collaborator: ProactiveCollaborator | None = None,
+        context_injector: ContextInjector | None = None,
     ) -> None:
         self.provider = provider
         self.memory = memory
         self.collaborator = collaborator
         self.recursion_guard = recursion_guard
         self.proactive_collaborator = proactive_collaborator
+        self.context_injector = context_injector
         self._tools: list[ToolDefinition] = []
         self._tool_handlers: dict[str, Any] = {}
 
@@ -268,15 +271,25 @@ class BaseAgent(ABC):
             logger.error("%s tool %s error: %s", self.name, name, e)
             return ToolResult(tool_call_id=name, output="", error=str(e))
 
-    def build_messages(self, context: AgentContext, user_request: str) -> list[Message]:
+    def build_messages(
+        self,
+        context: AgentContext,
+        user_request: str,
+        company_context: str | None = None,
+    ) -> list[Message]:
         """Build the message list for this agent.
 
         Uses minimal context to reduce token usage.
+
+        Args:
+            context: AgentContext with task info
+            user_request: The user's request
+            company_context: Optional pre-fetched company context from RAG
         """
         messages = [Message(role="system", content=self.system_prompt)]
 
-        # Add focused context
-        context_text = self._format_context(context)
+        # Add focused context (including company context if available)
+        context_text = self._format_context(context, company_context=company_context)
         if context_text:
             messages.append(Message(role="user", content=f"Context:\n{context_text}"))
 
@@ -285,8 +298,17 @@ class BaseAgent(ABC):
 
         return messages
 
-    def _format_context(self, context: AgentContext) -> str:
-        """Format context into minimal text."""
+    def _format_context(
+        self,
+        context: AgentContext,
+        company_context: str | None = None,
+    ) -> str:
+        """Format context into minimal text.
+
+        Args:
+            context: AgentContext with task info
+            company_context: Optional pre-fetched RAG context from ContextInjector
+        """
         parts = [f"Task: {context.task_summary}"]
 
         if context.relevant_files:
@@ -298,6 +320,10 @@ class BaseAgent(ABC):
         if context.constraints:
             parts.append(f"Constraints: {', '.join(context.constraints)}")
 
+        # Include company context from RAG if available
+        if company_context:
+            parts.append(f"\n{company_context}")
+
         # Include memory summary if available
         if self.memory:
             memory_context = self.memory.get_context_summary(max_entries=5)
@@ -305,6 +331,49 @@ class BaseAgent(ABC):
                 parts.append(f"\n{memory_context}")
 
         return "\n".join(parts)
+
+    async def get_company_context(
+        self,
+        query: str,
+        max_tokens: int = 1500,
+    ) -> str | None:
+        """Fetch relevant company context using RAG.
+
+        Args:
+            query: Query to search for (usually the task summary)
+            max_tokens: Maximum tokens for context
+
+        Returns:
+            Formatted context string or None if unavailable
+        """
+        if not self.context_injector:
+            return None
+
+        if not self.context_injector.is_available:
+            logger.debug("ContextInjector not available (missing dependencies)")
+            return None
+
+        try:
+            result = await self.context_injector.get_context_for_query(
+                query=query,
+                max_tokens=max_tokens,
+            )
+            if result.context and result.token_estimate > 0:
+                logger.info(
+                    "%s injected %d tokens of company context from %d sources",
+                    self.name,
+                    result.token_estimate,
+                    len(result.sources),
+                )
+                return result.context
+        except Exception as e:
+            logger.warning("Failed to get company context: %s", e)
+
+        return None
+
+    def set_context_injector(self, injector: ContextInjector) -> None:
+        """Set the context injector for RAG-based company context."""
+        self.context_injector = injector
 
     def remember(self, key: str, value: str, long_term: bool = False) -> None:
         """Store information in memory.
@@ -602,7 +671,13 @@ class BaseAgent(ABC):
             )
 
         try:
-            messages = self.build_messages(context, request)
+            # Fetch company context if ContextInjector is available
+            company_context = await self.get_company_context(
+                query=context.task_summary,
+                max_tokens=1500,
+            )
+
+            messages = self.build_messages(context, request, company_context=company_context)
             tools = self.get_tools()
 
             # Initial completion

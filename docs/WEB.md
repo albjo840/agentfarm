@@ -43,6 +43,7 @@ src/agentfarm/web/
 async def on_startup(app: web.Application) -> None:
     global llm_router, workflow_persistence, affiliate_manager
     global user_manager, feedback_manager, stripe_integration
+    global gpu_monitor, performance_tracker
 
     setup_event_bus()
 
@@ -53,6 +54,14 @@ async def on_startup(app: web.Application) -> None:
     feedback_manager = FeedbackManager(storage_dir)
     stripe_integration = StripeIntegration()
     llm_router = LLMRouter(event_bus=event_bus)
+
+    # Hardware monitoring
+    gpu_monitor = GPUMonitor()
+    performance_tracker = PerformanceTracker()
+
+    # Subscribe PerformanceTracker to LLM events
+    event_bus.subscribe(EventType.LLM_REQUEST, performance_tracker.on_llm_request)
+    event_bus.subscribe(EventType.LLM_RESPONSE, performance_tracker.on_llm_response)
 ```
 
 ### WebSocket
@@ -149,6 +158,86 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/wireguard/new-peer` | POST | Generate WireGuard peer |
+
+### Hardware Monitoring API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/hardware` | GET | Combined hardware + performance stats |
+| `/api/hardware/gpu` | GET | GPU stats (AMD rocm-smi / NVIDIA nvidia-smi) |
+| `/api/hardware/performance` | GET | LLM performance metrics (tokens/sec, latency) |
+
+**Example Response (`/api/hardware`):**
+
+```json
+{
+  "gpu": {
+    "available": true,
+    "vendor": "AMD",
+    "stats": {
+      "gpu_temp": 65,
+      "gpu_util": 75,
+      "vram_used_mb": 4096,
+      "vram_total_mb": 16384
+    }
+  },
+  "performance": {
+    "overall": {
+      "total_requests": 150,
+      "success_rate": 98.5,
+      "avg_latency_ms": 850,
+      "avg_tokens_per_second": 45.2
+    },
+    "by_model": {
+      "qwen-coder": {
+        "total_requests": 80,
+        "tokens_per_second": 52.1,
+        "latency_ms": {"avg": 720, "p50": 680, "p95": 1200}
+      }
+    },
+    "by_agent": {
+      "executor": {"total_requests": 45, "success_rate": 100}
+    }
+  }
+}
+```
+
+**Example Response (`/api/hardware/performance`):**
+
+```json
+{
+  "overall": {
+    "total_requests": 150,
+    "successful_requests": 148,
+    "success_rate": 98.5,
+    "avg_latency_ms": 850,
+    "avg_tokens_per_second": 45.2,
+    "active_requests": 2
+  },
+  "by_model": {
+    "qwen-coder": {
+      "model": "qwen-coder",
+      "total_requests": 80,
+      "success_rate": 100.0,
+      "tokens": {"input": 50000, "output": 25000, "total": 75000},
+      "latency_ms": {"avg": 720, "p50": 680, "p95": 1200, "p99": 1500},
+      "tokens_per_second": 52.1
+    }
+  },
+  "recent": [
+    {
+      "model": "qwen-coder",
+      "agent": "executor",
+      "task_type": "code_generation",
+      "latency_ms": 650,
+      "input_tokens": 500,
+      "output_tokens": 250,
+      "tokens_per_second": 55.3,
+      "success": true
+    }
+  ]
+}
+```
 
 ## Robot Visualizer (`robots.js`)
 

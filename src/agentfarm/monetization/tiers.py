@@ -36,6 +36,15 @@ from agentfarm.monetization.users import UserManager, UserProfile, SubscriptionT
 from agentfarm.monetization.stripe_integration import StripeIntegration
 from agentfarm.monetization.affiliates import AffiliateManager
 
+# Optional import for SecureVault
+try:
+    from agentfarm.security.vault import SecureVault, VaultSession
+    VAULT_AVAILABLE = True
+except ImportError:
+    VAULT_AVAILABLE = False
+    SecureVault = None  # type: ignore
+    VaultSession = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,12 +95,14 @@ class TierManager:
         self,
         storage_dir: Path | str,
         stripe_config: dict[str, str] | None = None,
+        enable_vault: bool = True,
     ) -> None:
         """Initialize tier manager.
 
         Args:
             storage_dir: Directory for persistent storage (.agentfarm/)
             stripe_config: Optional Stripe configuration override
+            enable_vault: Whether to enable SecureVault for Early Access
         """
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -101,9 +112,26 @@ class TierManager:
         self.affiliates = AffiliateManager(self.storage_dir)
         self.stripe = StripeIntegration()
 
+        # Initialize SecureVault if available and enabled
+        self.vault: SecureVault | None = None
+        self._vault_sessions: dict[str, VaultSession] = {}  # device_id -> session
+
+        if enable_vault and VAULT_AVAILABLE:
+            try:
+                self.vault = SecureVault()
+                if self.vault.is_available:
+                    logger.info("SecureVault initialized (Docker available)")
+                else:
+                    logger.warning("SecureVault: Docker not available")
+                    self.vault = None
+            except Exception as e:
+                logger.warning("Failed to initialize SecureVault: %s", e)
+                self.vault = None
+
         logger.info(
-            "TierManager initialized (Stripe: %s, Users: %d)",
+            "TierManager initialized (Stripe: %s, Vault: %s, Users: %d)",
             "enabled" if self.stripe.enabled else "disabled",
+            "enabled" if self.vault else "disabled",
             len(self.users.list_users()),
         )
 
@@ -220,6 +248,135 @@ class TierManager:
             self.users.upgrade_tier(device_id, SubscriptionTier.EARLY_ACCESS)
             logger.info("User %s upgraded to Early Access", device_id[:8])
 
+    # ===========================================
+    # SECURE VAULT METHODS (Early Access only)
+    # ===========================================
+
+    async def get_vault_session(self, device_id: str) -> VaultSession | None:
+        """Get or create a vault session for a user.
+
+        Only available for Early Access users. Returns None for free tier.
+
+        Args:
+            device_id: User's device fingerprint
+
+        Returns:
+            VaultSession or None if not available/allowed
+        """
+        if not self.vault:
+            return None
+
+        access, limits = self.get_user_tier(device_id)
+        if access != AccessLevel.EARLY_ACCESS:
+            logger.debug("Vault access denied for %s (tier: %s)", device_id[:8], access.value)
+            return None
+
+        # Check for existing session
+        existing = self._vault_sessions.get(device_id)
+        if existing and not existing.is_expired:
+            return existing
+
+        # Create new session
+        try:
+            session = await self.vault.create_session(device_id)
+            self._vault_sessions[device_id] = session
+            logger.info("Created vault session for %s", device_id[:8])
+            return session
+        except Exception as e:
+            logger.error("Failed to create vault session: %s", e)
+            return None
+
+    async def store_in_vault(
+        self,
+        device_id: str,
+        filename: str,
+        content: str | bytes,
+    ) -> tuple[bool, str]:
+        """Store a document in the user's vault.
+
+        Only available for Early Access users.
+
+        Args:
+            device_id: User's device fingerprint
+            filename: Document filename
+            content: Document content
+
+        Returns:
+            Tuple of (success, message)
+        """
+        session = await self.get_vault_session(device_id)
+        if not session:
+            return False, "Vault access requires Early Access subscription"
+
+        try:
+            path = await self.vault.store_document(session, filename, content)
+            return True, f"Document stored: {path}"
+        except Exception as e:
+            return False, f"Failed to store document: {e}"
+
+    async def retrieve_from_vault(
+        self,
+        device_id: str,
+        filename: str,
+    ) -> tuple[bytes | None, str]:
+        """Retrieve a document from the user's vault.
+
+        Args:
+            device_id: User's device fingerprint
+            filename: Document to retrieve
+
+        Returns:
+            Tuple of (content or None, message)
+        """
+        session = await self.get_vault_session(device_id)
+        if not session:
+            return None, "Vault access requires Early Access subscription"
+
+        try:
+            content = await self.vault.retrieve_document(session, filename)
+            return content, "Document retrieved"
+        except Exception as e:
+            return None, f"Failed to retrieve document: {e}"
+
+    async def list_vault_documents(self, device_id: str) -> list[str]:
+        """List documents in user's vault.
+
+        Args:
+            device_id: User's device fingerprint
+
+        Returns:
+            List of document filenames (empty if not available)
+        """
+        session = await self.get_vault_session(device_id)
+        if not session:
+            return []
+
+        try:
+            return await self.vault.list_documents(session)
+        except Exception:
+            return []
+
+    async def close_vault_session(self, device_id: str) -> bool:
+        """Close and cleanup a user's vault session.
+
+        Args:
+            device_id: User's device fingerprint
+
+        Returns:
+            True if session was closed, False otherwise
+        """
+        session = self._vault_sessions.pop(device_id, None)
+        if not session or not self.vault:
+            return False
+
+        try:
+            await self.vault.destroy_session(session)
+            logger.info("Closed vault session for %s", device_id[:8])
+            return True
+        except Exception as e:
+            logger.error("Failed to close vault session: %s", e)
+            return False
+
     def get_stats(self) -> dict[str, Any]:
         """Get tier statistics."""
         users = self.users.list_users()
@@ -233,9 +390,14 @@ class TierManager:
 
         affiliate_stats = self.affiliates.get_click_stats(days=30)
 
+        # Vault statistics
+        vault_stats = self.vault.get_stats() if self.vault else {"available": False}
+        vault_stats["active_user_sessions"] = len(self._vault_sessions)
+
         return {
             "total_users": len(users),
             "tier_distribution": tier_counts,
             "affiliate_clicks_30d": affiliate_stats.get("total_clicks", 0),
             "stripe_enabled": self.stripe.enabled,
+            "vault": vault_stats,
         }

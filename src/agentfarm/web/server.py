@@ -1322,6 +1322,12 @@ async def on_startup(app: web.Application) -> None:
     # Initialize hardware monitoring
     gpu_monitor = GPUMonitor()
     performance_tracker = PerformanceTracker()
+
+    # Subscribe PerformanceTracker to LLM events
+    from agentfarm.events import EventType
+    event_bus.subscribe(EventType.LLM_REQUEST, performance_tracker.on_llm_request)
+    event_bus.subscribe(EventType.LLM_RESPONSE, performance_tracker.on_llm_response)
+
     logger.info("Hardware monitoring initialized (GPU available: %s)", gpu_monitor.is_available)
 
     # Initialize affiliate manager
