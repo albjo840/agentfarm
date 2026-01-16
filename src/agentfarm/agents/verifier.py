@@ -25,52 +25,98 @@ class VerifierAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a verification agent. Your role is to:
-1. Run appropriate tests for the changes
-2. Check code quality (linting, formatting)
-3. Verify type correctness
-4. Report results clearly
+        return """You are a RIGOROUS verification agent. Your job is to THOROUGHLY validate all code changes.
 
-Output JSON:
+## MANDATORY CHECKS (run ALL of these):
+1. **Syntax Validation** - Use check_syntax on ALL Python files
+2. **Import Check** - Use check_imports to verify all imports resolve
+3. **Test Execution** - Use run_tests to run the test suite
+4. **Lint Check** - Use run_linter to check code quality
+5. **Type Check** - Use run_typecheck for type safety
+
+## VERIFICATION PROCESS:
+1. First, check syntax of all changed files (check_syntax)
+2. Then verify imports are valid (check_imports)
+3. Run the relevant tests (run_tests)
+4. Run linter (run_linter)
+5. Run type checker (run_typecheck)
+
+## OUTPUT FORMAT:
+After running ALL tools, summarize in JSON:
 {
+  "syntax_valid": true,
+  "imports_valid": true,
   "tests_passed": 5,
   "tests_failed": 0,
   "tests_skipped": 1,
-  "lint_issues": ["issue1", "issue2"],
+  "lint_issues": ["file.py:10: unused import"],
   "type_errors": [],
   "coverage_percent": 85.5,
-  "summary": "All tests pass, minor lint issues"
+  "summary": "All checks pass",
+  "issues_found": []
 }
 
-Guidelines:
-- Run tests related to changed files
-- Report all failures clearly
-- Suggest fixes for failures
-- Be thorough but efficient"""
+## IMPORTANT:
+- ALWAYS run the tools - don't just describe what you would do
+- If ANY check fails, set success=false and list all issues
+- Be STRICT - a single failing test means the verification FAILS
+- Report SPECIFIC line numbers and file paths for issues
+- Suggest CONCRETE fixes for each issue found"""
 
     def _setup_tools(self) -> None:
         """Register tools for the verifier."""
+        # Syntax validation - MUST run first
         self.register_tool(
-            name="run_tests",
-            description="Run test suite",
+            name="check_syntax",
+            description="Validate Python syntax of a file - run this FIRST on all changed files",
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Test path or pattern"},
+                    "path": {"type": "string", "description": "Python file path to check"},
+                },
+                "required": ["path"],
+            },
+            handler=self._check_syntax,
+        )
+
+        # Import validation
+        self.register_tool(
+            name="check_imports",
+            description="Verify all imports in a file can be resolved",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Python file path to check"},
+                },
+                "required": ["path"],
+            },
+            handler=self._check_imports,
+        )
+
+        # Test execution
+        self.register_tool(
+            name="run_tests",
+            description="Run pytest test suite",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Test path or pattern (default: .)"},
                     "verbose": {"type": "boolean", "description": "Verbose output"},
+                    "keywords": {"type": "string", "description": "Filter tests by keyword (-k)"},
                 },
                 "required": [],
             },
             handler=self._run_tests,
         )
 
+        # Linting
         self.register_tool(
             name="run_linter",
             description="Run code linter (ruff)",
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to lint"},
+                    "path": {"type": "string", "description": "Path to lint (default: .)"},
                     "fix": {"type": "boolean", "description": "Auto-fix issues"},
                 },
                 "required": [],
@@ -78,40 +124,136 @@ Guidelines:
             handler=self._run_linter,
         )
 
+        # Type checking
         self.register_tool(
             name="run_typecheck",
             description="Run type checker (mypy/pyright)",
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to check"},
+                    "path": {"type": "string", "description": "Path to check (default: .)"},
                 },
                 "required": [],
             },
             handler=self._run_typecheck,
         )
 
+        # Read file for manual inspection
+        self.register_tool(
+            name="read_file",
+            description="Read a file to manually inspect code",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path"},
+                },
+                "required": ["path"],
+            },
+            handler=self._read_file,
+        )
+
     def get_tools(self) -> list[ToolDefinition]:
         """Return verifier-specific tools."""
         return self._tools
 
-    async def _run_tests(self, path: str = ".", verbose: bool = False) -> str:
-        """Run tests - placeholder."""
-        return "[Test results would be here]"
+    async def _check_syntax(self, path: str) -> str:
+        """Check Python syntax of a file."""
+        import ast
+        from pathlib import Path
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            if not file_path.suffix == ".py":
+                return f"SKIP: Not a Python file: {path}"
+
+            source = file_path.read_text(encoding="utf-8")
+            ast.parse(source)
+            return f"OK: Syntax valid for {path}"
+
+        except SyntaxError as e:
+            return f"SYNTAX ERROR in {path}:\n  Line {e.lineno}: {e.msg}\n  {e.text}"
+        except Exception as e:
+            return f"ERROR checking {path}: {e}"
+
+    async def _check_imports(self, path: str) -> str:
+        """Verify imports in a file can be resolved."""
+        import ast
+        from pathlib import Path
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            source = file_path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+
+            imports = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        imports.append(alias.name)
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        imports.append(node.module)
+
+            # Check if imports resolve
+            issues = []
+            for module in imports:
+                try:
+                    __import__(module.split(".")[0])
+                except ImportError:
+                    issues.append(f"  - Cannot import: {module}")
+
+            if issues:
+                return f"IMPORT ISSUES in {path}:\n" + "\n".join(issues)
+            return f"OK: All {len(imports)} imports valid in {path}"
+
+        except Exception as e:
+            return f"ERROR checking imports in {path}: {e}"
+
+    async def _run_tests(self, path: str = ".", verbose: bool = False, keywords: str = "") -> str:
+        """Run pytest tests."""
+        return f"[Would run: pytest {path} {'-v' if verbose else ''} {f'-k {keywords}' if keywords else ''}]"
 
     async def _run_linter(self, path: str = ".", fix: bool = False) -> str:
-        """Run linter - placeholder."""
-        return "[Lint results would be here]"
+        """Run ruff linter."""
+        return f"[Would run: ruff check {path} {'--fix' if fix else ''}]"
 
     async def _run_typecheck(self, path: str = ".") -> str:
-        """Run type checker - placeholder."""
-        return "[Type check results would be here]"
+        """Run type checker."""
+        return f"[Would run: mypy {path}]"
 
-    def inject_tools(self, code_tools: Any, sandbox: Any) -> None:
+    async def _read_file(self, path: str) -> str:
+        """Read a file for inspection."""
+        from pathlib import Path
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+
+            # Truncate if too long
+            if len(content) > 5000:
+                content = content[:5000] + "\n... (truncated)"
+
+            return f"Contents of {path}:\n```\n{content}\n```"
+        except Exception as e:
+            return f"ERROR reading {path}: {e}"
+
+    def inject_tools(self, code_tools: Any, sandbox: Any = None) -> None:
         """Inject real tool implementations."""
-        self._tool_handlers["run_tests"] = code_tools.run_tests
-        self._tool_handlers["run_linter"] = code_tools.run_linter
-        self._tool_handlers["run_typecheck"] = code_tools.run_typecheck
+        if hasattr(code_tools, "run_tests"):
+            self._tool_handlers["run_tests"] = code_tools.run_tests
+        if hasattr(code_tools, "run_linter"):
+            self._tool_handlers["run_linter"] = code_tools.run_linter
+        if hasattr(code_tools, "run_typecheck"):
+            self._tool_handlers["run_typecheck"] = code_tools.run_typecheck
 
     async def process_response(
         self, response: CompletionResponse, tool_outputs: list[str]

@@ -589,3 +589,432 @@ class ProactiveCollaborator:
             )
 
         return "\n".join(lines)
+
+
+# ============================================
+# TEAM PROBLEM SOLVING SYSTEM
+# ============================================
+
+class FailureRecoveryStrategy(Enum):
+    """Strategies for recovering from agent failures."""
+    ASK_FOR_HELP = "ask_for_help"       # Ask another agent for help
+    TEAM_DISCUSSION = "team_discussion"  # Get multiple perspectives
+    SIMPLIFY_TASK = "simplify_task"      # Break down into smaller steps
+    ALTERNATIVE_APPROACH = "alternative"  # Try different approach
+    ESCALATE = "escalate"                # Give up and escalate to user
+
+
+@dataclass
+class FailureContext:
+    """Context about a failure that needs recovery."""
+    agent: str
+    task: str
+    error: str
+    attempts: int = 1
+    strategies_tried: list[FailureRecoveryStrategy] = field(default_factory=list)
+
+
+@dataclass
+class RecoverySolution:
+    """A solution from the team for a failure."""
+    strategy: FailureRecoveryStrategy
+    solution: str
+    suggested_by: str
+    confidence: float
+    implementation_steps: list[str] = field(default_factory=list)
+
+
+class TeamProblemSolver:
+    """Enables agents to work together to solve problems when failures occur.
+
+    Instead of failing immediately, agents can:
+    1. Ask a specialist agent for help
+    2. Initiate a team discussion
+    3. Get the task broken down into smaller pieces
+    4. Try alternative approaches
+
+    Only escalates to user as a last resort.
+    """
+
+    # Map agent types to their specialties
+    AGENT_SPECIALTIES = {
+        "planner": ["task breakdown", "step ordering", "dependencies", "strategy"],
+        "executor": ["code writing", "file operations", "implementation"],
+        "verifier": ["testing", "validation", "error analysis", "debugging"],
+        "reviewer": ["code quality", "best practices", "design patterns", "refactoring"],
+        "ux": ["UI design", "user experience", "component structure", "accessibility"],
+    }
+
+    # Which agent to ask for specific problem types
+    PROBLEM_TO_AGENT = {
+        "syntax error": "verifier",
+        "test failing": "verifier",
+        "code not working": "verifier",
+        "unclear requirements": "planner",
+        "design decision": "reviewer",
+        "performance": "reviewer",
+        "UI issue": "ux",
+        "complex logic": "planner",
+        "refactoring": "reviewer",
+    }
+
+    def __init__(
+        self,
+        collaborator: AgentCollaborator,
+        max_recovery_attempts: int = 3,
+    ):
+        self.collaborator = collaborator
+        self.max_attempts = max_recovery_attempts
+        self.failure_history: list[tuple[FailureContext, RecoverySolution | None]] = []
+        self.recovery_listeners: list[Callable[[FailureContext, RecoverySolution | None], Awaitable[None]]] = []
+
+    def add_recovery_listener(
+        self, callback: Callable[[FailureContext, RecoverySolution | None], Awaitable[None]]
+    ) -> None:
+        """Add listener for recovery events (for UI updates)."""
+        self.recovery_listeners.append(callback)
+
+    async def _notify_recovery(self, ctx: FailureContext, solution: RecoverySolution | None) -> None:
+        """Notify listeners of recovery attempt."""
+        for listener in self.recovery_listeners:
+            try:
+                await listener(ctx, solution)
+            except Exception as e:
+                logger.error("Error notifying recovery listener: %s", e)
+
+    def _identify_problem_type(self, error: str, task: str) -> str:
+        """Identify the type of problem from error message."""
+        error_lower = error.lower()
+        task_lower = task.lower()
+
+        if "syntax" in error_lower or "parse" in error_lower:
+            return "syntax error"
+        if "test" in error_lower or "assert" in error_lower:
+            return "test failing"
+        if "ui" in task_lower or "component" in task_lower:
+            return "UI issue"
+        if "refactor" in task_lower:
+            return "refactoring"
+        if "unclear" in error_lower or "ambiguous" in error_lower:
+            return "unclear requirements"
+        if "design" in error_lower or "pattern" in error_lower:
+            return "design decision"
+
+        return "code not working"
+
+    def _select_helper_agent(self, problem_type: str, failing_agent: str) -> str:
+        """Select the best agent to help with a problem."""
+        # First try the specialist for this problem type
+        specialist = self.PROBLEM_TO_AGENT.get(problem_type)
+        if specialist and specialist != failing_agent:
+            return specialist
+
+        # Otherwise, select based on agent complementarity
+        complement_map = {
+            "executor": "verifier",  # Executor problems -> Verifier helps
+            "verifier": "reviewer",  # Verifier problems -> Reviewer helps
+            "reviewer": "planner",   # Reviewer problems -> Planner helps
+            "planner": "reviewer",   # Planner problems -> Reviewer helps
+            "ux": "executor",        # UX problems -> Executor helps
+        }
+
+        return complement_map.get(failing_agent, "planner")
+
+    async def attempt_recovery(
+        self,
+        failure: FailureContext,
+    ) -> RecoverySolution | None:
+        """Attempt to recover from a failure by getting help from other agents.
+
+        Args:
+            failure: Context about the failure
+
+        Returns:
+            RecoverySolution if found, None if should escalate
+        """
+        logger.info(
+            "Attempting recovery for %s failure: %s (attempt %d/%d)",
+            failure.agent, failure.error[:100], failure.attempts, self.max_attempts
+        )
+
+        # Try different strategies based on attempt number
+        if failure.attempts == 1:
+            # First attempt: Ask specialist for help
+            solution = await self._ask_for_help(failure)
+        elif failure.attempts == 2:
+            # Second attempt: Team discussion
+            solution = await self._team_discussion(failure)
+        else:
+            # Third attempt: Try to simplify
+            solution = await self._simplify_task(failure)
+
+        # Record the attempt
+        self.failure_history.append((failure, solution))
+        await self._notify_recovery(failure, solution)
+
+        return solution
+
+    async def _ask_for_help(self, failure: FailureContext) -> RecoverySolution | None:
+        """Ask a specialist agent for help."""
+        problem_type = self._identify_problem_type(failure.error, failure.task)
+        helper = self._select_helper_agent(problem_type, failure.agent)
+
+        logger.info("Asking %s for help with %s", helper, problem_type)
+
+        question = f"""I'm {failure.agent} and I failed at this task:
+
+Task: {failure.task}
+Error: {failure.error}
+
+Can you help me understand what went wrong and suggest how to fix it?
+Please provide:
+1. What likely caused the error
+2. Specific steps to fix it
+3. Code or commands if applicable"""
+
+        try:
+            answer = await self.collaborator.ask_agent(
+                from_agent=failure.agent,
+                to_agent=helper,
+                question=question,
+                question_type=QuestionType.TECHNICAL,
+                context=f"Problem type: {problem_type}",
+            )
+
+            if answer.confidence > 0.5 and not answer.needs_user_input:
+                # Parse steps from answer
+                steps = self._extract_steps(answer.answer)
+
+                return RecoverySolution(
+                    strategy=FailureRecoveryStrategy.ASK_FOR_HELP,
+                    solution=answer.answer,
+                    suggested_by=helper,
+                    confidence=answer.confidence,
+                    implementation_steps=steps,
+                )
+
+        except Exception as e:
+            logger.error("Error asking %s for help: %s", helper, e)
+
+        failure.strategies_tried.append(FailureRecoveryStrategy.ASK_FOR_HELP)
+        return None
+
+    async def _team_discussion(self, failure: FailureContext) -> RecoverySolution | None:
+        """Initiate a team discussion to solve the problem."""
+        logger.info("Starting team discussion for %s's failure", failure.agent)
+
+        # Get perspectives from multiple agents
+        agents_to_consult = [
+            a for a in ["planner", "verifier", "reviewer"]
+            if a != failure.agent
+        ][:2]  # Max 2 agents to save tokens
+
+        question = f"""Team discussion needed:
+
+{failure.agent} failed at: {failure.task}
+Error: {failure.error}
+
+What's your perspective on how to solve this?"""
+
+        perspectives: dict[str, str] = {}
+
+        for agent in agents_to_consult:
+            try:
+                answer = await self.collaborator.ask_agent(
+                    from_agent=failure.agent,
+                    to_agent=agent,
+                    question=question,
+                    question_type=QuestionType.TECHNICAL,
+                )
+                perspectives[agent] = answer.answer
+            except Exception as e:
+                logger.error("Error in team discussion with %s: %s", agent, e)
+
+        if not perspectives:
+            failure.strategies_tried.append(FailureRecoveryStrategy.TEAM_DISCUSSION)
+            return None
+
+        # Synthesize perspectives into a solution
+        combined = "\n\n".join(f"{agent}: {answer}" for agent, answer in perspectives.items())
+        steps = self._extract_steps(combined)
+
+        # Determine best contributor
+        best_agent = max(perspectives.keys(), key=lambda a: len(perspectives[a]))
+
+        return RecoverySolution(
+            strategy=FailureRecoveryStrategy.TEAM_DISCUSSION,
+            solution=combined,
+            suggested_by=f"team ({', '.join(perspectives.keys())})",
+            confidence=0.7,  # Team solutions have moderate confidence
+            implementation_steps=steps,
+        )
+
+    async def _simplify_task(self, failure: FailureContext) -> RecoverySolution | None:
+        """Ask planner to break down the task into simpler steps."""
+        logger.info("Asking planner to simplify task for %s", failure.agent)
+
+        question = f"""The task below is failing. Please break it down into smaller, simpler steps:
+
+Original task: {failure.task}
+Error encountered: {failure.error}
+
+Provide 2-3 simpler sub-tasks that together accomplish the original goal."""
+
+        try:
+            answer = await self.collaborator.ask_agent(
+                from_agent=failure.agent,
+                to_agent="planner",
+                question=question,
+                question_type=QuestionType.CLARIFICATION,
+            )
+
+            if answer.confidence > 0.3:
+                steps = self._extract_steps(answer.answer)
+
+                return RecoverySolution(
+                    strategy=FailureRecoveryStrategy.SIMPLIFY_TASK,
+                    solution=answer.answer,
+                    suggested_by="planner",
+                    confidence=answer.confidence,
+                    implementation_steps=steps if steps else [answer.answer],
+                )
+
+        except Exception as e:
+            logger.error("Error simplifying task: %s", e)
+
+        failure.strategies_tried.append(FailureRecoveryStrategy.SIMPLIFY_TASK)
+        return None
+
+    def _extract_steps(self, text: str) -> list[str]:
+        """Extract numbered or bulleted steps from text."""
+        import re
+
+        steps = []
+
+        # Match numbered lists: 1. or 1)
+        numbered = re.findall(r'^\s*\d+[.)]\s*(.+)$', text, re.MULTILINE)
+        if numbered:
+            steps.extend(numbered)
+
+        # Match bullet points: - or *
+        bullets = re.findall(r'^\s*[-*]\s*(.+)$', text, re.MULTILINE)
+        if bullets and not numbered:
+            steps.extend(bullets)
+
+        return steps[:5]  # Max 5 steps
+
+    def get_recovery_summary(self) -> str:
+        """Get summary of recovery attempts."""
+        if not self.failure_history:
+            return "No recovery attempts"
+
+        successful = sum(1 for _, sol in self.failure_history if sol is not None)
+        total = len(self.failure_history)
+
+        return f"Recovery attempts: {successful}/{total} successful"
+
+
+# ============================================
+# PARALLEL AGENT DISCUSSION
+# ============================================
+
+class AgentDiscussion:
+    """Enables multiple agents to discuss a topic in parallel.
+
+    All agents receive the same question and respond concurrently,
+    then a synthesis is created from their responses.
+    """
+
+    def __init__(self, collaborator: AgentCollaborator):
+        self.collaborator = collaborator
+
+    async def discuss(
+        self,
+        topic: str,
+        participants: list[str],
+        moderator: str = "planner",
+        max_rounds: int = 1,
+    ) -> dict[str, Any]:
+        """Start a parallel discussion among agents.
+
+        Args:
+            topic: The topic to discuss
+            participants: Agents to include
+            moderator: Agent to synthesize results
+            max_rounds: Number of discussion rounds
+
+        Returns:
+            Dict with responses and synthesis
+        """
+        import asyncio
+
+        logger.info("Starting discussion on '%s' with %s", topic[:50], participants)
+
+        responses: dict[str, str] = {}
+
+        # Round 1: All agents respond in parallel
+        async def get_response(agent: str) -> tuple[str, str]:
+            try:
+                answer = await self.collaborator.ask_agent(
+                    from_agent=moderator,
+                    to_agent=agent,
+                    question=f"Discussion topic: {topic}\n\nShare your perspective.",
+                    question_type=QuestionType.DESIGN,
+                )
+                return agent, answer.answer
+            except Exception as e:
+                return agent, f"Error: {e}"
+
+        # Run all agents in parallel
+        tasks = [get_response(agent) for agent in participants if agent != moderator]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, tuple):
+                agent, response = result
+                responses[agent] = response
+
+        # Synthesize responses
+        synthesis = await self._synthesize(responses, topic, moderator)
+
+        return {
+            "topic": topic,
+            "participants": participants,
+            "responses": responses,
+            "synthesis": synthesis,
+            "rounds": 1,
+        }
+
+    async def _synthesize(
+        self, responses: dict[str, str], topic: str, moderator: str
+    ) -> str:
+        """Have the moderator synthesize the responses."""
+        if not responses:
+            return "No responses to synthesize"
+
+        # Format responses for moderator
+        formatted = "\n\n".join(
+            f"{agent}'s perspective:\n{response[:300]}"
+            for agent, response in responses.items()
+        )
+
+        question = f"""Synthesize these perspectives on "{topic}":
+
+{formatted}
+
+Provide a brief summary highlighting:
+1. Points of agreement
+2. Key differences
+3. Recommended approach"""
+
+        try:
+            answer = await self.collaborator.ask_agent(
+                from_agent="synthesis",
+                to_agent=moderator,
+                question=question,
+                question_type=QuestionType.DESIGN,
+            )
+            return answer.answer
+        except Exception as e:
+            logger.error("Error synthesizing discussion: %s", e)
+            return f"Synthesis failed: {e}"

@@ -25,35 +25,78 @@ class ReviewerAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a code review agent. Your role is to:
-1. Review code changes for correctness
-2. Check for security issues
-3. Verify adherence to project patterns
-4. Provide constructive feedback
+        return """You are a RIGOROUS code review agent. Your job is to thoroughly review ALL code changes.
 
-Output JSON:
+## MANDATORY REVIEW CHECKLIST (check ALL items):
+
+### 1. CORRECTNESS
+- Does the code do what it's supposed to do?
+- Are there any logical errors?
+- Are edge cases handled?
+- Is error handling adequate?
+
+### 2. SECURITY (CRITICAL)
+- No hardcoded credentials or API keys
+- No SQL injection vulnerabilities
+- No XSS vulnerabilities
+- No path traversal vulnerabilities
+- Input validation present
+- Proper authentication/authorization
+
+### 3. CODE QUALITY
+- Follows existing code patterns
+- Proper naming conventions
+- No code duplication
+- Functions/methods not too long (< 50 lines)
+- Single responsibility principle
+
+### 4. BEST PRACTICES
+- Type hints present
+- Docstrings for public functions
+- No unused imports
+- No unused variables
+- Async/await used correctly
+
+### 5. PERFORMANCE
+- No obvious N+1 query patterns
+- No unnecessary loops
+- Efficient data structures
+
+## REVIEW PROCESS:
+1. Use read_file to examine ALL changed files
+2. Use check_security to scan for security issues
+3. Use check_patterns to verify code patterns
+4. Add comments using add_comment for each issue found
+
+## OUTPUT FORMAT:
 {
-  "approved": true|false,
+  "approved": false,  // ONLY true if NO errors found
+  "checklist": {
+    "correctness": true,
+    "security": true,
+    "code_quality": true,
+    "best_practices": true,
+    "performance": true
+  },
   "comments": [
-    {"file": "path.py", "line": 42, "severity": "warning", "message": "Consider..."}
+    {"file": "path.py", "line": 42, "severity": "error", "message": "Security: hardcoded password"}
   ],
-  "suggestions": ["suggestion1", "suggestion2"],
-  "summary": "Overall assessment"
+  "suggestions": ["Add input validation for user data"],
+  "summary": "Changes requested: 1 security issue found"
 }
 
-Severity levels: info, warning, error
+## SEVERITY RULES:
+- error: Blocks approval (security issues, bugs, crashes)
+- warning: Should fix but not blocking
+- info: Nice-to-have improvements
 
-Guidelines:
-- Focus on correctness and security
-- Be constructive, not nitpicky
-- Approve if no blocking issues
-- Suggest improvements for next iteration"""
+**BE STRICT** - If you find ANY error-level issue, set approved=false"""
 
     def _setup_tools(self) -> None:
         """Register tools for the reviewer."""
         self.register_tool(
             name="read_file",
-            description="Read file to review",
+            description="Read a file to review its contents",
             parameters={
                 "type": "object",
                 "properties": {
@@ -66,11 +109,11 @@ Guidelines:
 
         self.register_tool(
             name="get_diff",
-            description="Get diff of changes",
+            description="Get git diff of changes",
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "File path (optional)"},
                     "base": {"type": "string", "description": "Base ref (default: HEAD)"},
                 },
                 "required": [],
@@ -79,8 +122,34 @@ Guidelines:
         )
 
         self.register_tool(
+            name="check_security",
+            description="Scan file for security vulnerabilities",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to scan"},
+                },
+                "required": ["path"],
+            },
+            handler=self._check_security,
+        )
+
+        self.register_tool(
+            name="check_patterns",
+            description="Check code against project patterns and best practices",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to check"},
+                },
+                "required": ["path"],
+            },
+            handler=self._check_patterns,
+        )
+
+        self.register_tool(
             name="add_comment",
-            description="Add a review comment",
+            description="Add a review comment for an issue found",
             parameters={
                 "type": "object",
                 "properties": {
@@ -103,24 +172,147 @@ Guidelines:
         return self._tools
 
     async def _read_file(self, path: str) -> str:
-        """Read file - placeholder."""
-        return f"[Contents of {path}]"
+        """Read a file for review."""
+        from pathlib import Path
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+
+            # Add line numbers for easier reference
+            lines = content.split("\n")
+            numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(lines))
+
+            if len(numbered) > 8000:
+                numbered = numbered[:8000] + "\n... (truncated)"
+
+            return f"Contents of {path} ({len(lines)} lines):\n{numbered}"
+        except Exception as e:
+            return f"ERROR reading {path}: {e}"
 
     async def _get_diff(self, path: str = ".", base: str = "HEAD") -> str:
-        """Get diff - placeholder."""
-        return f"[Diff for {path} against {base}]"
+        """Get git diff."""
+        return f"[Would run: git diff {base} -- {path}]"
+
+    async def _check_security(self, path: str) -> str:
+        """Scan file for common security vulnerabilities."""
+        from pathlib import Path
+        import re
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+            lines = content.split("\n")
+            issues = []
+
+            # Security patterns to check
+            patterns = [
+                (r'password\s*=\s*["\'][^"\']+["\']', "Hardcoded password"),
+                (r'api_key\s*=\s*["\'][^"\']+["\']', "Hardcoded API key"),
+                (r'secret\s*=\s*["\'][^"\']+["\']', "Hardcoded secret"),
+                (r'eval\s*\(', "Use of eval() - potential code injection"),
+                (r'exec\s*\(', "Use of exec() - potential code injection"),
+                (r'os\.system\s*\(', "Use of os.system() - prefer subprocess"),
+                (r'shell\s*=\s*True', "shell=True - potential command injection"),
+                (r'\.format\s*\([^)]*request', "String formatting with request data - potential injection"),
+                (r'%s.*request', "String interpolation with request data"),
+                (r'pickle\.loads?\s*\(', "Pickle deserialization - potential security risk"),
+                (r'yaml\.load\s*\([^)]*Loader\s*=\s*None', "Unsafe YAML loading"),
+                (r'__import__\s*\(', "Dynamic import - potential risk"),
+            ]
+
+            for i, line in enumerate(lines, 1):
+                for pattern, description in patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        issues.append(f"  Line {i}: {description}")
+                        issues.append(f"    {line.strip()[:80]}")
+
+            if issues:
+                return f"SECURITY ISSUES in {path}:\n" + "\n".join(issues)
+            return f"OK: No obvious security issues in {path}"
+
+        except Exception as e:
+            return f"ERROR checking security in {path}: {e}"
+
+    async def _check_patterns(self, path: str) -> str:
+        """Check code against best practices."""
+        from pathlib import Path
+        import ast
+
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return f"ERROR: File not found: {path}"
+
+            if not path.endswith(".py"):
+                return f"SKIP: Not a Python file: {path}"
+
+            content = file_path.read_text(encoding="utf-8")
+            lines = content.split("\n")
+            issues = []
+
+            # Parse AST for analysis
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                return f"ERROR: Cannot parse {path} - syntax error"
+
+            # Check function lengths
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    func_lines = node.end_lineno - node.lineno + 1 if node.end_lineno else 0
+                    if func_lines > 50:
+                        issues.append(f"  Line {node.lineno}: Function '{node.name}' is {func_lines} lines (max 50)")
+
+                    # Check for docstring
+                    if not ast.get_docstring(node):
+                        issues.append(f"  Line {node.lineno}: Function '{node.name}' missing docstring")
+
+                    # Check for type hints
+                    if not node.returns:
+                        issues.append(f"  Line {node.lineno}: Function '{node.name}' missing return type hint")
+
+            # Check for common anti-patterns
+            for i, line in enumerate(lines, 1):
+                # Bare except
+                if "except:" in line and "except Exception" not in line:
+                    issues.append(f"  Line {i}: Bare 'except:' - catch specific exceptions")
+
+                # TODO/FIXME without ticket
+                if "TODO" in line or "FIXME" in line:
+                    if not any(c in line for c in ["#", "ticket", "issue", "JIRA"]):
+                        issues.append(f"  Line {i}: TODO/FIXME without reference")
+
+                # Print statements in production code
+                if line.strip().startswith("print(") and "debug" not in path.lower():
+                    issues.append(f"  Line {i}: print() in production code - use logging")
+
+            if issues:
+                return f"CODE PATTERN ISSUES in {path}:\n" + "\n".join(issues[:20])  # Max 20 issues
+            return f"OK: Code follows best practices in {path}"
+
+        except Exception as e:
+            return f"ERROR checking patterns in {path}: {e}"
 
     async def _add_comment(
         self, file: str, message: str, severity: str, line: int | None = None
     ) -> str:
-        """Add comment - placeholder."""
-        return f"[Added {severity} comment on {file}:{line or 'general'}]"
+        """Add a review comment."""
+        location = f"{file}:{line}" if line else file
+        return f"[COMMENT {severity.upper()}] {location}: {message}"
 
-    def inject_tools(self, file_tools: Any, git_tools: Any) -> None:
+    def inject_tools(self, file_tools: Any = None, git_tools: Any = None) -> None:
         """Inject real tool implementations."""
-        self._tool_handlers["read_file"] = file_tools.read_file
-        self._tool_handlers["get_diff"] = git_tools.get_diff
-        # add_comment might store comments for later
+        if file_tools and hasattr(file_tools, "read_file"):
+            self._tool_handlers["read_file"] = file_tools.read_file
+        if git_tools and hasattr(git_tools, "get_diff"):
+            self._tool_handlers["get_diff"] = git_tools.get_diff
 
     async def process_response(
         self, response: CompletionResponse, tool_outputs: list[str]

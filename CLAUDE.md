@@ -778,14 +778,14 @@ TestCase(
 - [x] Provider auto-detection from available API keys
 
 ### Priority 3: MCP & Integration
-- [ ] Test MCP server with Claude Desktop
-- [ ] Add MCP resources for project files
-- [ ] VS Code extension integration
+- [x] Test MCP server with Claude Desktop (`tests/test_mcp_server.py`)
+- [x] Add MCP resources for project files (`mcp_server.py` - list_resources, read_resource)
+- [x] VS Code extension integration (`vscode-extension/`)
 
 ### Priority 4: Security & Sandbox
-- [ ] Build and test Docker sandbox image
-- [ ] Timeout handling for sandbox execution
-- [ ] Resource limits enforcement
+- [x] Build and test Docker sandbox image (`tests/test_sandbox_integration.py`)
+- [x] Timeout handling for sandbox execution (`tools/sandbox.py`)
+- [x] Resource limits enforcement (memory, CPU, network isolation)
 
 ### Priority 5: Web Interface
 - [x] Robot idle behavior (wandering, thinking, scanning)
@@ -793,12 +793,12 @@ TestCase(
 - [x] WebSocket events for parallel execution
 - [x] UX Designer stage in workflow status
 - [x] "SKIPPED" status styling for conditional phases
-- [ ] Streaming output for real-time feedback
-- [ ] Token usage dashboard per agent
+- [x] Streaming output for real-time feedback (router + frontend)
+- [x] Token usage dashboard per agent (`app.js` + `/api/hardware/performance`)
 
 ### Priority 6: UX Designer Integration
 - [x] UXDesignerAgent in main Orchestrator workflow
 - [x] `design_component()` and `review_ui()` methods
 - [x] Automatic UI task detection via keywords
 - [x] UX guidance passed to ExecutorAgent context
-- [ ] UXDesignerAgent steps in parallel execution
+- [x] UXDesignerAgent steps in parallel execution (`_run_parallel_ux_design`)

@@ -257,17 +257,86 @@ Guidelines:
     async def execute_step(
         self, context: AgentContext, step_description: str, step_id: int
     ) -> ExecutionResult:
-        """Execute a single step and return structured result."""
-        result = await self.run(context, step_description)
+        """Execute a single step with automatic retry and team collaboration on failure."""
+        max_attempts = 3
+        last_error = ""
 
-        files_changed = [
-            FileChange(**fc) for fc in result.data.get("files_changed", [])
-        ]
+        for attempt in range(1, max_attempts + 1):
+            result = await self.run(context, step_description)
 
+            if result.success:
+                files_changed = [
+                    FileChange(**fc) for fc in result.data.get("files_changed", [])
+                ]
+
+                return ExecutionResult(
+                    success=True,
+                    step_id=step_id,
+                    files_changed=files_changed,
+                    output=result.summary_for_next_agent,
+                    error=None,
+                )
+
+            # Execution failed - try to recover
+            last_error = result.output or "Unknown error"
+
+            if attempt < max_attempts:
+                # Try to get help from team
+                recovery_result = await self._attempt_recovery(
+                    step_description, last_error, attempt
+                )
+
+                if recovery_result:
+                    # Update context with recovery suggestion
+                    context = AgentContext(
+                        task_summary=f"{step_description}\n\nRECOVERY GUIDANCE:\n{recovery_result}",
+                        relevant_files=context.relevant_files,
+                        previous_step_output=context.previous_step_output,
+                        constraints=context.constraints,
+                    )
+
+        # All attempts failed
         return ExecutionResult(
-            success=result.success,
+            success=False,
             step_id=step_id,
-            files_changed=files_changed,
-            output=result.summary_for_next_agent,
-            error=None if result.success else result.output,
+            files_changed=[],
+            output=f"Failed after {max_attempts} attempts",
+            error=last_error,
         )
+
+    async def _attempt_recovery(
+        self, task: str, error: str, attempt: int
+    ) -> str | None:
+        """Attempt to recover from failure by asking other agents for help."""
+        from agentfarm.agents.collaboration import (
+            FailureContext,
+            TeamProblemSolver,
+        )
+
+        # Only try collaboration if we have a collaborator set up
+        if not hasattr(self, '_collaborator') or self._collaborator is None:
+            return None
+
+        try:
+            problem_solver = TeamProblemSolver(self._collaborator)
+
+            failure = FailureContext(
+                agent="executor",
+                task=task,
+                error=error,
+                attempts=attempt,
+            )
+
+            solution = await problem_solver.attempt_recovery(failure)
+
+            if solution and solution.confidence > 0.5:
+                return solution.solution
+
+        except Exception as e:
+            # Log but don't fail if collaboration fails
+            import logging
+            logging.getLogger(__name__).warning(
+                "Recovery collaboration failed: %s", e
+            )
+
+        return None

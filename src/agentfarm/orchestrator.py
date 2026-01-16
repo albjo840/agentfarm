@@ -531,16 +531,25 @@ class Orchestrator:
         task: str,
         plan: TaskPlan,
     ) -> dict[str, Any] | None:
-        """Run the UX design phase for UI-related tasks."""
-        # Build a design request from the task and plan
+        """Run the UX design phase for UI-related tasks.
+
+        Supports parallel execution of multiple independent design steps.
+        """
+        import asyncio
+
+        # Extract UI-related steps
         ui_steps = []
         for step in plan.steps:
             step_lower = step.description.lower()
             if any(kw in step_lower for kw in ["ui", "component", "interface", "display", "visual", "sprite", "graphics"]):
                 ui_steps.append(step.description)
 
+        # If multiple UI steps, run them in parallel
+        if len(ui_steps) > 1:
+            return await self._run_parallel_ux_design(context, task, ui_steps, plan)
+
+        # Single step or general guidance
         if not ui_steps:
-            # Generate general UI guidance for the task
             design_request = f"Provide UI/UX design guidance for: {task}"
         else:
             design_request = f"Design UI components for:\n" + "\n".join(f"- {s}" for s in ui_steps)
@@ -562,6 +571,112 @@ class Orchestrator:
         except Exception as e:
             logger.warning("UX design phase failed: %s", e)
             return None
+
+    async def _run_parallel_ux_design(
+        self,
+        context: AgentContext,
+        task: str,
+        ui_steps: list[str],
+        plan: TaskPlan,
+    ) -> dict[str, Any] | None:
+        """Execute multiple UX design steps in parallel."""
+        import asyncio
+
+        logger.info("Running %d UX design steps in parallel", len(ui_steps))
+
+        # Emit parallel execution start event
+        if self._event_callback:
+            await self._event_callback("parallel_ux_start", {
+                "total_steps": len(ui_steps),
+                "steps": ui_steps,
+            })
+
+        async def design_single_component(step_description: str, step_idx: int) -> dict[str, Any]:
+            """Design a single UI component."""
+            ux_context = AgentContext(
+                task_summary=f"UX Design: {step_description}",
+                relevant_files=context.relevant_files,
+                previous_step_output=plan.summary,
+            )
+
+            try:
+                if self._event_callback:
+                    await self._event_callback("ux_step_start", {
+                        "step_idx": step_idx,
+                        "description": step_description,
+                    })
+
+                result = await self.ux_designer.run(ux_context, f"Design: {step_description}")
+
+                if self._event_callback:
+                    await self._event_callback("ux_step_complete", {
+                        "step_idx": step_idx,
+                        "success": result.success,
+                    })
+
+                return {
+                    "step": step_description,
+                    "success": result.success,
+                    "summary": result.summary_for_next_agent or "",
+                    "output": result.output,
+                }
+            except Exception as e:
+                logger.warning("UX design step failed: %s - %s", step_description, e)
+                return {
+                    "step": step_description,
+                    "success": False,
+                    "summary": "",
+                    "output": str(e),
+                }
+
+        # Run all design steps in parallel
+        tasks = [
+            design_single_component(step, idx)
+            for idx, step in enumerate(ui_steps)
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect results
+        successful = []
+        failed = []
+        summaries = []
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                failed.append(ui_steps[i])
+            elif result.get("success"):
+                successful.append(result)
+                if result.get("summary"):
+                    summaries.append(result["summary"])
+            else:
+                failed.append(result.get("step", ui_steps[i]))
+
+        # Emit completion event
+        if self._event_callback:
+            await self._event_callback("parallel_ux_complete", {
+                "successful": len(successful),
+                "failed": len(failed),
+            })
+
+        logger.info(
+            "Parallel UX design complete: %d successful, %d failed",
+            len(successful), len(failed)
+        )
+
+        # Combine summaries
+        combined_summary = "\n".join(summaries) if summaries else "Design guidance provided"
+
+        return {
+            "success": len(failed) == 0,
+            "summary": combined_summary,
+            "output": "\n\n".join(r.get("output", "") for r in successful if isinstance(r, dict)),
+            "parallel_results": {
+                "successful": len(successful),
+                "failed": len(failed),
+                "failed_steps": failed,
+            },
+        }
 
     def _collect_changed_files(self, results: list[ExecutionResult]) -> list[str]:
         """Collect all files changed during execution."""

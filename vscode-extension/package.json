@@ -1,0 +1,139 @@
+{
+  "name": "agentfarm",
+  "displayName": "AgentFarm",
+  "description": "Multi-agent AI orchestration for code tasks",
+  "version": "0.1.0",
+  "publisher": "agentfarm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentfarm/agentfarm"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "code generation",
+    "llm",
+    "automation"
+  ],
+  "activationEvents": [
+    "onCommand:agentfarm.runWorkflow",
+    "onCommand:agentfarm.planTask",
+    "onCommand:agentfarm.reviewCode"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentfarm.runWorkflow",
+        "title": "AgentFarm: Run Workflow",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "agentfarm.planTask",
+        "title": "AgentFarm: Plan Task",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "agentfarm.reviewCode",
+        "title": "AgentFarm: Review Selected Code",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "agentfarm.showStatus",
+        "title": "AgentFarm: Show Status",
+        "icon": "$(info)"
+      },
+      {
+        "command": "agentfarm.openWebUI",
+        "title": "AgentFarm: Open Web UI",
+        "icon": "$(browser)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "agentfarm.reviewCode",
+          "when": "editorHasSelection",
+          "group": "agentfarm"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "agentfarm.runWorkflow",
+          "group": "agentfarm"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AgentFarm",
+      "properties": {
+        "agentfarm.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "URL of the AgentFarm web server"
+        },
+        "agentfarm.autoStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically start AgentFarm server when VS Code opens"
+        },
+        "agentfarm.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for workflow events"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentfarm",
+          "title": "AgentFarm",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentfarm": [
+        {
+          "id": "agentfarm.status",
+          "name": "Status"
+        },
+        {
+          "id": "agentfarm.agents",
+          "name": "Agents"
+        },
+        {
+          "id": "agentfarm.history",
+          "name": "History"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.14.0"
+  }
+}

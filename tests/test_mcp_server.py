@@ -114,3 +114,111 @@ def test_claude_desktop_config_format():
     assert "agentfarm" in parsed["mcpServers"]
     assert parsed["mcpServers"]["agentfarm"]["command"] == "agentfarm"
     assert "mcp" in parsed["mcpServers"]["agentfarm"]["args"]
+
+
+def test_mcp_resource_patterns():
+    """Test that resource patterns are sensible."""
+    from agentfarm.mcp_server import RESOURCE_PATTERNS, EXCLUDE_DIRS
+
+    # Should include common code file types
+    assert "*.py" in RESOURCE_PATTERNS
+    assert "*.js" in RESOURCE_PATTERNS
+    assert "*.ts" in RESOURCE_PATTERNS
+    assert "*.md" in RESOURCE_PATTERNS
+
+    # Should exclude common non-code directories
+    assert ".git" in EXCLUDE_DIRS
+    assert "__pycache__" in EXCLUDE_DIRS
+    assert "node_modules" in EXCLUDE_DIRS
+
+
+def test_file_to_uri_conversion():
+    """Test URI conversion functions."""
+    from pathlib import Path
+    from agentfarm.mcp_server import _file_to_uri, _uri_to_file, _working_dir
+
+    # Mock working dir
+    import agentfarm.mcp_server as mcp
+    original_dir = mcp._working_dir
+    mcp._working_dir = "/test/project"
+
+    try:
+        # Test file to URI
+        test_path = Path("/test/project/src/main.py")
+        uri = _file_to_uri(test_path)
+        assert uri == "file:///src/main.py"
+
+        # Test URI to file
+        result = _uri_to_file("file:///src/main.py")
+        assert result == Path("/test/project/src/main.py")
+
+    finally:
+        mcp._working_dir = original_dir
+
+
+def test_list_project_files_handler():
+    """Test list_project_files tool handler."""
+    import json
+    import tempfile
+    from pathlib import Path
+    from agentfarm.mcp_server import _handle_list_project_files
+    import agentfarm.mcp_server as mcp
+
+    # Create temp directory with test files
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_dir = mcp._working_dir
+        mcp._working_dir = tmpdir
+
+        try:
+            # Create test files
+            (Path(tmpdir) / "test.py").write_text("# test")
+            (Path(tmpdir) / "src").mkdir()
+            (Path(tmpdir) / "src" / "app.py").write_text("# app")
+
+            # Test listing all files
+            result = json.loads(_handle_list_project_files({"pattern": "*.py"}))
+            assert result["count"] >= 2
+            paths = [f["path"] for f in result["files"]]
+            assert "test.py" in paths
+            assert "src/app.py" in paths or "src\\app.py" in paths
+
+            # Test listing specific directory
+            result = json.loads(_handle_list_project_files({"directory": "src"}))
+            assert result["directory"] == "src"
+
+        finally:
+            mcp._working_dir = original_dir
+
+
+def test_read_file_handler():
+    """Test read_file tool handler."""
+    import json
+    import tempfile
+    from pathlib import Path
+    from agentfarm.mcp_server import _handle_read_file
+    import agentfarm.mcp_server as mcp
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_dir = mcp._working_dir
+        mcp._working_dir = tmpdir
+
+        try:
+            # Create test file
+            test_content = "Hello, World!\nLine 2"
+            (Path(tmpdir) / "test.txt").write_text(test_content)
+
+            # Read file
+            result = json.loads(_handle_read_file({"path": "test.txt"}))
+            assert result["content"] == test_content
+            assert result["path"] == "test.txt"
+
+            # Test non-existent file
+            result = json.loads(_handle_read_file({"path": "nonexistent.txt"}))
+            assert "error" in result
+
+            # Test path traversal protection
+            result = json.loads(_handle_read_file({"path": "../../../etc/passwd"}))
+            assert "error" in result
+
+        finally:
+            mcp._working_dir = original_dir
