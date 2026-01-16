@@ -455,9 +455,15 @@ class LLMRouter:
         self,
         messages: list[dict[str, str]],
         task_type: TaskType = TaskType.GENERAL,
+        agent: str | None = None,
         **kwargs: Any,
     ):
         """Stream a completion request.
+
+        Args:
+            messages: Chat messages
+            task_type: Type of task for routing
+            agent: Agent name (for stream event tracking)
 
         Yields:
             Chunks from the LLM response
@@ -467,6 +473,26 @@ class LLMRouter:
             raise RuntimeError(f"No available models for task type: {task_type}")
 
         state.current_load += 1
+        request_id = str(uuid.uuid4())
+        model_name = state.config.name
+
+        # Emit stream start
+        if self.event_bus:
+            from agentfarm.events import Event, EventType as ET
+            await self.event_bus.emit(Event(
+                type=ET.LLM_REQUEST,
+                source="router",
+                data={
+                    "request_id": request_id,
+                    "model": model_name,
+                    "agent": agent,
+                    "task_type": task_type.value,
+                    "streaming": True,
+                },
+            ))
+
+        start_time = time.time()
+        total_tokens = 0
 
         try:
             async with self._client.stream(
@@ -485,16 +511,42 @@ class LLMRouter:
                         import json
                         data = json.loads(line)
                         if "message" in data:
-                            yield data["message"].get("content", "")
+                            chunk = data["message"].get("content", "")
+                            total_tokens += 1  # Rough estimate
+                            yield chunk
 
-                        # Emit stream chunk event
-                        if self.event_bus:
-                            from agentfarm.events import Event, EventType as ET
-                            await self.event_bus.emit(Event(
-                                type=ET.LLM_STREAM_CHUNK,
-                                source="router",
-                                data={"model": state.config.name},
-                            ))
+                            # Emit stream chunk event with content
+                            if self.event_bus and chunk:
+                                from agentfarm.events import Event, EventType as ET
+                                await self.event_bus.emit(Event(
+                                    type=ET.LLM_STREAM_CHUNK,
+                                    source="router",
+                                    data={
+                                        "request_id": request_id,
+                                        "model": model_name,
+                                        "agent": agent,
+                                        "chunk": chunk,
+                                    },
+                                ))
+
+            # Emit stream completion
+            latency_ms = (time.time() - start_time) * 1000
+            if self.event_bus:
+                from agentfarm.events import Event, EventType as ET
+                await self.event_bus.emit(Event(
+                    type=ET.LLM_RESPONSE,
+                    source="router",
+                    data={
+                        "request_id": request_id,
+                        "model": model_name,
+                        "agent": agent,
+                        "success": True,
+                        "streaming": True,
+                        "latency_ms": latency_ms,
+                        "output_tokens": total_tokens,
+                    },
+                ))
+
         finally:
             state.current_load -= 1
 

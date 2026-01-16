@@ -11,9 +11,11 @@ Branch: feature/affiliate-ads
 Status: Security + Monitoring moduler tillagda
 ```
 
-## Senaste Commits (före dagens session)
+## Senaste Commits
 
 ```
+3df7fcb feat: Integrate monitoring with LLMRouter and add SecureVault to TierManager
+e58888e feat: Add security, monitoring modules and infrastructure docs
 143908b docs: Add WireGuard + DuckDNS setup guide
 37d9e62 docs: Add ROCm 6.4.3 + Ollama setup guide
 71b3d68 feat: Add TierManager for unified access control
@@ -148,15 +150,15 @@ vmbr1 (192.168.100.0/24) ─► Ollama (INGEN INTERNET)
 
 ## Pågående TODO
 
-### Prioritet 1: Integration
+### Prioritet 1: Integration ✅ KLAR
 
-- [ ] Koppla PerformanceTracker till LLMRouter events
-- [ ] Integrera ContextInjector med agents (system prompt injection)
-- [ ] Koppla SecureVault till TierManager för Early Access
+- [x] Koppla PerformanceTracker till LLMRouter events
+- [x] Integrera ContextInjector med agents (system prompt injection)
+- [x] Koppla SecureVault till TierManager för Early Access
 
 ### Prioritet 2: Kompletteringar
 
-- [ ] Fler affiliate-retailers (Proshop, Amazon/Adtraction)
+- [ ] Fler affiliate-retailers (Proshop, Amazon/Adtraction) - *Kräver företagsregistrering*
 - [ ] Streaming output i web UI
 - [ ] Token usage dashboard per agent
 - [ ] MCP server test med Claude Desktop
@@ -164,8 +166,8 @@ vmbr1 (192.168.100.0/24) ─► Ollama (INGEN INTERNET)
 
 ### Prioritet 3: Dokumentation
 
-- [ ] Uppdatera SECURITY.md med nya moduler
-- [ ] Uppdatera WEB.md med nya endpoints
+- [x] Uppdatera SECURITY.md med nya moduler
+- [x] Uppdatera WEB.md med nya endpoints
 - [ ] README för scripts/
 
 ## Kända Begränsningar

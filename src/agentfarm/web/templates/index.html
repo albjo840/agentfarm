@@ -147,6 +147,34 @@
                     <div class="launch-path" id="launch-path"></div>
                 </div>
             </section>
+
+            <!-- Token Usage Dashboard -->
+            <section class="token-dashboard" id="token-dashboard">
+                <div class="section-header collapsible" id="token-dashboard-toggle">
+                    <span class="icon">⚡</span>
+                    <h2>TOKEN METRICS</h2>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="token-dashboard-content" id="token-dashboard-content">
+                    <div class="token-overview">
+                        <div class="metric-card">
+                            <span class="metric-label">TOTAL TOKENS</span>
+                            <span class="metric-value" id="total-tokens">0</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">AVG TOKENS/SEC</span>
+                            <span class="metric-value" id="avg-tps">0</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">LATENCY (P95)</span>
+                            <span class="metric-value" id="latency-p95">0ms</span>
+                        </div>
+                    </div>
+                    <div class="agent-token-grid" id="agent-token-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
         </main>
 
         <!-- Footer -->

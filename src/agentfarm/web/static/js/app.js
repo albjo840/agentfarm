@@ -35,6 +35,9 @@ let availableProviders = [];
 let robotVisualizer = null;
 let currentProjectPath = null;
 
+// Streaming message tracking
+let streamingMessages = {}; // request_id -> {agent, content, messageId}
+
 // DOM Elements
 const messagesContainer = document.getElementById('messages');
 const taskInput = document.getElementById('task-input');
@@ -51,6 +54,7 @@ function init() {
     setupEventListeners();
     startClock();
     connectWebSocket();
+    setupTokenDashboard();
 
     addMessage('orchestrator', 'System initialized. Connecting to neural network...');
 }
@@ -135,6 +139,18 @@ function handleServerMessage(data) {
 
                 // Queue the walk and speak animation
                 robotVisualizer.queueCommunication(fromAgent, toAgent, data.content);
+            }
+            break;
+
+        case 'llm_stream_chunk':
+            // Handle streaming LLM output
+            handleStreamChunk(data);
+            break;
+
+        case 'llm_response':
+            // Finalize streaming message when LLM response completes
+            if (data.streaming && data.request_id) {
+                finalizeStreamingMessage(data.request_id);
             }
             break;
 
@@ -321,20 +337,83 @@ function addMessage(agentId, content) {
 // Make addMessage available globally for robots.js
 window.addMessage = addMessage;
 
+// Handle streaming chunk from LLM
+function handleStreamChunk(data) {
+    const { request_id, agent, chunk } = data;
+    if (!request_id || !chunk) return;
+
+    const agentId = agent || 'orchestrator';
+
+    if (!streamingMessages[request_id]) {
+        // Create new streaming message
+        let agentObj = AGENTS.find(a => a.id === agentId);
+        if (!agentObj) {
+            agentObj = {
+                id: agentId,
+                name: agentId.toUpperCase(),
+                color: AGENT_COLORS[agentId] || '#00fff2'
+            };
+        }
+
+        const messageId = Date.now();
+        const message = {
+            id: messageId,
+            agent: agentObj,
+            content: chunk,
+            time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            streaming: true  // Mark as streaming
+        };
+
+        messages.push(message);
+        streamingMessages[request_id] = {
+            agent: agentId,
+            content: chunk,
+            messageId: messageId
+        };
+    } else {
+        // Append to existing streaming message
+        streamingMessages[request_id].content += chunk;
+
+        // Update the message in the messages array
+        const msgIndex = messages.findIndex(m => m.id === streamingMessages[request_id].messageId);
+        if (msgIndex !== -1) {
+            messages[msgIndex].content = streamingMessages[request_id].content;
+        }
+    }
+
+    renderMessages();
+}
+
+// Finalize streaming message (remove streaming indicator)
+function finalizeStreamingMessage(request_id) {
+    if (!streamingMessages[request_id]) return;
+
+    const msgIndex = messages.findIndex(m => m.id === streamingMessages[request_id].messageId);
+    if (msgIndex !== -1) {
+        messages[msgIndex].streaming = false;
+    }
+
+    delete streamingMessages[request_id];
+    renderMessages();
+}
+
 // Render messages
 function renderMessages() {
     messagesContainer.innerHTML = messages.slice(-50).map(msg => {
         const color = msg.agent.color || AGENT_COLORS[msg.agent.id] || '#00fff2';
         const name = msg.agent.name || msg.agent.id.toUpperCase();
+        const streamingCursor = msg.streaming ? '<span class="streaming-cursor">▌</span>' : '';
+        const streamingClass = msg.streaming ? ' streaming' : '';
         return `
-            <div class="message ${msg.agent.id}">
+            <div class="message ${msg.agent.id}${streamingClass}">
                 <div class="message-header">
                     <span class="message-agent" style="color: ${color};">
                         ${name}
                     </span>
                     <span class="message-time">${msg.time}</span>
+                    ${msg.streaming ? '<span class="streaming-badge">STREAMING</span>' : ''}
                 </div>
-                <div class="message-content">${escapeHtml(msg.content)}</div>
+                <div class="message-content">${escapeHtml(msg.content)}${streamingCursor}</div>
             </div>
         `;
     }).join('');
