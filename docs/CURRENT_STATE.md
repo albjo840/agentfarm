@@ -14,14 +14,55 @@ Status: Security + Monitoring moduler tillagda
 ## Senaste Commits
 
 ```
+115a7a1 docs: Update CURRENT_STATE and enhance web UI with affiliate ads
 3df7fcb feat: Integrate monitoring with LLMRouter and add SecureVault to TierManager
 e58888e feat: Add security, monitoring modules and infrastructure docs
 143908b docs: Add WireGuard + DuckDNS setup guide
 37d9e62 docs: Add ROCm 6.4.3 + Ollama setup guide
-71b3d68 feat: Add TierManager for unified access control
 ```
 
-## Session 2026-01-16: Security, Monitoring & Infrastructure
+## Session 2026-01-16 (del 2): Web UI, Testing & Documentation
+
+### Slutfört i denna session
+
+- [x] **Token Dashboard** - Realtids-token-statistik i web UI
+  - Total tokens, avg tokens/sek, P95 latency
+  - Per-agent token breakdown (input/output/requests)
+  - Collapsible dashboard section
+  - Polling mot `/api/hardware/performance`
+
+- [x] **Streaming Infrastructure** - Komplett streaming-stöd
+  - Router `stream()` metod med `LLM_STREAM_CHUNK` events
+  - WebSocket broadcasting av stream chunks
+  - Frontend `handleStreamChunk()` för realtids-visning
+  - Streaming-indikator och cursor i UI
+
+- [x] **MCP Server Tests** - Verifiering av Claude Desktop-integration
+  - `tests/test_mcp_server.py` med tool schema-validering
+  - Dokumenterad config-format för Claude Desktop
+
+- [x] **Docker Sandbox Tests** - Komplett integrationstest-suite
+  - `tests/test_sandbox_integration.py`
+  - Testar: execution, security, isolation, timeouts
+  - Kräver Docker för att köras (`@pytest.mark.docker`)
+
+- [x] **Scripts README** - Dokumentation för scripts/
+  - `scripts/README.md` med usage och env-variabler
+  - Dokumenterar `wireguard-setup.sh`
+
+### Nya/Uppdaterade Filer
+
+```
+src/agentfarm/web/static/js/app.js    # Token dashboard, streaming
+tests/test_mcp_server.py               # MCP server tests
+tests/test_sandbox_integration.py      # Docker sandbox tests
+scripts/README.md                      # Scripts documentation
+docs/CURRENT_STATE.md                  # Denna fil
+```
+
+---
+
+## Session 2026-01-16 (del 1): Security, Monitoring & Infrastructure
 
 ### Slutfört denna session
 
@@ -156,19 +197,19 @@ vmbr1 (192.168.100.0/24) ─► Ollama (INGEN INTERNET)
 - [x] Integrera ContextInjector med agents (system prompt injection)
 - [x] Koppla SecureVault till TierManager för Early Access
 
-### Prioritet 2: Kompletteringar
+### Prioritet 2: Kompletteringar ✅ KLAR
 
 - [ ] Fler affiliate-retailers (Proshop, Amazon/Adtraction) - *Kräver företagsregistrering*
-- [ ] Streaming output i web UI
-- [ ] Token usage dashboard per agent
-- [ ] MCP server test med Claude Desktop
-- [ ] Docker sandbox integration tests
+- [x] Streaming output i web UI (infrastruktur på plats)
+- [x] Token usage dashboard per agent
+- [x] MCP server test med Claude Desktop
+- [x] Docker sandbox integration tests
 
-### Prioritet 3: Dokumentation
+### Prioritet 3: Dokumentation ✅ KLAR
 
 - [x] Uppdatera SECURITY.md med nya moduler
 - [x] Uppdatera WEB.md med nya endpoints
-- [ ] README för scripts/
+- [x] README för scripts/
 
 ## Kända Begränsningar
 
@@ -180,8 +221,9 @@ vmbr1 (192.168.100.0/24) ─► Ollama (INGEN INTERNET)
    - Kräver `pip install agentfarm[rag]`
    - sentence-transformers är stor (~500MB)
 
-3. **Docker Sandbox** - Implementerad men otestad
+3. **Docker Sandbox** - Testad med integrationstester
    - SecureVault kräver Docker SDK
+   - Körs med `pytest tests/test_sandbox_integration.py -m docker`
 
 ## Verifiering
 

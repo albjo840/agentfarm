@@ -152,6 +152,8 @@ function handleServerMessage(data) {
             if (data.streaming && data.request_id) {
                 finalizeStreamingMessage(data.request_id);
             }
+            // Track tokens for dashboard
+            trackTokensFromEvent(data);
             break;
 
         case 'agent_handoff':
@@ -810,6 +812,152 @@ async function generateNewVPNQR() {
 function closeQRModal() {
     const qrModal = document.getElementById('qr-modal');
     qrModal.classList.add('hidden');
+}
+
+// =============================================================================
+// TOKEN DASHBOARD
+// =============================================================================
+
+let tokenDashboardInterval = null;
+let agentTokens = {}; // Track tokens per agent
+
+function setupTokenDashboard() {
+    // Toggle collapse
+    const toggle = document.getElementById('token-dashboard-toggle');
+    const dashboard = document.getElementById('token-dashboard');
+
+    if (toggle && dashboard) {
+        toggle.addEventListener('click', () => {
+            dashboard.classList.toggle('collapsed');
+        });
+    }
+
+    // Start polling for performance metrics
+    updateTokenDashboard();
+    tokenDashboardInterval = setInterval(updateTokenDashboard, 5000); // Every 5 seconds
+}
+
+async function updateTokenDashboard() {
+    try {
+        const response = await fetch('/api/hardware/performance');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const overall = data.overall || {};
+        const byAgent = data.by_agent || {};
+
+        // Calculate totals from by_model stats
+        let totalTokens = 0;
+        for (const modelStats of Object.values(data.by_model || {})) {
+            if (modelStats.tokens) {
+                totalTokens += modelStats.tokens.total || 0;
+            }
+        }
+
+        // Update overview metrics
+        const totalTokensEl = document.getElementById('total-tokens');
+        const avgTps = document.getElementById('avg-tps');
+        const latencyP95 = document.getElementById('latency-p95');
+
+        if (totalTokensEl) {
+            totalTokensEl.textContent = formatNumber(totalTokens);
+        }
+
+        if (avgTps && overall.avg_tokens_per_second !== undefined) {
+            avgTps.textContent = overall.avg_tokens_per_second.toFixed(1);
+        }
+
+        // Get P95 from first model with data
+        let p95Latency = 0;
+        for (const modelStats of Object.values(data.by_model || {})) {
+            if (modelStats.latency_ms && modelStats.latency_ms.p95) {
+                p95Latency = modelStats.latency_ms.p95;
+                break;
+            }
+        }
+        if (latencyP95) {
+            latencyP95.textContent = Math.round(p95Latency) + 'ms';
+        }
+
+        // Update agent grid
+        updateAgentTokenGrid(byAgent);
+
+    } catch (err) {
+        console.error('Failed to update token dashboard:', err);
+    }
+}
+
+function updateAgentTokenGrid(agentData) {
+    const grid = document.getElementById('agent-token-grid');
+    if (!grid) return;
+
+    // Merge with tracked tokens from streaming
+    const mergedData = { ...agentTokens };
+    for (const [agent, stats] of Object.entries(agentData)) {
+        // API returns nested format with tokens.input, tokens.output
+        const tokens = stats.tokens || {};
+        mergedData[agent] = {
+            input_tokens: tokens.input || stats.input_tokens || 0,
+            output_tokens: tokens.output || stats.output_tokens || 0,
+            requests: stats.total_requests || stats.requests || 0,
+        };
+    }
+
+    // Generate cards
+    const agentOrder = ['planner', 'executor', 'verifier', 'reviewer', 'ux', 'orchestrator'];
+    const cards = [];
+
+    for (const agentId of agentOrder) {
+        const stats = mergedData[agentId];
+        if (!stats) continue;
+
+        const color = AGENT_COLORS[agentId] || '#00fff2';
+        const input = stats.input_tokens || 0;
+        const output = stats.output_tokens || 0;
+        const requests = stats.requests || 0;
+
+        cards.push(`
+            <div class="agent-token-card" style="border-color: ${color}">
+                <div class="agent-name" style="color: ${color}">${agentId.toUpperCase()}</div>
+                <div class="agent-stats">
+                    <span>IN: <span class="stat-value">${formatNumber(input)}</span></span>
+                    <span>OUT: <span class="stat-value">${formatNumber(output)}</span></span>
+                </div>
+                <div class="agent-stats">
+                    <span>REQ: <span class="stat-value">${requests}</span></span>
+                </div>
+            </div>
+        `);
+    }
+
+    grid.innerHTML = cards.join('');
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+}
+
+// Track tokens from LLM events
+function trackTokensFromEvent(data) {
+    const agent = data.agent || 'unknown';
+    if (!agentTokens[agent]) {
+        agentTokens[agent] = { input_tokens: 0, output_tokens: 0, requests: 0 };
+    }
+
+    if (data.input_tokens) {
+        agentTokens[agent].input_tokens += data.input_tokens;
+    }
+    if (data.output_tokens) {
+        agentTokens[agent].output_tokens += data.output_tokens;
+    }
+    if (data.success !== undefined) {
+        agentTokens[agent].requests += 1;
+    }
 }
 
 // Start
