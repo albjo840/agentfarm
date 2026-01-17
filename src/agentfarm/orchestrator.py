@@ -78,7 +78,7 @@ class Orchestrator:
             self.planner = PlannerAgent(provider)
             self.executor = ExecutorAgent(provider)
             self.verifier = VerifierAgent(provider)
-            self.reviewer = ReviewerAgent(provider)
+            self.reviewer = ReviewerAgent(provider, working_dir=working_dir)
             self.ux_designer = UXDesignerAgent(provider)
 
         # Set recursion guard on all agents
@@ -125,7 +125,7 @@ class Orchestrator:
         self.planner = PlannerAgent(planner_provider)
         self.executor = ExecutorAgent(executor_provider)
         self.verifier = VerifierAgent(verifier_provider)
-        self.reviewer = ReviewerAgent(reviewer_provider)
+        self.reviewer = ReviewerAgent(reviewer_provider, working_dir=self._working_dir)
         self.ux_designer = UXDesignerAgent(designer_provider)
 
         # Store providers for token tracking

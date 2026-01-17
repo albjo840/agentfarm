@@ -19,8 +19,9 @@ class ReviewerAgent(BaseAgent):
     name = "ReviewerAgent"
     description = "Reviews code for quality and correctness"
 
-    def __init__(self, provider: LLMProvider) -> None:
+    def __init__(self, provider: LLMProvider, working_dir: str = ".") -> None:
         super().__init__(provider)
+        self._working_dir = working_dir
         self._setup_tools()
 
     @property
@@ -176,7 +177,11 @@ class ReviewerAgent(BaseAgent):
         from pathlib import Path
 
         try:
+            # Handle both absolute and relative paths
             file_path = Path(path)
+            if not file_path.is_absolute():
+                file_path = Path(self._working_dir) / path
+
             if not file_path.exists():
                 return f"ERROR: File not found: {path}"
 
@@ -203,7 +208,11 @@ class ReviewerAgent(BaseAgent):
         import re
 
         try:
+            # Handle both absolute and relative paths
             file_path = Path(path)
+            if not file_path.is_absolute():
+                file_path = Path(self._working_dir) / path
+
             if not file_path.exists():
                 return f"ERROR: File not found: {path}"
 
@@ -246,7 +255,11 @@ class ReviewerAgent(BaseAgent):
         import ast
 
         try:
+            # Handle both absolute and relative paths
             file_path = Path(path)
+            if not file_path.is_absolute():
+                file_path = Path(self._working_dir) / path
+
             if not file_path.exists():
                 return f"ERROR: File not found: {path}"
 
@@ -361,16 +374,27 @@ class ReviewerAgent(BaseAgent):
                     ),
                 )
 
-        except (json.JSONDecodeError, KeyError):
-            pass
+        except (json.JSONDecodeError, KeyError) as e:
+            # JSON parsing failed - try to extract approval from text
+            content_lower = content.lower()
 
-        return AgentResult(
-            success=False,
-            output=content,
-            data={"tool_outputs": tool_outputs},
-            tokens_used=response.total_tokens,
-            summary_for_next_agent="Review completed, see details",
-        )
+            # Heuristic: If review mentions "approved" positively, consider it approved
+            approved = False
+            if "approved" in content_lower:
+                if "not approved" not in content_lower and "changes requested" not in content_lower:
+                    approved = "approved: true" in content_lower or '"approved": true' in content_lower
+
+            return AgentResult(
+                success=approved,
+                output=content,
+                data={
+                    "tool_outputs": tool_outputs,
+                    "parse_error": str(e),
+                    "approved": approved,
+                },
+                tokens_used=response.total_tokens,
+                summary_for_next_agent=f"Review: {'Approved' if approved else 'Changes requested'} (JSON parse fallback)",
+            )
 
     async def review_changes(
         self, context: AgentContext, changed_files: list[str], diff: str | None = None
