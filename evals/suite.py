@@ -43,6 +43,7 @@ class TestCase:
     prompt: str
     validators: list[dict[str, Any]]
     expected_files: list[str] = field(default_factory=list)
+    setup_files: dict[str, str] = field(default_factory=dict)  # Files to create before test
     timeout: int = 300  # 5 minutes default
     difficulty: str = "medium"  # easy, medium, hard
     points: int = 10
@@ -272,17 +273,22 @@ TEST_CASES: list[TestCase] = [
         id="bugfix-001",
         name="Fix Off-by-One Error",
         category=CATEGORY_BUGFIX,
-        prompt="""Fixa buggen i denna kod. Filen heter buggy.py:
+        prompt="""Fixa buggen i filen buggy.py. Funktionen get_last_n_items ska returnera de sista n elementen från en lista.
 
-```python
-def get_last_n_items(items, n):
-    '''Returns the last n items from a list'''
+Test: get_last_n_items([1,2,3,4,5], 2) ska returnera [4, 5], men returnerar nu [4].""",
+        setup_files={
+            "buggy.py": '''def get_last_n_items(items, n):
+    """Returns the last n items from a list."""
     return items[-n:-1]  # BUG: Returns wrong items
 
-# Test: get_last_n_items([1,2,3,4,5], 2) should return [4, 5]
-```
 
-Skapa filen med den fixade koden.""",
+# Test: get_last_n_items([1,2,3,4,5], 2) should return [4, 5]
+if __name__ == "__main__":
+    result = get_last_n_items([1, 2, 3, 4, 5], 2)
+    print(f"Result: {result}")
+    assert result == [4, 5], f"Expected [4, 5], got {result}"
+'''
+        },
         validators=[
             {"type": "file_exists", "filename": "buggy.py"},
             {"type": "python_syntax", "filename": "buggy.py"},
@@ -295,10 +301,11 @@ Skapa filen med den fixade koden.""",
         id="bugfix-002",
         name="Fix Race Condition",
         category=CATEGORY_BUGFIX,
-        prompt="""Fixa race condition i denna kod. Filen heter counter.py:
+        prompt="""Fixa race condition i filen counter.py. Counter-variabeln uppdateras inte korrekt när flera trådar kör increment() samtidigt.
 
-```python
-import threading
+Lägg till korrekt thread-locking så att counter blir thread-safe.""",
+        setup_files={
+            "counter.py": '''import threading
 
 counter = 0
 
@@ -307,10 +314,21 @@ def increment():
     for _ in range(100000):
         counter += 1  # BUG: Not thread-safe
 
-threads = [threading.Thread(target=increment) for _ in range(4)]
-```
 
-Lägg till korrekt locking för thread-safety.""",
+def main():
+    threads = [threading.Thread(target=increment) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    print(f"Counter: {counter}")
+    # Expected: 400000, but will be less due to race condition
+
+
+if __name__ == "__main__":
+    main()
+'''
+        },
         validators=[
             {"type": "file_exists", "filename": "counter.py"},
             {"type": "python_syntax", "filename": "counter.py"},
@@ -323,21 +341,34 @@ Lägg till korrekt locking för thread-safety.""",
         id="bugfix-003",
         name="Fix SQL Injection",
         category=CATEGORY_BUGFIX,
-        prompt="""Fixa SQL injection-sårbarheten i denna kod. Filen heter db.py:
+        prompt="""Fixa SQL injection-sårbarheten i filen db.py. Funktionen get_user använder f-strings för att bygga SQL-queryn, vilket är farligt.
 
-```python
-import sqlite3
+Använd parameteriserade queries istället.""",
+        setup_files={
+            "db.py": '''import sqlite3
+
 
 def get_user(username):
-    conn = sqlite3.connect('users.db')
+    """Get user by username - VULNERABLE TO SQL INJECTION!"""
+    conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     # BUG: SQL Injection vulnerability!
     query = f"SELECT * FROM users WHERE username = '{username}'"
     cursor.execute(query)
     return cursor.fetchone()
-```
 
-Använd parameteriserade queries.""",
+
+def create_user(username, email):
+    """Create a new user."""
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (username, email) VALUES (?, ?)",
+        (username, email)
+    )
+    conn.commit()
+'''
+        },
         validators=[
             {"type": "file_exists", "filename": "db.py"},
             {"type": "python_syntax", "filename": "db.py"},
@@ -353,19 +384,27 @@ Använd parameteriserade queries.""",
         id="refactor-001",
         name="Extract Method",
         category=CATEGORY_REFACTOR,
-        prompt="""Refaktorera denna kod genom att extrahera metoder. Filen heter messy.py:
+        prompt="""Refaktorera filen messy.py genom att extrahera metoder.
 
-```python
-def process_order(order):
+Den nuvarande process_order-funktionen gör för mycket. Extrahera till separata funktioner:
+- calculate_subtotal(items) - summerar item['price'] * item['quantity']
+- apply_discount(total, discount_code) - applicerar rabatt
+- calculate_tax(total) - beräknar 25% moms
+- format_receipt(order, total_with_tax) - formaterar kvittot
+
+Behåll process_order som huvudfunktion som anropar de andra.""",
+        setup_files={
+            "messy.py": '''def process_order(order):
+    """Process an order and return a receipt."""
     # Calculate total
     total = 0
-    for item in order['items']:
-        total += item['price'] * item['quantity']
+    for item in order["items"]:
+        total += item["price"] * item["quantity"]
 
     # Apply discount
-    if order.get('discount_code') == 'SAVE10':
+    if order.get("discount_code") == "SAVE10":
         total = total * 0.9
-    elif order.get('discount_code') == 'SAVE20':
+    elif order.get("discount_code") == "SAVE20":
         total = total * 0.8
 
     # Calculate tax
@@ -373,15 +412,26 @@ def process_order(order):
     total_with_tax = total + tax
 
     # Format receipt
-    receipt = f"Order #{order['id']}\\n"
-    for item in order['items']:
-        receipt += f"  {item['name']}: {item['price']} x {item['quantity']}\\n"
+    receipt = f"Order #{order[\'id\']}\\n"
+    for item in order["items"]:
+        receipt += f"  {item[\'name\']}: {item[\'price\']} x {item[\'quantity\']}\\n"
     receipt += f"Total: {total_with_tax}"
 
     return receipt
-```
 
-Extrahera till separata funktioner: calculate_subtotal, apply_discount, calculate_tax, format_receipt.""",
+
+if __name__ == "__main__":
+    test_order = {
+        "id": 123,
+        "items": [
+            {"name": "Widget", "price": 100, "quantity": 2},
+            {"name": "Gadget", "price": 50, "quantity": 1},
+        ],
+        "discount_code": "SAVE10",
+    }
+    print(process_order(test_order))
+'''
+        },
         validators=[
             {"type": "file_exists", "filename": "messy.py"},
             {"type": "python_syntax", "filename": "messy.py"},
@@ -397,21 +447,38 @@ Extrahera till separata funktioner: calculate_subtotal, apply_discount, calculat
         id="refactor-002",
         name="Replace Conditionals with Polymorphism",
         category=CATEGORY_REFACTOR,
-        prompt="""Refaktorera denna kod att använda polymorfism istället för if-satser. Filen heter shapes.py:
+        prompt="""Refaktorera filen shapes.py att använda polymorfism istället för if-satser.
 
-```python
-def calculate_area(shape):
-    if shape['type'] == 'circle':
-        return 3.14159 * shape['radius'] ** 2
-    elif shape['type'] == 'rectangle':
-        return shape['width'] * shape['height']
-    elif shape['type'] == 'triangle':
-        return 0.5 * shape['base'] * shape['height']
+Skapa:
+- Shape basklass (ABC) med abstrakt area() metod
+- Circle(Shape) med radius-parameter
+- Rectangle(Shape) med width/height
+- Triangle(Shape) med base/height
+
+Varje subklass implementerar sin egen area() metod.""",
+        setup_files={
+            "shapes.py": '''def calculate_area(shape):
+    """Calculate area based on shape type - uses conditionals."""
+    if shape["type"] == "circle":
+        return 3.14159 * shape["radius"] ** 2
+    elif shape["type"] == "rectangle":
+        return shape["width"] * shape["height"]
+    elif shape["type"] == "triangle":
+        return 0.5 * shape["base"] * shape["height"]
     else:
-        raise ValueError(f"Unknown shape: {shape['type']}")
-```
+        raise ValueError(f"Unknown shape: {shape[\'type\']}")
 
-Skapa en Shape-basklass med Circle, Rectangle och Triangle som subklasser.""",
+
+if __name__ == "__main__":
+    circle = {"type": "circle", "radius": 5}
+    rect = {"type": "rectangle", "width": 4, "height": 6}
+    tri = {"type": "triangle", "base": 3, "height": 4}
+
+    print(f"Circle area: {calculate_area(circle)}")
+    print(f"Rectangle area: {calculate_area(rect)}")
+    print(f"Triangle area: {calculate_area(tri)}")
+'''
+        },
         validators=[
             {"type": "file_exists", "filename": "shapes.py"},
             {"type": "python_syntax", "filename": "shapes.py"},
@@ -513,6 +580,12 @@ class EvalRunner:
             project_path = Path(tmpdir)
 
             try:
+                # Create setup files if any
+                for filename, content in test.setup_files.items():
+                    filepath = project_path / filename
+                    filepath.parent.mkdir(parents=True, exist_ok=True)
+                    filepath.write_text(content)
+
                 # Run AgentFarm workflow
                 await self._run_workflow(test.prompt, project_path)
 

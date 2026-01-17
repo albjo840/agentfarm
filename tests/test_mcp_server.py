@@ -3,6 +3,15 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 
+# Check if mcp module is available
+try:
+    import mcp
+    HAS_MCP = True
+except ImportError:
+    HAS_MCP = False
+
+requires_mcp = pytest.mark.skipif(not HAS_MCP, reason="MCP module not installed")
+
 
 def test_mcp_tools_list():
     """Test that MCP tools are defined correctly."""
@@ -116,6 +125,7 @@ def test_claude_desktop_config_format():
     assert "mcp" in parsed["mcpServers"]["agentfarm"]["args"]
 
 
+@requires_mcp
 def test_mcp_resource_patterns():
     """Test that resource patterns are sensible."""
     from agentfarm.mcp_server import RESOURCE_PATTERNS, EXCLUDE_DIRS
@@ -132,6 +142,7 @@ def test_mcp_resource_patterns():
     assert "node_modules" in EXCLUDE_DIRS
 
 
+@requires_mcp
 def test_file_to_uri_conversion():
     """Test URI conversion functions."""
     from pathlib import Path
@@ -156,6 +167,7 @@ def test_file_to_uri_conversion():
         mcp._working_dir = original_dir
 
 
+@requires_mcp
 def test_list_project_files_handler():
     """Test list_project_files tool handler."""
     import json
@@ -190,6 +202,7 @@ def test_list_project_files_handler():
             mcp._working_dir = original_dir
 
 
+@requires_mcp
 def test_read_file_handler():
     """Test read_file tool handler."""
     import json

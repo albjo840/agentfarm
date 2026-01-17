@@ -235,76 +235,52 @@ class TestRetryLogic:
 
 
 class TestGetProvider:
-    """Test the provider auto-detection and factory function."""
+    """Test the provider factory function - local-first with Ollama."""
 
-    def test_explicit_provider_groq(self, monkeypatch):
-        """Test explicit provider selection for Groq."""
-        monkeypatch.setenv("GROQ_API_KEY", "test-key")
-        provider = get_provider("groq")
-        assert provider.model == "llama-3.3-70b-versatile"
+    def test_default_provider_is_ollama(self, monkeypatch):
+        """Test default provider is Ollama."""
+        monkeypatch.delenv("AGENTFARM_PROVIDER", raising=False)
+        provider = get_provider()
+        assert "ollama" in type(provider).__module__
+
+    def test_explicit_provider_ollama(self, monkeypatch):
+        """Test explicit provider selection for Ollama."""
+        provider = get_provider("ollama")
+        assert "ollama" in type(provider).__module__
+        assert provider.model == "qwen2.5-coder:7b"  # Default model
 
     def test_explicit_provider_with_model(self, monkeypatch):
         """Test explicit provider with custom model."""
-        monkeypatch.setenv("GROQ_API_KEY", "test-key")
-        provider = get_provider("groq", model="mixtral-8x7b-32768")
-        assert provider.model == "mixtral-8x7b-32768"
+        provider = get_provider("ollama", model="llama3.2")
+        assert provider.model == "llama3.2"
 
-    def test_auto_detect_groq(self, monkeypatch):
-        """Test auto-detection selects Groq when key is present."""
-        monkeypatch.delenv("AGENTFARM_PROVIDER", raising=False)
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OLLAMA_HOST", raising=False)
-        monkeypatch.setenv("GROQ_API_KEY", "test-key")
-
+    def test_env_model_override(self, monkeypatch):
+        """Test AGENTFARM_MODEL env var overrides default model."""
+        monkeypatch.setenv("AGENTFARM_MODEL", "qwen3:14b")
         provider = get_provider()
-        assert "groq" in type(provider).__module__
-
-    def test_auto_detect_claude(self, monkeypatch):
-        """Test auto-detection selects Claude when Groq not available."""
-        monkeypatch.delenv("AGENTFARM_PROVIDER", raising=False)
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
-        monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OLLAMA_HOST", raising=False)
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-
-        provider = get_provider()
-        assert "claude" in type(provider).__module__
-
-    def test_auto_detect_azure(self, monkeypatch):
-        """Test auto-detection selects Azure when Claude not available."""
-        monkeypatch.delenv("AGENTFARM_PROVIDER", raising=False)
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("OLLAMA_HOST", raising=False)
-        monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-key")
-        monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com")
-
-        provider = get_provider()
-        assert "azure" in type(provider).__module__
+        assert provider.model == "qwen3:14b"
 
     def test_env_provider_override(self, monkeypatch):
-        """Test AGENTFARM_PROVIDER env var overrides auto-detection."""
-        monkeypatch.setenv("GROQ_API_KEY", "test-key")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-        monkeypatch.setenv("AGENTFARM_PROVIDER", "claude")
-
+        """Test AGENTFARM_PROVIDER env var selects provider."""
+        monkeypatch.setenv("AGENTFARM_PROVIDER", "ollama")
         provider = get_provider()
-        assert "claude" in type(provider).__module__
+        assert "ollama" in type(provider).__module__
 
-    def test_no_provider_available(self, monkeypatch):
-        """Test error when no provider can be detected."""
-        monkeypatch.delenv("AGENTFARM_PROVIDER", raising=False)
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OLLAMA_HOST", raising=False)
-
-        with pytest.raises(ValueError, match="No LLM provider could be detected"):
-            get_provider()
+    def test_router_provider(self, monkeypatch):
+        """Test router provider selection."""
+        provider = get_provider("router")
+        assert "router" in type(provider).__module__
 
     def test_unknown_provider(self, monkeypatch):
         """Test error for unknown provider name."""
         with pytest.raises(ValueError, match="Unknown provider"):
             get_provider("unknown_provider")
+
+    def test_unknown_cloud_provider(self, monkeypatch):
+        """Test that cloud providers are not supported (local-first design)."""
+        with pytest.raises(ValueError, match="Unknown provider"):
+            get_provider("groq")
+        with pytest.raises(ValueError, match="Unknown provider"):
+            get_provider("claude")
+        with pytest.raises(ValueError, match="Unknown provider"):
+            get_provider("azure")
