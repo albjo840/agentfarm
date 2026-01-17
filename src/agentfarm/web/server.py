@@ -361,6 +361,113 @@ async def api_affiliates_stats_handler(request: web.Request) -> web.Response:
     return web.json_response(stats)
 
 
+async def api_affiliates_prices_handler(request: web.Request) -> web.Response:
+    """Return current price comparisons from scraped data.
+
+    Uses Groq API for intelligent price extraction from retailer pages.
+    """
+    storage_dir = Path(".agentfarm")
+    price_report_path = storage_dir / "price_report.json"
+
+    if not price_report_path.exists():
+        return web.json_response({
+            "error": "No price data available. Run price scraper first.",
+            "hint": "POST /api/affiliates/prices/scrape to update prices",
+        }, status=404)
+
+    try:
+        report = json.loads(price_report_path.read_text())
+        return web.json_response(report)
+    except json.JSONDecodeError as e:
+        return web.json_response({"error": f"Invalid price data: {e}"}, status=500)
+
+
+async def api_affiliates_scrape_handler(request: web.Request) -> web.Response:
+    """Trigger a price scrape using Groq API.
+
+    This runs asynchronously and updates the price_report.json file.
+    """
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        return web.json_response({
+            "error": "GROQ_API_KEY not configured",
+            "hint": "Set GROQ_API_KEY environment variable for price scraping",
+        }, status=503)
+
+    # Import here to avoid circular imports
+    from agentfarm.monetization.price_scraper import AffiliatePriceScraper, ScraperConfig
+
+    try:
+        config = ScraperConfig(groq_api_key=groq_api_key)
+        scraper = AffiliatePriceScraper(config=config)
+
+        # Run scrape in background
+        async def run_scrape():
+            try:
+                path = await scraper.run_and_save()
+                logger.info("Price scrape completed: %s", path)
+                # Broadcast update to connected clients
+                await ws_clients.broadcast({
+                    "type": "price_update",
+                    "status": "complete",
+                    "path": str(path),
+                })
+            except Exception as e:
+                logger.error("Price scrape failed: %s", e)
+                await ws_clients.broadcast({
+                    "type": "price_update",
+                    "status": "error",
+                    "error": str(e),
+                })
+            finally:
+                await scraper.close()
+
+        asyncio.create_task(run_scrape())
+
+        return web.json_response({
+            "status": "started",
+            "message": "Price scrape started in background",
+        })
+
+    except Exception as e:
+        logger.error("Failed to start price scrape: %s", e)
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_affiliates_best_prices_handler(request: web.Request) -> web.Response:
+    """Return best prices for each product.
+
+    Filters to only show products with valid prices and in stock.
+    """
+    storage_dir = Path(".agentfarm")
+    price_report_path = storage_dir / "price_report.json"
+
+    if not price_report_path.exists():
+        return web.json_response({"products": []})
+
+    try:
+        report = json.loads(price_report_path.read_text())
+
+        best_prices = []
+        for product in report.get("products", []):
+            if product.get("best_price"):
+                best_prices.append({
+                    "id": product["id"],
+                    "name": product["name"],
+                    "category": product.get("category"),
+                    "best_price": product["best_price"],
+                    "best_retailer": product.get("best_retailer"),
+                    "price_range": product.get("price_range"),
+                })
+
+        return web.json_response({
+            "generated_at": report.get("generated_at"),
+            "products": best_prices,
+        })
+    except json.JSONDecodeError as e:
+        return web.json_response({"error": f"Invalid price data: {e}"}, status=500)
+
+
 async def static_handler(request: web.Request) -> web.Response:
     """Serve static files."""
     path = request.match_info.get('path', '')
@@ -1395,6 +1502,9 @@ def create_app() -> web.Application:
     app.router.add_get('/api/affiliates/categories', api_affiliates_categories_handler)
     app.router.add_get('/api/affiliates/{product_id}/click/{retailer_id}', api_affiliates_click_handler)
     app.router.add_get('/api/affiliates/stats', api_affiliates_stats_handler)
+    app.router.add_get('/api/affiliates/prices', api_affiliates_prices_handler)
+    app.router.add_post('/api/affiliates/prices/scrape', api_affiliates_scrape_handler)
+    app.router.add_get('/api/affiliates/prices/best', api_affiliates_best_prices_handler)
     app.router.add_get('/api/events', api_events_handler)
     app.router.add_post('/api/interrupt', api_interrupt_handler)
     app.router.add_get('/api/router', api_router_handler)

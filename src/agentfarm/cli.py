@@ -233,6 +233,26 @@ def main() -> None:
         help="Port to listen on (default: 8080)",
     )
 
+    # scrape-prices command
+    scrape_parser = subparsers.add_parser(
+        "scrape-prices",
+        help="Scrape affiliate prices using Groq API"
+    )
+    scrape_parser.add_argument(
+        "--config", "-c",
+        help="Affiliates config path (default: .agentfarm/affiliates.json)",
+    )
+    scrape_parser.add_argument(
+        "--output", "-o",
+        help="Output report path (default: .agentfarm/price_report.json)",
+    )
+    scrape_parser.add_argument(
+        "--cache-ttl",
+        type=int,
+        default=3600,
+        help="Cache TTL in seconds (default: 3600)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "workflow":
@@ -245,9 +265,63 @@ def main() -> None:
     elif args.command == "web":
         from agentfarm.web.server import run_server
         run_server(args.host, args.port, args.workdir)
+    elif args.command == "scrape-prices":
+        sys.exit(asyncio.run(run_scrape_prices(args)))
     else:
         parser.print_help()
         sys.exit(1)
+
+
+async def run_scrape_prices(args) -> int:
+    """Run affiliate price scraper using Groq API."""
+    import os
+
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        print("Error: GROQ_API_KEY environment variable not set")
+        print("Get your API key at: https://console.groq.com/keys")
+        return 1
+
+    from agentfarm.monetization.price_scraper import AffiliatePriceScraper, ScraperConfig
+
+    print("Starting affiliate price scraper...")
+    print(f"  Config: {args.config or '.agentfarm/affiliates.json'}")
+    print(f"  Cache TTL: {args.cache_ttl}s")
+    print()
+
+    try:
+        config = ScraperConfig(
+            groq_api_key=groq_api_key,
+            cache_ttl=args.cache_ttl,
+        )
+
+        scraper = AffiliatePriceScraper(
+            config=config,
+            affiliates_path=args.config,
+        )
+
+        path = await scraper.run_and_save()
+        await scraper.close()
+
+        print(f"\nPrice report saved: {path}")
+
+        # Print summary
+        report = json.loads(path.read_text())
+        print(f"\nProducts: {len(report['products'])}")
+        for p in report["products"]:
+            best = p.get("best_price")
+            retailer = p.get("best_retailer")
+            if best:
+                print(f"  {p['name']}: {best:,.0f} SEK @ {retailer}")
+            else:
+                print(f"  {p['name']}: No price found")
+
+        return 0
+
+    except Exception as e:
+        logging.exception("Price scrape failed")
+        print(f"\nError: {e}")
+        return 1
 
 
 if __name__ == "__main__":
