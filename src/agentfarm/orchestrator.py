@@ -125,7 +125,7 @@ class Orchestrator:
         self.planner = PlannerAgent(planner_provider)
         self.executor = ExecutorAgent(executor_provider)
         self.verifier = VerifierAgent(verifier_provider)
-        self.reviewer = ReviewerAgent(reviewer_provider, working_dir=self._working_dir)
+        self.reviewer = ReviewerAgent(reviewer_provider, working_dir=self.working_dir)
         self.ux_designer = UXDesignerAgent(designer_provider)
 
         # Store providers for token tracking

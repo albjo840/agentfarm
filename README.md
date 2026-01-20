@@ -2,13 +2,28 @@
 
 Token-efficient multi-agent orchestration system for code tasks.
 
+## 🌐 Live Demo
+
+**Try it now:** [http://taborsen.duckdns.org:8080/](http://taborsen.duckdns.org:8080/)
+
 ## Features
 
-- **Multi-agent workflow**: PLAN → EXECUTE → VERIFY → REVIEW → SUMMARY
+- **Multi-agent workflow**: PLAN → UX DESIGN → EXECUTE → VERIFY → REVIEW
+- **6 specialized agents**: Orchestrator, Planner, UX Designer, Executor, Verifier, Reviewer
 - **Token efficiency**: Minimal context per agent, summarized handoffs
-- **Provider abstraction**: Ollama (free), Groq (free tier), Claude, Azure
-- **Docker sandbox**: Safe code execution in isolated containers
+- **Provider abstraction**: Ollama, Groq, Gemini, Claude, SiliconFlow
+- **80s Sci-Fi UI**: Retro dashboard with pixel art robots
+- **Custom agent prompts**: Personalize each agent's behavior
+- **Project downloads**: Download generated projects as ZIP
 - **MCP server**: Integrate with Claude Desktop, VS Code, etc.
+
+## Pricing
+
+| | |
+|---|---|
+| **10 Prompts** | 29 kr |
+
+Each prompt = one complete workflow (plan → execute → verify → review).
 
 ## Installation
 

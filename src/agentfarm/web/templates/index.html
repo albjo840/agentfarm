@@ -206,10 +206,6 @@
                 <span class="cyber-text">NEURAL ORCHESTRATION SYSTEM</span>
             </div>
             <div class="footer-center">
-                <button id="qr-btn" class="qr-btn" title="Generera VPN QR-kod">
-                    <span class="qr-icon">&#9783;</span>
-                    <span class="qr-label">VPN</span>
-                </button>
                 <button id="agent-prompts-btn" class="agent-prompts-btn tier-gated-btn" title="Anpassa agent system prompts">
                     <span class="agent-prompts-icon">⚙</span>
                     <span class="agent-prompts-label">PROMPTS</span>
@@ -231,23 +227,6 @@
                 <span id="current-time"></span>
             </div>
         </footer>
-    </div>
-
-    <!-- QR Modal -->
-    <div id="qr-modal" class="qr-modal hidden">
-        <div class="qr-modal-content">
-            <div class="qr-modal-header">
-                <h3>NY VPN-ANSLUTNING</h3>
-                <button id="qr-close" class="qr-close">&times;</button>
-            </div>
-            <div class="qr-modal-body">
-                <pre id="qr-code" class="qr-code"></pre>
-                <div id="qr-info" class="qr-info"></div>
-            </div>
-            <div class="qr-modal-footer">
-                <span>Skanna med WireGuard-appen</span>
-            </div>
-        </div>
     </div>
 
     <!-- File Browser Modal -->
@@ -420,36 +399,129 @@
     </div>
 
     <!-- Agent Prompts Modal -->
+    <!-- Agent Customization Panel (Beta Operator / Admin) -->
     <div id="agent-prompts-modal" class="modal hidden">
-        <div class="modal-content agent-prompts-modal-content">
+        <div class="modal-content agent-panel-content">
             <div class="modal-header">
-                <h3>AGENT SYSTEM PROMPTS</h3>
+                <h3>⚙️ AGENT KONFIGURATION</h3>
                 <button class="modal-close" data-modal="agent-prompts-modal">&times;</button>
             </div>
-            <div class="modal-body">
-                <p class="agent-prompts-info">Anpassa varje agents beteende med egna instruktioner. Dessa läggs till i slutet av agentens system prompt.</p>
+            <div class="modal-body agent-panel-body">
+                <p class="agent-panel-info">Anpassa varje agents beteende. Dina tillägg läggs till efter bas-prompten.</p>
 
-                <div class="agent-prompts-tabs">
-                    <button class="agent-tab active" data-agent="planner">PLANNER</button>
-                    <button class="agent-tab" data-agent="ux_designer">UX</button>
-                    <button class="agent-tab" data-agent="executor">EXECUTOR</button>
-                    <button class="agent-tab" data-agent="verifier">VERIFIER</button>
-                    <button class="agent-tab" data-agent="reviewer">REVIEWER</button>
-                </div>
-
-                <div class="agent-prompt-editor">
-                    <div class="agent-prompt-hint" id="agent-prompt-hint">
-                        <strong>PLANNER</strong> - Ansvarar för att bryta ned uppgiften i steg.
+                <div class="agent-cards-grid">
+                    <!-- ORCHESTRATOR -->
+                    <div class="agent-card" data-agent="orchestrator">
+                        <div class="agent-card-header orchestrator">
+                            <span class="agent-icon">🧠</span>
+                            <span class="agent-name">ORCHESTRATOR</span>
+                            <span class="agent-status" id="status-orchestrator">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">Hjärnan i AgentFarm. Styr flödet mellan agenter, hanterar loop-detektering och kvalitetsspärr.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="orchestrator" rows="3" placeholder="T.ex: Prioritera snabbhet över precision..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
                     </div>
-                    <textarea id="agent-prompt-text" rows="8" placeholder="T.ex: Använd alltid svenska kommentarer i koden. Prioritera säkerhet över prestanda."></textarea>
-                    <div class="agent-prompt-chars">
-                        <span id="agent-prompt-char-count">0</span>/500 tecken
+
+                    <!-- PLANNER -->
+                    <div class="agent-card" data-agent="planner">
+                        <div class="agent-card-header planner">
+                            <span class="agent-icon">📋</span>
+                            <span class="agent-name">PLANNER</span>
+                            <span class="agent-status" id="status-planner">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">Chefsarkitekt. Bryter ner problem till exekverbar roadmap med sekventiell JSON-plan.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="planner" rows="3" placeholder="T.ex: Använd alltid microservices-arkitektur..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                    </div>
+
+                    <!-- UX DESIGNER -->
+                    <div class="agent-card" data-agent="ux_designer">
+                        <div class="agent-card-header ux">
+                            <span class="agent-icon">🎨</span>
+                            <span class="agent-name">UX DESIGNER</span>
+                            <span class="agent-status" id="status-ux_designer">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">Ansvarar för gränssnitt, API-kontrakt och användarflöden. Följer 80-tals Sci-Fi estetik som default.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="ux_designer" rows="3" placeholder="T.ex: Använd vårt designsystem med blå primärfärg..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                    </div>
+
+                    <!-- EXECUTOR -->
+                    <div class="agent-card" data-agent="executor">
+                        <div class="agent-card-header executor">
+                            <span class="agent-icon">⚡</span>
+                            <span class="agent-name">EXECUTOR</span>
+                            <span class="agent-status" id="status-executor">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">Seniordeveloper. Skriver ren, säker kod i isolerad sandbox. Följer kodstilar från kontext.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="executor" rows="3" placeholder="T.ex: Använd TypeScript och skriv JSDoc-kommentarer..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                    </div>
+
+                    <!-- VERIFIER -->
+                    <div class="agent-card" data-agent="verifier">
+                        <div class="agent-card-header verifier">
+                            <span class="agent-icon">🔍</span>
+                            <span class="agent-name">VERIFIER</span>
+                            <span class="agent-status" id="status-verifier">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">QA-ingenjör. Hittar buggar, kör tester i sandbox, godkänner endast om alla tester passerar.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="verifier" rows="3" placeholder="T.ex: Kräv 80% code coverage..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                    </div>
+
+                    <!-- REVIEWER -->
+                    <div class="agent-card" data-agent="reviewer">
+                        <div class="agent-card-header reviewer">
+                            <span class="agent-icon">✅</span>
+                            <span class="agent-name">REVIEWER</span>
+                            <span class="agent-status" id="status-reviewer">●</span>
+                        </div>
+                        <div class="agent-card-base">
+                            <div class="base-prompt-label">BAS-PROMPT:</div>
+                            <div class="base-prompt-text">Slutgiltig granskning. Verifierar att resultatet matchar krav och att ZIP-exporten är säker.</div>
+                        </div>
+                        <div class="agent-card-custom">
+                            <label>DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="reviewer" rows="3" placeholder="T.ex: Kontrollera att inga API-nycklar finns i koden..."></textarea>
+                            <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button id="save-agent-prompt" class="submit-btn">SPARA</button>
-                <button id="clear-agent-prompt" class="clear-btn">RENSA</button>
+            <div class="modal-footer agent-panel-footer">
+                <button id="save-all-prompts" class="submit-btn">💾 SPARA ALLA</button>
+                <button id="clear-all-prompts" class="clear-btn">🗑️ RENSA ALLA</button>
             </div>
         </div>
     </div>

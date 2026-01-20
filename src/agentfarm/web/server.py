@@ -500,6 +500,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     ws = web.WebSocketResponse()
     await ws.prepare(request)
 
+    # Get device_id from cookie
+    device_id = _get_device_id(request)
+
     ws_clients.add(ws)
 
     # Send welcome message with available providers
@@ -514,7 +517,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
                 data = json.loads(msg.data)
-                await handle_ws_message(ws, data)
+                await handle_ws_message(ws, data, device_id)
             elif msg.type == web.WSMsgType.ERROR:
                 break
     finally:
@@ -523,7 +526,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     return ws
 
 
-async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any]) -> None:
+async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any], device_id: str) -> None:
     """Handle incoming WebSocket messages."""
     global current_working_dir
     msg_type = data.get('type')
@@ -534,14 +537,14 @@ async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any]) -> 
         provider = data.get('provider', 'auto')  # Default to auto (uses multi-provider/Ollama)
         workdir = data.get('workdir', current_working_dir)
         # Run in background so we don't block
-        asyncio.create_task(run_real_workflow(task, provider, workdir))
+        asyncio.create_task(run_real_workflow(task, provider, workdir, device_id))
 
     elif msg_type == 'create_project':
         # Create a new project and start workflow (multi-provider mode)
         name = data.get('name', 'nytt-projekt')
         prompt = data.get('prompt', '')
         # Run in background - multi-provider mode is automatic
-        asyncio.create_task(create_and_run_project(name, prompt))
+        asyncio.create_task(create_and_run_project(name, prompt, device_id))
 
     elif msg_type == 'ping':
         await ws.send_json({'type': 'pong'})
@@ -551,11 +554,32 @@ async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any]) -> 
         await ws.send_json({'type': 'workdir_set', 'workdir': current_working_dir})
 
 
-async def create_and_run_project(name: str, prompt: str) -> None:
+async def create_and_run_project(name: str, prompt: str, device_id: str) -> None:
     """Create a new project directory and run workflow in multi-provider mode."""
     import re
 
-    logger.info("Creating project: %s with prompt: %s", name, prompt[:100])
+    logger.info("Creating project: %s with prompt: %s (user: %s)", name, prompt[:100], device_id[:8])
+
+    # Check and consume workflow credit
+    if user_manager:
+        can_run, remaining = user_manager.use_prompt(device_id)
+        if not can_run:
+            await ws_clients.broadcast({
+                'type': 'workflow_error',
+                'error': 'Du har inga workflows kvar. Uppgradera till Beta Operator för fler!',
+                'upgrade_url': '/api/checkout/beta-operator',
+            })
+            logger.warning("User %s tried to run workflow but has no prompts remaining", device_id[:8])
+            return
+
+        # Notify user of remaining workflows
+        if remaining >= 0:
+            await ws_clients.broadcast({
+                'type': 'agent_message',
+                'agent': 'orchestrator',
+                'content': f'🎫 Workflow startar... ({remaining} kvar efter detta)',
+            })
+            logger.info("User %s used 1 workflow, %d remaining", device_id[:8], remaining)
 
     # Sanitize project name
     safe_name = re.sub(r'[^a-zA-Z0-9_-]', '-', name.lower())
@@ -688,11 +712,32 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
         ))
 
 
-async def run_real_workflow(task: str, provider_type: str, working_dir: str) -> None:
+async def run_real_workflow(task: str, provider_type: str, working_dir: str, device_id: str = "") -> None:
     """Run a real AgentFarm workflow and broadcast updates via event bus."""
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
     import uuid
+
+    # Check and consume workflow credit
+    if device_id and user_manager:
+        can_run, remaining = user_manager.use_prompt(device_id)
+        if not can_run:
+            await ws_clients.broadcast({
+                'type': 'workflow_error',
+                'error': 'Du har inga workflows kvar. Uppgradera till Beta Operator för fler!',
+                'upgrade_url': '/api/checkout/beta-operator',
+            })
+            logger.warning("User %s tried to run workflow but has no prompts remaining", device_id[:8])
+            return
+
+        # Notify user of remaining workflows
+        if remaining >= 0:
+            await ws_clients.broadcast({
+                'type': 'agent_message',
+                'agent': 'orchestrator',
+                'content': f'🎫 Workflow startar... ({remaining} kvar efter detta)',
+            })
+            logger.info("User %s used 1 workflow, %d remaining", device_id[:8], remaining)
 
     # Create correlation ID for this workflow
     correlation_id = str(uuid.uuid4())[:8]
@@ -1712,12 +1757,17 @@ async def api_agent_prompts_get_handler(request: web.Request) -> web.Response:
 
     return web.json_response({
         "prompts": prompts,
-        "agents": ["planner", "executor", "verifier", "reviewer", "ux"],
+        "agents": ["orchestrator", "planner", "ux_designer", "executor", "verifier", "reviewer"],
     })
 
 
 async def api_agent_prompts_set_handler(request: web.Request) -> web.Response:
-    """Set custom prompt for an agent. Requires Beta Operator."""
+    """Set custom prompt for an agent. Requires Beta Operator.
+
+    Supports two formats:
+    - Single agent: { "agent_id": "planner", "custom_text": "..." }
+    - Batch save: { "prompts": { "orchestrator": "...", "planner": "...", ... } }
+    """
     if not user_manager:
         return web.json_response({"error": "Not initialized"}, status=503)
 
@@ -1732,12 +1782,49 @@ async def api_agent_prompts_set_handler(request: web.Request) -> web.Response:
         }, status=403)
 
     data = await request.json()
+
+    # Valid agents (including orchestrator)
+    valid_agents = ["orchestrator", "planner", "executor", "verifier", "reviewer", "ux", "ux_designer"]
+
+    # Check if batch format
+    if "prompts" in data:
+        # Batch save all prompts at once
+        prompts = data.get("prompts", {})
+        saved_count = 0
+
+        for agent_id, custom_text in prompts.items():
+            # Normalize ux_designer to ux
+            normalized_agent = "ux" if agent_id == "ux_designer" else agent_id
+
+            if normalized_agent not in valid_agents:
+                continue  # Skip invalid agents
+
+            if len(custom_text) > 2000:
+                return web.json_response({
+                    "error": f"Prompt for {agent_id} too long (max 2000 chars)",
+                }, status=400)
+
+            if custom_text.strip():
+                user_manager.set_agent_custom_prompt(device_id, normalized_agent, custom_text)
+                saved_count += 1
+            else:
+                user_manager.clear_agent_custom_prompt(device_id, normalized_agent)
+
+        logger.info("Batch saved %d custom prompts by user %s", saved_count, device_id[:8])
+
+        return web.json_response({
+            "status": "saved",
+            "saved_count": saved_count,
+        })
+
+    # Single agent format (backwards compatibility)
     agent_id = data.get("agent_id", "")
     custom_text = data.get("custom_text", "")
 
-    # Validate agent_id
-    valid_agents = ["planner", "executor", "verifier", "reviewer", "ux"]
-    if agent_id not in valid_agents:
+    # Normalize ux_designer to ux
+    normalized_agent = "ux" if agent_id == "ux_designer" else agent_id
+
+    if normalized_agent not in valid_agents:
         return web.json_response({
             "error": f"Invalid agent_id. Must be one of: {valid_agents}",
         }, status=400)
@@ -1749,15 +1836,15 @@ async def api_agent_prompts_set_handler(request: web.Request) -> web.Response:
         }, status=400)
 
     if custom_text.strip():
-        user_manager.set_agent_custom_prompt(device_id, agent_id, custom_text)
-        logger.info("Set custom prompt for %s agent by user %s", agent_id, device_id[:8])
+        user_manager.set_agent_custom_prompt(device_id, normalized_agent, custom_text)
+        logger.info("Set custom prompt for %s agent by user %s", normalized_agent, device_id[:8])
     else:
-        user_manager.clear_agent_custom_prompt(device_id, agent_id)
-        logger.info("Cleared custom prompt for %s agent by user %s", agent_id, device_id[:8])
+        user_manager.clear_agent_custom_prompt(device_id, normalized_agent)
+        logger.info("Cleared custom prompt for %s agent by user %s", normalized_agent, device_id[:8])
 
     return web.json_response({
         "status": "saved",
-        "agent_id": agent_id,
+        "agent_id": normalized_agent,
         "length": len(custom_text),
     })
 

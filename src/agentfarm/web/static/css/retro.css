@@ -2792,6 +2792,253 @@ section {
     background: rgba(255, 0, 68, 0.1);
 }
 
+/* ============================================
+   AGENT CONFIGURATION PANEL (Beta Operator)
+   ============================================ */
+
+.agent-panel-content {
+    max-width: 1100px;
+    width: 95vw;
+}
+
+.agent-panel-body {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.agent-panel-info {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.agent-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.agent-card {
+    background: rgba(10, 10, 20, 0.9);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.agent-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px rgba(0, 255, 242, 0.2);
+}
+
+.agent-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-card-header.orchestrator {
+    background: linear-gradient(135deg, rgba(0, 255, 242, 0.2), rgba(0, 255, 242, 0.05));
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+}
+
+.agent-card-header.planner {
+    background: linear-gradient(135deg, rgba(0, 102, 255, 0.2), rgba(0, 102, 255, 0.05));
+    color: #0066ff;
+    border-bottom-color: #0066ff;
+}
+
+.agent-card-header.ux {
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 107, 107, 0.05));
+    color: #ff6b6b;
+    border-bottom-color: #ff6b6b;
+}
+
+.agent-card-header.executor {
+    background: linear-gradient(135deg, rgba(255, 0, 255, 0.2), rgba(255, 0, 255, 0.05));
+    color: var(--magenta);
+    border-bottom-color: var(--magenta);
+}
+
+.agent-card-header.verifier {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.05));
+    color: var(--green);
+    border-bottom-color: var(--green);
+}
+
+.agent-card-header.reviewer {
+    background: linear-gradient(135deg, rgba(255, 255, 0, 0.2), rgba(255, 255, 0, 0.05));
+    color: var(--yellow);
+    border-bottom-color: var(--yellow);
+}
+
+.agent-icon {
+    font-size: 1.2rem;
+}
+
+.agent-name {
+    flex: 1;
+}
+
+.agent-status {
+    font-size: 0.6rem;
+    opacity: 0.5;
+}
+
+.agent-status.active {
+    opacity: 1;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.agent-card-base {
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.base-prompt-label {
+    font-size: 0.65rem;
+    font-family: var(--font-display);
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.25rem;
+}
+
+.base-prompt-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    font-family: var(--font-mono);
+}
+
+.agent-card-custom {
+    padding: 0.75rem 1rem;
+}
+
+.agent-card-custom label {
+    display: block;
+    font-size: 0.65rem;
+    font-family: var(--font-display);
+    color: var(--cyan);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+}
+
+.agent-custom-prompt {
+    width: 100%;
+    min-height: 70px;
+    padding: 0.6rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    resize: vertical;
+    transition: all 0.2s ease;
+}
+
+.agent-custom-prompt:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 242, 0.2);
+}
+
+.agent-custom-prompt::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.agent-card-custom .char-count {
+    text-align: right;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 0.25rem;
+}
+
+/* Agent card states */
+.agent-card.error {
+    border-color: var(--red);
+    box-shadow: 0 0 10px rgba(255, 0, 68, 0.3);
+    animation: shake 0.3s ease-in-out;
+}
+
+.agent-card.error .agent-custom-prompt {
+    border-color: var(--red);
+}
+
+.agent-card.saved {
+    animation: saveFlash 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes saveFlash {
+    0% { box-shadow: 0 0 0 rgba(0, 255, 136, 0); }
+    50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); border-color: var(--green); }
+    100% { box-shadow: 0 0 0 rgba(0, 255, 136, 0); }
+}
+
+.agent-panel-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.agent-panel-footer .submit-btn,
+.agent-panel-footer .clear-btn {
+    min-width: 150px;
+}
+
+/* Scrollbar styling for agent panel */
+.agent-panel-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.agent-panel-body::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.agent-panel-body::-webkit-scrollbar-thumb {
+    background: var(--cyan);
+    border-radius: 3px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .agent-panel-content {
+        width: 98vw;
+        max-height: 90vh;
+    }
+
+    .agent-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .agent-panel-footer {
+        flex-direction: column;
+    }
+
+    .agent-panel-footer .submit-btn,
+    .agent-panel-footer .clear-btn {
+        width: 100%;
+    }
+}
+
 /* File upload section improvements */
 .section-subtitle {
     margin-left: 0.5rem;

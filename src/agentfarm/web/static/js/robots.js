@@ -169,14 +169,14 @@ const ROBOT_SPRITES = {
     `
 };
 
-// Robot agent definitions with positions
+// Robot agent definitions with positions (centered layout)
 const ROBOT_AGENTS = [
-    { id: 'orchestrator', name: 'ORCHESTRATOR', x: 50, y: 50, role: 'Koordinerar alla agenter' },
-    { id: 'planner', name: 'PLANNER', x: 20, y: 25, role: 'Skapar exekveringsplaner' },
-    { id: 'executor', name: 'EXECUTOR', x: 80, y: 25, role: 'Skriver och modifierar kod' },
-    { id: 'verifier', name: 'VERIFIER', x: 20, y: 75, role: 'Testar och validerar' },
-    { id: 'reviewer', name: 'REVIEWER', x: 80, y: 75, role: 'Granskar kodkvalitet' },
-    { id: 'ux', name: 'DESIGNER', x: 50, y: 90, role: 'Skapar UI/UX design' },
+    { id: 'orchestrator', name: 'ORCHESTRATOR', x: 50, y: 45, role: 'Koordinerar alla agenter' },
+    { id: 'planner', name: 'PLANNER', x: 25, y: 20, role: 'Skapar exekveringsplaner' },
+    { id: 'executor', name: 'EXECUTOR', x: 75, y: 20, role: 'Skriver och modifierar kod' },
+    { id: 'verifier', name: 'VERIFIER', x: 25, y: 70, role: 'Testar och validerar' },
+    { id: 'reviewer', name: 'REVIEWER', x: 75, y: 70, role: 'Granskar kodkvalitet' },
+    { id: 'ux', name: 'DESIGNER', x: 50, y: 85, role: 'Skapar UI/UX design' },
 ];
 
 class RobotVisualizer {
@@ -195,11 +195,16 @@ class RobotVisualizer {
     }
 
     init() {
-        if (!this.container) return;
+        console.log('RobotVisualizer.init() called, container:', this.container);
+        if (!this.container) {
+            console.error('Robot container not found!');
+            return;
+        }
 
         // Clear existing content
         this.container.innerHTML = '';
         this.container.classList.add('robot-arena');
+        console.log('Creating', ROBOT_AGENTS.length, 'robots');
 
         // Create SVG for connection lines
         this.createConnectionsSVG();

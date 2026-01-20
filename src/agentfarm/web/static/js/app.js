@@ -214,6 +214,8 @@ function handleServerMessage(data) {
             } else {
                 addMessage('orchestrator', `✗ Workflow failed: ${data.error || 'Unknown error'}`);
             }
+            // Refresh user data to update workflow counter
+            loadUserData();
             break;
 
         case 'workflow_result':
@@ -239,11 +241,18 @@ function handleServerMessage(data) {
                     robotVisualizer.setWorking(agent.id, false);
                 });
             }
-            // Show full error message with traceback (expandable)
-            const errorMsg = data.error || 'Unknown error';
-            const traceback = data.traceback || '';
-            const fullError = traceback ? `${errorMsg}\n\n--- TRACEBACK ---\n${traceback}` : errorMsg;
-            addMessage('orchestrator', `✗ WORKFLOW ERROR:\n${fullError}`);
+            // Check if this is a "no workflows remaining" error
+            if (data.upgrade_url) {
+                addMessage('orchestrator', `✗ ${data.error}`);
+                // Show Beta Operator modal
+                openModal('beta-operator-modal');
+            } else {
+                // Show full error message with traceback (expandable)
+                const errorMsg = data.error || 'Unknown error';
+                const traceback = data.traceback || '';
+                const fullError = traceback ? `${errorMsg}\n\n--- TRACEBACK ---\n${traceback}` : errorMsg;
+                addMessage('orchestrator', `✗ WORKFLOW ERROR:\n${fullError}`);
+            }
             break;
 
         case 'pong':
@@ -1935,60 +1944,42 @@ if (urlParams.get('payment') === 'success') {
 }
 
 // =============================================================================
-// AGENT CUSTOM PROMPTS
+// AGENT CUSTOM PROMPTS (Card-based layout)
 // =============================================================================
 
-const AGENT_HINTS = {
-    planner: 'PLANNER - Ansvarar för att bryta ned uppgiften i steg och skapa en plan.',
-    ux_designer: 'UX DESIGNER - Skapar UI/UX-design och wireframes för frontend-uppgifter.',
-    executor: 'EXECUTOR - Skriver och redigerar kod enligt planen.',
-    verifier: 'VERIFIER - Testar och verifierar att koden fungerar korrekt.',
-    reviewer: 'REVIEWER - Granskar kodens kvalitet, säkerhet och best practices.'
-};
-
-let currentAgentTab = 'planner';
+const AGENT_IDS = ['orchestrator', 'planner', 'ux_designer', 'executor', 'verifier', 'reviewer'];
 let agentCustomPrompts = {};
 
 function initAgentPrompts() {
-    const agentPromptsBtn = document.getElementById('agent-prompts-btn');
-    if (agentPromptsBtn) {
-        agentPromptsBtn.addEventListener('click', () => {
-            // Check if user has prompts or is admin
-            if (!currentUserData) {
-                openModal('upgrade-modal');
-                return;
-            }
-            if (!currentUserData.is_admin && !currentUserData.prompts_remaining && currentUserData.tier !== 'early_access') {
-                openModal('upgrade-modal');
-                return;
-            }
-            openAgentPromptsModal();
-        });
-    }
-
-    // Tab switching
-    document.querySelectorAll('.agent-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            switchAgentTab(tab.dataset.agent);
+    // Wire up character counting for all textareas
+    document.querySelectorAll('.agent-custom-prompt').forEach(textarea => {
+        textarea.addEventListener('input', () => {
+            updateCardCharCount(textarea);
         });
     });
 
-    // Save button
-    const saveBtn = document.getElementById('save-agent-prompt');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', saveAgentPrompt);
+    // Wire up save-all button
+    const saveAllBtn = document.getElementById('save-all-prompts');
+    if (saveAllBtn) {
+        saveAllBtn.addEventListener('click', saveAllAgentPrompts);
     }
 
-    // Clear button
-    const clearBtn = document.getElementById('clear-agent-prompt');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', clearAgentPrompt);
+    // Wire up clear-all button
+    const clearAllBtn = document.getElementById('clear-all-prompts');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', clearAllAgentPrompts);
     }
+}
 
-    // Character counter
-    const textarea = document.getElementById('agent-prompt-text');
-    if (textarea) {
-        textarea.addEventListener('input', updateCharCount);
+function updateCardCharCount(textarea) {
+    const card = textarea.closest('.agent-card');
+    if (!card) return;
+
+    const countEl = card.querySelector('.char-count .count');
+    if (countEl) {
+        const count = textarea.value.length;
+        countEl.textContent = count;
+        countEl.style.color = count > 500 ? 'var(--red)' : 'inherit';
     }
 }
 
@@ -2002,95 +1993,98 @@ async function openAgentPromptsModal() {
         }
     } catch (e) {
         console.error('Failed to load agent prompts:', e);
+        agentCustomPrompts = {};
     }
 
-    // Set first tab
-    switchAgentTab('planner');
+    // Populate all textareas with saved prompts
+    AGENT_IDS.forEach(agentId => {
+        const textarea = document.querySelector(`.agent-custom-prompt[data-agent="${agentId}"]`);
+        if (textarea) {
+            textarea.value = agentCustomPrompts[agentId] || '';
+            updateCardCharCount(textarea);
+        }
+    });
+
     openModal('agent-prompts-modal');
 }
 
-function switchAgentTab(agentId) {
-    currentAgentTab = agentId;
+async function saveAllAgentPrompts() {
+    const saveBtn = document.getElementById('save-all-prompts');
+    if (!saveBtn) return;
 
-    // Update active tab
-    document.querySelectorAll('.agent-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.agent === agentId);
+    // Collect all prompts from textareas
+    const prompts = {};
+    let hasError = false;
+
+    AGENT_IDS.forEach(agentId => {
+        const textarea = document.querySelector(`.agent-custom-prompt[data-agent="${agentId}"]`);
+        if (textarea) {
+            const text = textarea.value.trim();
+            if (text.length > 500) {
+                hasError = true;
+                // Highlight the card with error
+                const card = textarea.closest('.agent-card');
+                if (card) card.classList.add('error');
+            } else {
+                prompts[agentId] = text;
+                // Remove error state
+                const card = textarea.closest('.agent-card');
+                if (card) card.classList.remove('error');
+            }
+        }
     });
 
-    // Update hint
-    const hintEl = document.getElementById('agent-prompt-hint');
-    if (hintEl) {
-        hintEl.innerHTML = `<strong>${agentId.toUpperCase().replace('_', ' ')}</strong> - ${AGENT_HINTS[agentId] || ''}`;
-    }
-
-    // Update textarea with saved prompt
-    const textarea = document.getElementById('agent-prompt-text');
-    if (textarea) {
-        textarea.value = agentCustomPrompts[agentId] || '';
-        updateCharCount();
-    }
-}
-
-function updateCharCount() {
-    const textarea = document.getElementById('agent-prompt-text');
-    const countEl = document.getElementById('agent-prompt-char-count');
-    if (textarea && countEl) {
-        const count = textarea.value.length;
-        countEl.textContent = count;
-        countEl.style.color = count > 500 ? 'var(--red)' : 'inherit';
-    }
-}
-
-async function saveAgentPrompt() {
-    const textarea = document.getElementById('agent-prompt-text');
-    const saveBtn = document.getElementById('save-agent-prompt');
-    if (!textarea) return;
-
-    const customText = textarea.value.trim();
-
-    if (customText.length > 500) {
-        addMessage('system', 'Prompten får max vara 500 tecken.', 'error');
+    if (hasError) {
+        addMessage('orchestrator', '✗ En eller flera prompter överskrider 500 tecken.');
         return;
     }
 
     saveBtn.disabled = true;
-    saveBtn.textContent = 'SPARAR...';
+    saveBtn.innerHTML = '⏳ SPARAR...';
 
     try {
         const response = await fetch('/api/user/agent-prompts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                agent_id: currentAgentTab,
-                custom_text: customText
-            })
+            body: JSON.stringify({ prompts: prompts })
         });
 
         if (response.ok) {
-            agentCustomPrompts[currentAgentTab] = customText;
-            addMessage('system', `✓ Prompt för ${currentAgentTab.toUpperCase()} sparad.`, 'success');
+            agentCustomPrompts = prompts;
+            addMessage('orchestrator', '✓ Alla agent-prompter sparade!');
+
+            // Show success animation on cards
+            document.querySelectorAll('.agent-card').forEach(card => {
+                card.classList.add('saved');
+                setTimeout(() => card.classList.remove('saved'), 1000);
+            });
         } else {
             const error = await response.json();
-            addMessage('system', `✗ Kunde inte spara: ${error.error || 'Okänt fel'}`, 'error');
+            addMessage('orchestrator', `✗ Kunde inte spara: ${error.error || 'Okänt fel'}`);
         }
     } catch (e) {
-        console.error('Save agent prompt error:', e);
-        addMessage('system', '✗ Ett fel uppstod.', 'error');
+        console.error('Save agent prompts error:', e);
+        addMessage('orchestrator', '✗ Ett fel uppstod vid sparning.');
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'SPARA';
+        saveBtn.innerHTML = '💾 SPARA ALLA';
     }
 }
 
-async function clearAgentPrompt() {
-    const textarea = document.getElementById('agent-prompt-text');
-    if (!textarea) return;
+async function clearAllAgentPrompts() {
+    if (!confirm('Rensa ALLA anpassade prompter?')) return;
 
-    if (!confirm(`Rensa prompt för ${currentAgentTab.toUpperCase()}?`)) return;
+    // Clear all textareas
+    AGENT_IDS.forEach(agentId => {
+        const textarea = document.querySelector(`.agent-custom-prompt[data-agent="${agentId}"]`);
+        if (textarea) {
+            textarea.value = '';
+            updateCardCharCount(textarea);
+        }
+    });
 
-    textarea.value = '';
-    updateCharCount();
-    await saveAgentPrompt();
+    // Save empty prompts
+    await saveAllAgentPrompts();
 }
 
 // Initialize agent prompts when DOM is ready
