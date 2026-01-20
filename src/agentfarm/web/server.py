@@ -613,10 +613,10 @@ async def create_and_run_project(name: str, prompt: str, device_id: str) -> None
     })
 
     # Run workflow in multi-provider mode
-    await run_multi_provider_workflow(prompt, str(project_path))
+    await run_multi_provider_workflow(prompt, str(project_path), device_id)
 
 
-async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
+async def run_multi_provider_workflow(task: str, working_dir: str, device_id: str = "") -> None:
     """Run AgentFarm workflow with multi-provider mode (each agent uses optimal provider)."""
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
@@ -679,9 +679,29 @@ async def run_multi_provider_workflow(task: str, working_dir: str) -> None:
         # Set up collaboration event broadcasting
         setup_collaboration_events(orchestrator)
 
-        # Inject file tools
+        # Inject ALL tools (file, code, git) for verifier and reviewer to work
+        from agentfarm.tools.code_tools import CodeTools
+        from agentfarm.tools.git_tools import GitTools
+
         file_tools = FileTools(working_dir)
-        orchestrator.inject_tools(file_tools=file_tools)
+        code_tools = CodeTools(working_dir)
+        git_tools = GitTools(working_dir)
+        orchestrator.inject_tools(
+            file_tools=file_tools,
+            code_tools=code_tools,
+            git_tools=git_tools,
+        )
+
+        # Apply user's custom prompts if available (Beta Operator feature)
+        if device_id and user_manager:
+            custom_prompts = user_manager.get_all_agent_custom_prompts(device_id)
+            if custom_prompts:
+                orchestrator.apply_custom_prompts(custom_prompts)
+                logger.info("Applied %d custom prompts for user %s", len(custom_prompts), device_id[:8])
+
+        # Connect context injector for RAG (uploaded files)
+        if context_injector and CONTEXT_INJECTOR_AVAILABLE:
+            orchestrator.set_context_injector(context_injector)
 
         # Run the workflow
         result = await orchestrator.run_workflow(task)
@@ -821,9 +841,29 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
         # Set up collaboration event broadcasting
         setup_collaboration_events(orchestrator)
 
-        # Inject file tools
+        # Inject ALL tools (file, code, git) for verifier and reviewer to work
+        from agentfarm.tools.code_tools import CodeTools
+        from agentfarm.tools.git_tools import GitTools
+
         file_tools = FileTools(working_dir)
-        orchestrator.inject_tools(file_tools=file_tools)
+        code_tools = CodeTools(working_dir)
+        git_tools = GitTools(working_dir)
+        orchestrator.inject_tools(
+            file_tools=file_tools,
+            code_tools=code_tools,
+            git_tools=git_tools,
+        )
+
+        # Apply user's custom prompts if available (Beta Operator feature)
+        if device_id and user_manager:
+            custom_prompts = user_manager.get_all_agent_custom_prompts(device_id)
+            if custom_prompts:
+                orchestrator.apply_custom_prompts(custom_prompts)
+                logger.info("Applied %d custom prompts for user %s", len(custom_prompts), device_id[:8])
+
+        # Connect context injector for RAG (uploaded files)
+        if context_injector and CONTEXT_INJECTOR_AVAILABLE:
+            orchestrator.set_context_injector(context_injector)
 
         # Run the workflow
         result = await orchestrator.run_workflow(task)

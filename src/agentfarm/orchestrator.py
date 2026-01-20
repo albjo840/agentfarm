@@ -243,6 +243,49 @@ class Orchestrator:
         elif git_tools:
             self.reviewer._tool_handlers["get_diff"] = git_tools.get_diff
 
+    def apply_custom_prompts(self, prompts: dict[str, str]) -> None:
+        """Apply custom prompt suffixes to agents.
+
+        Args:
+            prompts: Dict mapping agent_id to custom prompt text.
+                     Valid agent_ids: orchestrator, planner, executor, verifier,
+                     reviewer, ux_designer (or ux)
+        """
+        agent_map = {
+            "orchestrator": None,  # OrchestratorAgent handled separately if used
+            "planner": self.planner,
+            "executor": self.executor,
+            "verifier": self.verifier,
+            "reviewer": self.reviewer,
+            "ux_designer": self.ux_designer,
+            "ux": self.ux_designer,  # Alias
+        }
+
+        for agent_id, custom_text in prompts.items():
+            if not custom_text or not custom_text.strip():
+                continue
+
+            agent = agent_map.get(agent_id.lower())
+            if agent:
+                agent.set_custom_prompt(custom_text)
+                logger.debug("Applied custom prompt to %s: %s...", agent_id, custom_text[:50])
+
+    def set_context_injector(self, injector: Any) -> None:
+        """Set context injector for RAG-based context retrieval.
+
+        The context injector allows agents to retrieve relevant context
+        from uploaded files and documents during workflow execution.
+
+        Args:
+            injector: ContextInjector instance with indexed documents
+        """
+        self.planner.set_context_injector(injector)
+        self.executor.set_context_injector(injector)
+        self.verifier.set_context_injector(injector)
+        self.reviewer.set_context_injector(injector)
+        self.ux_designer.set_context_injector(injector)
+        logger.info("Context injector set for all agents")
+
     async def run_workflow(
         self,
         task: str,

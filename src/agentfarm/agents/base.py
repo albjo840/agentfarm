@@ -221,6 +221,7 @@ class BaseAgent(ABC):
         self.context_injector = context_injector
         self._tools: list[ToolDefinition] = []
         self._tool_handlers: dict[str, Any] = {}
+        self._custom_prompt_suffix: str = ""  # User-defined prompt additions
 
     @property
     @abstractmethod
@@ -236,6 +237,28 @@ class BaseAgent(ABC):
 
         Only include tools this specific agent needs.
         """
+
+    def set_custom_prompt(self, custom_text: str) -> None:
+        """Set a custom prompt suffix to append to the system prompt.
+
+        This allows users to customize agent behavior with their own instructions.
+        The custom text is appended after the base system prompt.
+
+        Args:
+            custom_text: Custom instructions to add (max 2000 chars recommended)
+        """
+        self._custom_prompt_suffix = custom_text.strip()
+
+    def get_full_system_prompt(self) -> str:
+        """Get the complete system prompt including any custom suffix.
+
+        Returns:
+            Base system prompt + custom suffix (if set)
+        """
+        base = self.system_prompt
+        if self._custom_prompt_suffix:
+            return f"{base}\n\n## User Custom Instructions:\n{self._custom_prompt_suffix}"
+        return base
 
     def register_tool(
         self,
@@ -286,7 +309,8 @@ class BaseAgent(ABC):
             user_request: The user's request
             company_context: Optional pre-fetched company context from RAG
         """
-        messages = [Message(role="system", content=self.system_prompt)]
+        # Use full system prompt including any user-defined custom instructions
+        messages = [Message(role="system", content=self.get_full_system_prompt())]
 
         # Add focused context (including company context if available)
         context_text = self._format_context(context, company_context=company_context)
