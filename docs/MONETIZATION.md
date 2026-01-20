@@ -2,37 +2,67 @@
 
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md) | [WEB.md](./WEB.md)
 
-## Dual Revenue Model
+## 🌐 Live URL
 
-AgentFarm har två intäktsströmmar som kompletterar varandra:
+**Publik portal:** [http://taborsen.duckdns.org:8080/](http://taborsen.duckdns.org:8080/)
+
+## Pricing Model
+
+AgentFarm använder ett tvåstegs-system: **Tryout** (gratis) och **Beta Operator** (betald).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         REVENUE STREAMS                                 │
+│                         PRICING MODEL                                   │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ┌─────────────────────────────┐    ┌─────────────────────────────┐   │
-│  │   BRANCH 1: AFFILIATES      │    │   BRANCH 2: EARLY ACCESS    │   │
-│  │   (Hardware Revenue)        │    │   (Subscription Revenue)    │   │
+│  │   TRYOUT (Gratis)           │    │   BETA OPERATOR (29 kr)     │   │
 │  ├─────────────────────────────┤    ├─────────────────────────────┤   │
 │  │                             │    │                             │   │
-│  │  Målgrupp:                  │    │  Målgrupp:                  │   │
-│  │  • DIY-byggare              │    │  • Företag                  │   │
-│  │  • Entusiaster              │    │  • Utvecklare               │   │
-│  │  • Studenter                │    │  • Startups                 │   │
+│  │  • 1 gratis workflow        │    │  • 10 workflows             │   │
+│  │  • Alla 6 agenter           │    │  • Alla 6 agenter           │   │
+│  │  • Grundläggande access     │    │  • Filuppladdning           │   │
+│  │                             │    │  • Custom system prompts    │   │
+│  │  Ingen registrering krävs   │    │  • Feedback till utvecklare │   │
+│  │  Device-baserad identitet   │    │  • VPN-access               │   │
+│  │                             │    │  • ZIP-nedladdning          │   │
+│  └─────────────────────────────┘    └─────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────┐    ┌─────────────────────────────┐   │
+│  │   AFFILIATE REVENUE         │    │   ADMIN ACCESS              │   │
+│  ├─────────────────────────────┤    ├─────────────────────────────┤   │
 │  │                             │    │                             │   │
-│  │  Erbjudande:                │    │  Erbjudande:                │   │
-│  │  • /hardware sida           │    │  • Unlimited workflows      │   │
-│  │  • GPU-prestanda stats      │    │  • Company context (Vault)  │   │
-│  │  • Affiliate-länkar         │    │  • Fil-uppladdning          │   │
-│  │                             │    │  • VPN-access               │   │
-│  │  Revenue:                   │    │  Revenue:                   │   │
-│  │  • Click-baserat            │    │  • Månadsprenumeration      │   │
-│  │  • 1-5% per köp             │    │  • Token-packs (optional)   │   │
-│  │                             │    │                             │   │
+│  │  • /hardware sida           │    │  • Unlimited prompts (∞)    │   │
+│  │  • GPU-prestanda stats      │    │  • Full access to all       │   │
+│  │  • Affiliate-länkar         │    │    features                 │   │
+│  │  • Adtraction integration   │    │  • Set via scripts/         │   │
+│  │                             │    │    set_admin.py             │   │
 │  └─────────────────────────────┘    └─────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Access Levels
+
+| Feature | Gäst | Tryout | Beta Operator | Admin |
+|---------|------|--------|---------------|-------|
+| Visa sidan | ✅ | ✅ | ✅ | ✅ |
+| Köra workflows | ❌ | 1 st | 10 st | ∞ |
+| Filuppladdning | ❌ | ❌ | ✅ | ✅ |
+| Custom prompts | ❌ | ❌ | ✅ | ✅ |
+| Skicka feedback | ❌ | ❌ | ✅ | ✅ |
+| VPN-access | ❌ | ✅ | ✅ | ✅ |
+| ZIP-nedladdning | ❌ | ✅ | ✅ | ✅ |
+
+## Subscription Tiers (Kod)
+
+```python
+class SubscriptionTier(str, Enum):
+    FREE = "free"              # Gäst, ingen access
+    TRYOUT = "tryout"          # Har testat (1 gratis workflow)
+    BETA_OPERATOR = "beta_operator"  # Betalande (29 kr, 10 workflows)
+    EARLY_ACCESS = "early_access"    # Legacy tier
+    PRO = "pro"                # Framtida tier
 ```
 
 ## Modulstruktur
@@ -47,37 +77,84 @@ src/agentfarm/monetization/
 └── feedback.py              # FeedbackManager
 ```
 
-## TierManager (Central koordinator)
+## UserManager API
 
 ```python
-from agentfarm.monetization import TierManager, AccessLevel, TierLimits
+from agentfarm.monetization import UserManager, SubscriptionTier
 
-tier_mgr = TierManager(storage_dir=".agentfarm")
+users = UserManager(storage_dir=".agentfarm")
 
-# Kontrollera access
-allowed, reason = tier_mgr.check_workflow_access(device_id)
-# allowed=True, reason="free_tier" eller "early_access"
-# allowed=False, reason="Daily limit reached (5 workflows/day)"
+# Hämta eller skapa användare
+user = users.get_or_create_user(device_id)
 
-# Hämta tier-info
-access, limits = tier_mgr.get_user_tier(device_id)
-# access: AccessLevel.FREE eller AccessLevel.EARLY_ACCESS
-# limits.workflows_per_day: 5 (free) eller -1 (unlimited)
-# limits.can_upload_files: False (free) eller True (early_access)
-# limits.max_context_chars: 0 (free) eller 50000 (early_access)
+# Kolla om användare är Beta Operator
+if users.is_beta_operator(device_id):
+    # Har access till premium-funktioner
+    pass
+
+# Uppgradera till Beta Operator (efter Stripe-betalning)
+users.upgrade_to_beta_operator(device_id, stripe_customer_id)
+# Ger automatiskt 10 workflows
 ```
 
-## Tier Limits
+## Stripe Integration
 
-| Feature | FREE | EARLY_ACCESS |
-|---------|------|--------------|
-| Workflows/dag | 5 | Unlimited |
-| Company context | Nej | 50,000 chars |
-| Fil-uppladdning | Nej | Ja |
-| Priority queue | Nej | Ja |
-| VPN-access | Nej | Ja |
+### Environment Variables
 
-## 1. Affiliate System
+```bash
+# Obligatoriska
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Beta Operator (29 kr, engångsbetalning)
+STRIPE_BETA_OPERATOR_PRICE_ID=price_1SrD6WHKMZEfwz9FBZTwDejG
+
+# URLs
+STRIPE_SUCCESS_URL=http://taborsen.duckdns.org:8080/?payment=success
+STRIPE_CANCEL_URL=http://taborsen.duckdns.org:8080/?payment=cancelled
+```
+
+### Checkout Flow
+
+```
+┌────────────┐    ┌─────────────────┐    ┌──────────────┐
+│   Gäst     │───▶│  Tryout Modal   │───▶│  1 workflow  │
+└────────────┘    └─────────────────┘    └──────────────┘
+                           │
+                           ▼
+┌────────────┐    ┌─────────────────┐    ┌──────────────┐
+│  Tryout    │───▶│ Beta Operator   │───▶│ Stripe       │
+│  user      │    │ Modal (29 kr)   │    │ Checkout     │
+└────────────┘    └─────────────────┘    └──────────────┘
+                                                │
+                                                ▼
+                                         ┌──────────────┐
+                                         │ Webhook:     │
+                                         │ upgrade_     │
+                                         │ beta_operator│
+                                         └──────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Metod | Beskrivning |
+|----------|-------|-------------|
+| `/api/user` | GET | Hämta användarprofil (inkl. is_beta_operator) |
+| `/api/user/tryout` | POST | Starta tryout (1 gratis workflow) |
+| `/api/checkout/beta-operator` | POST | Skapa Stripe checkout för Beta Operator |
+| `/webhook/stripe` | POST | Stripe webhook handler |
+| `/api/feedback` | POST | Skicka feedback (Beta Operator only) |
+| `/api/user/agent-prompts` | POST | Sätt custom prompts (Beta Operator only) |
+| `/api/files/upload` | POST | Ladda upp filer (Beta Operator only) |
+
+### Webhook Events
+
+| Event | Action | Resultat |
+|-------|--------|----------|
+| `checkout.session.completed` (beta_operator) | `upgrade_beta_operator` | Tier → BETA_OPERATOR, +10 workflows |
+| `customer.subscription.deleted` | `downgrade_tier` | Tier → FREE |
+
+## Affiliate System
 
 ### AffiliateManager
 
@@ -95,166 +172,58 @@ url, click = manager.track_click(
     retailer_id="dustin",
     device_id=user_device_id,
 )
-# url = "https://www.dustin.se/product/123?ref=agentfarm"
-
-# Statistik
-stats = manager.get_click_stats(days=30)
-# {"total_clicks": 142, "by_product": {...}, "by_retailer": {...}}
 ```
 
 ### Konfigurerade retailers
 
-| Retailer | Affiliate-param | Status |
-|----------|-----------------|--------|
-| Dustin | `ref=agentfarm` | Aktiv |
-| Komplett | `wt.mc_id=agentfarm` | Aktiv |
-| Inet | `ref=agentfarm` | Aktiv |
-| Electrokit | `ref=agentfarm` | Aktiv |
-| Proshop | - | TODO |
-| Amazon (Adtraction) | - | TODO |
+| Retailer | Status |
+|----------|--------|
+| Dustin | Aktiv |
+| Komplett | Aktiv |
+| Inet | Aktiv |
+| Adtraction | Konfigureras |
 
-### Produktkategorier
-
-- `gpu` - Grafikkort (AMD ROCm-kompatibla)
-- `sbc` - Single board computers (Raspberry Pi)
-- `storage` - NVMe, RAM
-- `networking` - Switchar, kablar
-
-## 2. Stripe Early Access
-
-### StripeIntegration
-
-```python
-from agentfarm.monetization import StripeIntegration
-
-stripe = StripeIntegration()
-
-if stripe.enabled:
-    # Skapa checkout session
-    session = await stripe.create_checkout_session(
-        device_id="user123",
-        product_type="early_access"
-    )
-    # Redirect user till session.url
-
-    # Verifiera webhook
-    result = await stripe.handle_webhook(payload, signature)
-    # {"action": "upgrade_tier", "device_id": "...", "tier": "early_access"}
-```
-
-### Environment Variables
-
-```bash
-STRIPE_SECRET_KEY=sk_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_EARLY_ACCESS_PRICE_ID=price_...
-STRIPE_SUCCESS_URL=https://domain.com/?payment=success
-STRIPE_CANCEL_URL=https://domain.com/?payment=cancelled
-```
-
-### Webhook Events
-
-| Event | Action |
-|-------|--------|
-| `checkout.session.completed` | `upgrade_tier` eller `add_tokens` |
-| `customer.subscription.deleted` | `downgrade_tier` |
-| `invoice.paid` | `subscription_renewed` |
-
-## 3. User Management
-
-### UserManager
-
-```python
-from agentfarm.monetization import UserManager, SubscriptionTier
-
-users = UserManager(storage_dir=".agentfarm")
-
-# Hämta eller skapa användare
-user = users.get_or_create_user(device_id)
-# user.tier: SubscriptionTier.FREE eller .EARLY_ACCESS
-# user.tokens_remaining: int
-# user.company_context: str | None
-
-# Uppgradera tier
-users.upgrade_tier(device_id, SubscriptionTier.EARLY_ACCESS)
-
-# Sätt company context
-users.set_company_context(device_id, "Vi är ett fintech-bolag som...")
-```
-
-### UserProfile (Pydantic model)
-
-```python
-class UserProfile(BaseModel):
-    device_id: str
-    tier: SubscriptionTier = SubscriptionTier.FREE
-    tokens_remaining: int = 0
-    tokens_used_total: int = 0
-    company_context: str | None = None
-    stripe_customer_id: str | None = None
-    created_at: float
-    last_active: float
-```
-
-## 4. Feedback System
-
-### FeedbackManager
+## Feedback System (Beta Operator only)
 
 ```python
 from agentfarm.monetization import FeedbackManager
 
 feedback = FeedbackManager(storage_dir=".agentfarm")
 
-# Skapa feedback
+# Endast Beta Operators kan skicka feedback
 entry = feedback.create_feedback(
     device_id="user123",
-    message="Agenten fastnade i en loop",
-    category="bug",
-    workflow_id="abc123",
-    rating=3,
+    message="Feedback...",
+    category="bug",  # bug, feature, ux, performance, general
+    rating=4,
 )
-
-# Lista feedback (admin)
-entries = feedback.list_feedback(status="new", limit=100)
-stats = feedback.get_stats()
 ```
-
-### Feedback Categories
-
-- `bug` - Buggar och fel
-- `feature` - Feature requests
-- `ux` - UX/UI feedback
-- `performance` - Prestandaproblem
-- `general` - Övrigt
-
-## API Endpoints
-
-Se [WEB.md](./WEB.md) för fullständig API-dokumentation.
-
-| Endpoint | Metod | Beskrivning |
-|----------|-------|-------------|
-| `/api/user` | GET | Hämta användarprofil |
-| `/api/user/context` | POST | Spara company context |
-| `/api/tokens` | GET | Token-balans |
-| `/api/subscription/checkout` | POST | Skapa Stripe checkout |
-| `/webhook/stripe` | POST | Stripe webhook handler |
-| `/api/feedback` | POST | Skicka feedback |
-| `/api/affiliates/products` | GET | Lista produkter |
-| `/api/affiliates/{id}/click/{retailer}` | GET | Track click + redirect |
 
 ## Storage
 
 ```
 .agentfarm/
-├── users.json              # UserManager data
-├── affiliates.json         # AffiliateManager config
-├── feedback/               # Feedback entries
-│   ├── abc123.json
-│   └── def456.json
+├── users/                   # UserProfile JSON-filer
+│   ├── device123.json
+│   └── device456.json
+├── tokens/
+│   └── transactions.json    # Token/prompt transaktioner
+├── feedback/                # Feedback entries
+│   └── fb_abc123.json
+├── affiliates.json          # Affiliate config
 └── analytics/
     └── affiliate_clicks.json
 ```
 
+## Säkerhet
+
+| Resurs | Publik | Skydd |
+|--------|--------|-------|
+| Web UI (port 8080) | ✅ | Gäster kan se, premium bakom betalning |
+| Ollama API (11434) | ❌ | Blockerad av brandvägg |
+| VPN (51820) | ✅ | Kräver WireGuard-config |
+| GitLab (443) | ✅ | Kräver inloggning |
+
 ---
 
-*Se även: [SECURITY.md](./SECURITY.md) för Secure Vault (company context storage)*
+*Se även: [SECURITY.md](./SECURITY.md) | [WEB.md](./WEB.md)*

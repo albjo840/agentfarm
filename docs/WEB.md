@@ -2,6 +2,10 @@
 
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md) | [MONETIZATION.md](./MONETIZATION.md)
 
+## 🌐 Live URL
+
+**Kundportal:** [http://taborsen.duckdns.org:8080/](http://taborsen.duckdns.org:8080/)
+
 ## Översikt
 
 80s Sci-Fi themed web interface med real-time agent visualization.
@@ -134,15 +138,25 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
 
 ### Monetization API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/user` | GET | Get user profile |
-| `/api/user/context` | POST | Save company context |
-| `/api/tokens` | GET | Get token balance |
-| `/api/subscription/checkout` | POST | Create Stripe checkout |
-| `/webhook/stripe` | POST | Stripe webhook |
-| `/api/feedback` | GET/POST | Feedback management |
-| `/api/monetization/stats` | GET | Admin stats |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/user` | GET | - | Get user profile (inkl. is_beta_operator) |
+| `/api/user/tryout` | POST | - | Starta tryout (1 gratis workflow) |
+| `/api/user/context` | POST | Beta | Save company context |
+| `/api/user/agent-prompts` | GET | - | Get custom agent prompts |
+| `/api/user/agent-prompts` | POST | Beta | Set custom agent prompts |
+| `/api/checkout/beta-operator` | POST | - | Create Stripe checkout (29 kr) |
+| `/api/files/upload` | POST | Beta | Upload files to SecureVault |
+| `/api/files/vault` | GET | - | List uploaded files |
+| `/webhook/stripe` | POST | - | Stripe webhook handler |
+| `/api/feedback` | POST | Beta | Submit feedback |
+| `/api/feedback` | GET | Admin | List all feedback |
+| `/api/monetization/stats` | GET | Admin | Admin statistics |
+
+**Auth nivåer:**
+- `-` = Alla användare
+- `Beta` = Beta Operator krävs
+- `Admin` = Admin krävs
 
 ### Affiliate API
 
@@ -321,7 +335,12 @@ agentfarm web --host 0.0.0.0
 agentfarm web --workdir ~/projects
 ```
 
-**URLs:**
+**URLs (Production):**
+- Dashboard: `http://taborsen.duckdns.org:8080/`
+- Mobile: `http://taborsen.duckdns.org:8080/mobile`
+- Hardware: `http://taborsen.duckdns.org:8080/hardware`
+
+**URLs (Local Development):**
 - Dashboard: `http://localhost:8080/`
 - Mobile: `http://localhost:8080/mobile`
 - Hardware: `http://localhost:8080/hardware`
