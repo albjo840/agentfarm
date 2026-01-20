@@ -35,16 +35,12 @@
                 </div>
                 <div class="status-item">
                     <span class="label">AGENTS</span>
-                    <span class="value" id="agent-count">5</span>
+                    <span class="value" id="agent-count">6</span>
                 </div>
-                <div class="status-item">
-                    <span class="label">TOKENS</span>
-                    <span class="value" id="token-count">0</span>
-                </div>
-                <div class="status-item credits-display">
-                    <span class="label">CREDITS</span>
-                    <span class="value" id="credits-balance">100</span>
-                    <span class="tier-badge" id="tier-badge">FREE</span>
+                <div class="status-item tryout-display">
+                    <span class="label">STATUS</span>
+                    <span class="value" id="user-status">GÄST</span>
+                    <span class="tier-badge" id="tier-badge"></span>
                 </div>
                 <div class="status-item music-control">
                     <button id="music-toggle" class="music-btn" title="Toggle Synthwave Music">
@@ -175,6 +171,33 @@
                     </div>
                 </div>
             </section>
+
+            <!-- File Upload Section (SecureVault) -->
+            <section class="file-upload-section tier-gated" id="file-upload-section">
+                <div class="section-header">
+                    <span class="icon">📁</span>
+                    <h2>PROJEKTFILER</h2>
+                    <span class="section-subtitle">Filer som agenterna kan läsa</span>
+                </div>
+                <div class="file-upload-info">
+                    <p>Ladda upp filer som agenterna ska ha tillgång till: kodfiler, dokumentation, specifikationer etc.</p>
+                </div>
+                <div class="file-drop-zone" id="file-drop-zone">
+                    <input type="file" id="file-input-hidden" multiple hidden accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv,.pdf,.ts,.tsx,.jsx,.html,.css">
+                    <span class="drop-zone-icon">📥</span>
+                    <span class="drop-zone-text">SLÄPP FILER HÄR</span>
+                    <span class="drop-zone-hint">eller klicka för att välja filer</span>
+                    <span class="drop-zone-formats">.py .js .ts .json .md .txt .yaml .csv .pdf</span>
+                </div>
+                <div class="uploaded-files-list" id="uploaded-files-list">
+                    <!-- Populated by JavaScript -->
+                </div>
+                <!-- Beta Operator overlay for non-premium users -->
+                <div class="beta-operator-overlay" id="file-upload-overlay">
+                    <span class="overlay-text">🔒 BETA OPERATOR KRÄVS</span>
+                    <button class="beta-upgrade-btn" onclick="openModal('beta-operator-modal')">BLI BETA OPERATOR</button>
+                </div>
+            </section>
         </main>
 
         <!-- Footer -->
@@ -187,9 +210,13 @@
                     <span class="qr-icon">&#9783;</span>
                     <span class="qr-label">VPN</span>
                 </button>
-                <button id="upgrade-btn" class="upgrade-btn" title="Uppgradera till Early Access">
-                    <span class="upgrade-icon">★</span>
-                    <span class="upgrade-label">UPGRADE</span>
+                <button id="agent-prompts-btn" class="agent-prompts-btn tier-gated-btn" title="Anpassa agent system prompts">
+                    <span class="agent-prompts-icon">⚙</span>
+                    <span class="agent-prompts-label">PROMPTS</span>
+                </button>
+                <button id="beta-operator-btn" class="beta-operator-btn" title="Bli Beta Operator - få fler funktioner">
+                    <span class="beta-operator-icon">⚡</span>
+                    <span class="beta-operator-label">BETA OPERATOR</span>
                 </button>
                 <button id="feedback-btn" class="feedback-btn" title="Skicka feedback">
                     <span class="feedback-icon">✉</span>
@@ -252,56 +279,80 @@
         </div>
     </div>
 
-    <!-- Upgrade Modal -->
-    <div id="upgrade-modal" class="modal hidden">
-        <div class="modal-content upgrade-modal-content">
+    <!-- Beta Operator Modal -->
+    <div id="beta-operator-modal" class="modal hidden">
+        <div class="modal-content beta-operator-modal-content">
             <div class="modal-header">
-                <h3>EARLY ACCESS</h3>
-                <button class="modal-close" data-modal="upgrade-modal">&times;</button>
+                <h3>⚡ BLI BETA OPERATOR</h3>
+                <button class="modal-close" data-modal="beta-operator-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="tier-comparison">
-                    <div class="tier-card tier-free">
-                        <h4>FREE</h4>
-                        <div class="tier-price">0 kr</div>
-                        <ul class="tier-features">
-                            <li>100 credits/month</li>
-                            <li>Basic agents</li>
-                            <li>Community support</li>
-                        </ul>
-                        <div class="tier-current" id="free-current">CURRENT</div>
-                    </div>
-                    <div class="tier-card tier-early-access">
-                        <div class="tier-badge-hot">EARLY BIRD</div>
-                        <h4>EARLY ACCESS</h4>
-                        <div class="tier-price">79 kr<span>/mån</span></div>
-                        <ul class="tier-features">
-                            <li>Obegränsade credits</li>
-                            <li>Alla agenter</li>
-                            <li>Prioriterad support</li>
-                            <li>Företagskontext</li>
-                            <li>Påverka roadmap</li>
-                        </ul>
-                        <button id="checkout-early-access" class="checkout-btn">UPPGRADERA</button>
+                <div class="beta-hero">
+                    <p class="beta-intro">Lås upp alla premium-funktioner och hjälp till att forma AgentFarm!</p>
+                    <div class="beta-price">
+                        <span class="price-amount">29 kr</span>
+                        <span class="price-period">engångsbetalning</span>
                     </div>
                 </div>
-                <div class="token-packs hidden" id="token-packs">
-                    <h4>TOKEN PACKS</h4>
-                    <div class="token-pack-grid">
-                        <button class="token-pack" data-pack="small">
-                            <span class="pack-amount">500</span>
-                            <span class="pack-price">29 kr</span>
-                        </button>
-                        <button class="token-pack" data-pack="medium">
-                            <span class="pack-amount">2000</span>
-                            <span class="pack-price">99 kr</span>
-                        </button>
-                        <button class="token-pack" data-pack="large">
-                            <span class="pack-amount">5000</span>
-                            <span class="pack-price">199 kr</span>
-                        </button>
+                <div class="beta-features">
+                    <div class="feature-item included">
+                        <span class="feature-icon">🤖</span>
+                        <span class="feature-text">10 AI-drivna workflows</span>
+                    </div>
+                    <div class="feature-item included">
+                        <span class="feature-icon">📁</span>
+                        <span class="feature-text">Filuppladdning (SecureVault)</span>
+                    </div>
+                    <div class="feature-item included">
+                        <span class="feature-icon">⚙️</span>
+                        <span class="feature-text">Anpassade systemprompter</span>
+                    </div>
+                    <div class="feature-item included">
+                        <span class="feature-icon">✉️</span>
+                        <span class="feature-text">Direkt feedback till utvecklaren</span>
+                    </div>
+                    <div class="feature-item included">
+                        <span class="feature-icon">🔒</span>
+                        <span class="feature-text">VPN-access för säker anslutning</span>
+                    </div>
+                    <div class="feature-item included">
+                        <span class="feature-icon">📥</span>
+                        <span class="feature-text">ZIP-nedladdning av projekt</span>
                     </div>
                 </div>
+                <button id="checkout-beta-operator" class="beta-checkout-btn">
+                    <span>⚡ BLI BETA OPERATOR</span>
+                </button>
+                <p class="beta-disclaimer">Du får direkt tillgång. Betalning hanteras säkert via Stripe.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tryout Modal (for first-time guests) -->
+    <div id="tryout-modal" class="modal hidden">
+        <div class="modal-content tryout-modal-content">
+            <div class="modal-header">
+                <h3>🚀 PROVA AGENTFARM</h3>
+                <button class="modal-close" data-modal="tryout-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tryout-hero">
+                    <p class="tryout-intro">Testa AI-agenter som skapar kod åt dig - helt gratis!</p>
+                </div>
+                <div class="tryout-features">
+                    <div class="feature-item">
+                        <span class="feature-icon">🤖</span>
+                        <span class="feature-text">6 specialiserade AI-agenter</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📝</span>
+                        <span class="feature-text">1 gratis workflow</span>
+                    </div>
+                </div>
+                <button id="start-tryout-btn" class="tryout-start-btn">
+                    <span>▶ STARTA GRATIS</span>
+                </button>
+                <p class="tryout-disclaimer">Ingen registrering. Gillar du det? Uppgradera till Beta Operator!</p>
             </div>
         </div>
     </div>
@@ -364,6 +415,41 @@
             </div>
             <div class="modal-footer">
                 <button id="save-context" class="submit-btn">SPARA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Prompts Modal -->
+    <div id="agent-prompts-modal" class="modal hidden">
+        <div class="modal-content agent-prompts-modal-content">
+            <div class="modal-header">
+                <h3>AGENT SYSTEM PROMPTS</h3>
+                <button class="modal-close" data-modal="agent-prompts-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="agent-prompts-info">Anpassa varje agents beteende med egna instruktioner. Dessa läggs till i slutet av agentens system prompt.</p>
+
+                <div class="agent-prompts-tabs">
+                    <button class="agent-tab active" data-agent="planner">PLANNER</button>
+                    <button class="agent-tab" data-agent="ux_designer">UX</button>
+                    <button class="agent-tab" data-agent="executor">EXECUTOR</button>
+                    <button class="agent-tab" data-agent="verifier">VERIFIER</button>
+                    <button class="agent-tab" data-agent="reviewer">REVIEWER</button>
+                </div>
+
+                <div class="agent-prompt-editor">
+                    <div class="agent-prompt-hint" id="agent-prompt-hint">
+                        <strong>PLANNER</strong> - Ansvarar för att bryta ned uppgiften i steg.
+                    </div>
+                    <textarea id="agent-prompt-text" rows="8" placeholder="T.ex: Använd alltid svenska kommentarer i koden. Prioritera säkerhet över prestanda."></textarea>
+                    <div class="agent-prompt-chars">
+                        <span id="agent-prompt-char-count">0</span>/500 tecken
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-agent-prompt" class="submit-btn">SPARA</button>
+                <button id="clear-agent-prompt" class="clear-btn">RENSA</button>
             </div>
         </div>
     </div>

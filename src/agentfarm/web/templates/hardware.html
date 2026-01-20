@@ -8,6 +8,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         /* Hardware Terminal Specific Styles */
+        /* Fix missing CSS variables - map to retro.css vars */
+        :root {
+            --text: var(--text-primary, #00fff2);
+            --bg: var(--bg-dark, #0a0a0f);
+            --border: var(--border-color, #00fff2);
+        }
+
         .hardware-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -46,8 +53,8 @@
 
         .hardware-header .subtitle {
             font-family: 'Share Tech Mono', monospace;
-            color: var(--text-dim);
-            font-size: 1rem;
+            color: #90c8d8;
+            font-size: 1.1rem;
             letter-spacing: 0.1em;
         }
 
@@ -67,6 +74,80 @@
         @keyframes badge-glow {
             0%, 100% { box-shadow: 0 0 10px var(--magenta); }
             50% { box-shadow: 0 0 20px var(--cyan), 0 0 30px var(--magenta); }
+        }
+
+        /* Hero CTA Section */
+        .hero-cta {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.1) 0%, rgba(255, 0, 255, 0.1) 100%);
+            border: 2px solid var(--cyan, #00fff2);
+            padding: 30px 40px;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-cta::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--cyan, #00fff2), var(--magenta, #ff00ff), var(--cyan, #00fff2));
+            animation: hero-gradient 3s ease-in-out infinite;
+        }
+
+        @keyframes hero-gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero-content h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: #ffffff;
+            margin: 0 0 15px 0;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .hero-content p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1rem;
+            color: #c0e0f0;
+            margin: 0 0 20px 0;
+            line-height: 1.6;
+        }
+
+        .hero-benefits {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .benefit {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--green, #00ff88);
+        }
+
+        .benefit-icon {
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero-cta {
+                padding: 20px;
+            }
+            .hero-content h2 {
+                font-size: 1.2rem;
+            }
+            .hero-benefits {
+                flex-direction: column;
+                gap: 15px;
+            }
         }
 
         /* Category tabs */
@@ -170,18 +251,33 @@
 
         .product-name {
             font-family: 'Orbitron', monospace;
-            font-size: 1.1rem;
-            color: var(--text);
+            font-size: 1.2rem;
+            color: #ffffff;
             margin: 0 0 10px 0;
             letter-spacing: 0.05em;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .product-price {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.4rem;
+            color: var(--green, #00ff88);
+            margin: 0 0 15px 0;
+            text-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+        }
+
+        .product-price .price-from {
+            font-size: 0.75rem;
+            color: #80a0b0;
+            margin-right: 5px;
         }
 
         .product-description {
             font-family: 'Share Tech Mono', monospace;
-            font-size: 0.85rem;
-            color: var(--text-dim);
+            font-size: 0.9rem;
+            color: #a0d0e0;
             margin: 0 0 20px 0;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         .product-specs {
@@ -242,6 +338,18 @@
             font-size: 0.7rem;
         }
 
+        .retailer-link .link-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .retailer-link .link-price {
+            color: var(--green, #00ff88);
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
         .retailer-link .arrow {
             color: var(--cyan);
             font-size: 1.2rem;
@@ -285,10 +393,10 @@
 
         .info-item p {
             font-family: 'Share Tech Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--text-dim);
+            font-size: 0.85rem;
+            color: #b0c8d0;
             margin: 0;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         /* Back link */
@@ -313,6 +421,56 @@
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
         }
 
+        /* Try CTA Section */
+        .try-cta {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 255, 255, 0.1) 100%);
+            border: 2px solid var(--magenta, #ff00ff);
+            margin-bottom: 40px;
+        }
+
+        .try-cta h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: #ffffff;
+            margin: 0 0 15px 0;
+            text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        .try-cta p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1rem;
+            color: #c0d0e0;
+            margin: 0 0 25px 0;
+        }
+
+        .try-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, var(--magenta, #ff00ff), var(--cyan, #00fff2));
+            border: none;
+            color: #000000;
+            font-family: 'Orbitron', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        .try-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.8), 0 0 60px rgba(0, 255, 255, 0.5);
+        }
+
+        .try-icon {
+            font-size: 1.2rem;
+        }
+
         /* Footer */
         .hardware-footer {
             text-align: center;
@@ -323,9 +481,10 @@
 
         .hardware-footer p {
             font-family: 'Share Tech Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--text-dim);
+            font-size: 0.9rem;
+            color: #80a0b0;
             margin: 0;
+            line-height: 1.8;
         }
 
         .hardware-footer a {
@@ -342,7 +501,8 @@
             text-align: center;
             padding: 60px;
             font-family: 'Share Tech Mono', monospace;
-            color: var(--text-dim);
+            color: #90c8d8;
+            font-size: 1.1rem;
         }
 
         .loading::after {
@@ -361,8 +521,9 @@
             text-align: center;
             padding: 60px;
             font-family: 'Share Tech Mono', monospace;
-            color: var(--text-dim);
-            border: 1px dashed var(--border);
+            color: #90c8d8;
+            border: 1px dashed var(--cyan, #00fff2);
+            font-size: 1.1rem;
         }
 
         /* Responsive */
@@ -404,9 +565,31 @@
         <!-- Header -->
         <header class="hardware-header">
             <h1>HARDWARE TERMINAL</h1>
-            <p class="subtitle">REKOMMENDERAD UTRUSTNING FOR AI/ML-ARBETE</p>
+            <p class="subtitle">BYGG DIN EGNA AI-DATOR - KÖR LLMs LOKALT</p>
             <span class="rocm-badge">AMD ROCm OPTIMERAT</span>
         </header>
+
+        <!-- Hero CTA Section -->
+        <section class="hero-cta">
+            <div class="hero-content">
+                <h2>🚀 Kör AI-modeller lokalt på din egen GPU</h2>
+                <p>Med AgentFarm och rätt hårdvara kan du köra LLaMA, Qwen, Mistral och andra open source-modeller helt privat - utan molntjänster eller månadsavgifter.</p>
+                <div class="hero-benefits">
+                    <div class="benefit">
+                        <span class="benefit-icon">🔒</span>
+                        <span>100% privat - ingen data lämnar din dator</span>
+                    </div>
+                    <div class="benefit">
+                        <span class="benefit-icon">💰</span>
+                        <span>Engångskostnad - inga API-avgifter</span>
+                    </div>
+                    <div class="benefit">
+                        <span class="benefit-icon">⚡</span>
+                        <span>Snabb inference - 50+ tokens/sek</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- Category tabs -->
         <div class="category-tabs">
@@ -424,33 +607,43 @@
 
         <!-- Info section -->
         <section class="info-section">
-            <h2>VARFOR AMD FOR AI/ML?</h2>
+            <h2>🎯 VARFÖR AMD FÖR AI/ML?</h2>
             <div class="info-grid">
                 <div class="info-item">
-                    <h3>ROCm 6.x SUPPORT</h3>
-                    <p>Full PyTorch och TensorFlow-kompatibilitet via ROCm. Kor lokala LLMs utan CUDA-beroende.</p>
+                    <h3>🔧 ROCm 6.x SUPPORT</h3>
+                    <p>Full PyTorch och TensorFlow-kompatibilitet via ROCm. Kör lokala LLMs utan CUDA-beroende - helt open source.</p>
                 </div>
                 <div class="info-item">
-                    <h3>VRAM MATTERS</h3>
-                    <p>24GB VRAM pa 7900 XTX klarar 70B-modeller med kvantisering. 16GB pa 7900 GRE racker for de flesta 7B-13B modeller.</p>
+                    <h3>💾 VRAM ÄR NYCKELN</h3>
+                    <p>24GB VRAM på 7900 XTX klarar 70B-modeller med kvantisering. 16GB på 7800 XT räcker för de flesta 7B-13B modeller.</p>
                 </div>
                 <div class="info-item">
-                    <h3>UBUNTU 22.04 LTS</h3>
-                    <p>ROCm fungerar bast pa Ubuntu 22.04 LTS. Debian och andra distros har begransat stod.</p>
+                    <h3>🐧 UBUNTU 22.04 LTS</h3>
+                    <p>ROCm fungerar bäst på Ubuntu 22.04 LTS. Vi kör AgentFarm på exakt denna setup - testat och verifierat.</p>
                 </div>
                 <div class="info-item">
-                    <h3>KOSTNADSEFFEKTIVT</h3>
-                    <p>AMD-kort ger ofta mer VRAM per krona jamfort med NVIDIA. Perfekt for hobbyprojekt och startups.</p>
+                    <h3>💰 MER VRAM PER KRONA</h3>
+                    <p>AMD-kort ger ofta mer VRAM per krona jämfört med NVIDIA. Perfekt för hobbyprojekt, startups och privatpersoner.</p>
                 </div>
             </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="try-cta">
+            <h2>🤖 VILL DU TESTA AGENTERNA?</h2>
+            <p>Prova AgentFarm gratis och se hur AI-agenter kan hjälpa dig skapa kod, tester och dokumentation.</p>
+            <a href="/" class="try-btn">
+                <span class="try-icon">▶</span>
+                <span>PROVA NU - GRATIS</span>
+            </a>
         </section>
 
         <!-- Footer -->
         <footer class="hardware-footer">
             <p>
-                Affiliate-lankar - vi far en liten provision om du koper via vara lankar.
-                <br>
-                <a href="/">&larr; Tillbaka till AgentFarm</a>
+                🔗 Affiliate-länkar - vi får en liten provision om du köper via våra länkar. Det kostar dig inget extra!
+                <br><br>
+                <a href="/">← Tillbaka till AgentFarm</a>
             </p>
         </footer>
     </div>
@@ -511,8 +704,14 @@
                     ? `<div class="product-badge ${badgeClass}">${product.badge}</div>`
                     : '';
 
-                const linksHtml = Object.entries(product.links || {}).map(([retailerId, url]) => {
+                // Get first link for primary CTA
+                const links = Object.entries(product.links || {});
+                const primaryLink = links[0];
+
+                const linksHtml = links.map(([retailerId, url]) => {
                     const retailerName = this.getRetailerName(retailerId);
+                    const price = product.prices?.[retailerId];
+                    const priceHtml = price ? `<span class="link-price">${price} kr</span>` : '';
                     return `
                         <a href="/api/affiliates/${product.id}/click/${retailerId}"
                            class="retailer-link"
@@ -522,17 +721,28 @@
                                 <span class="retailer-icon">${retailerName.charAt(0)}</span>
                                 ${retailerName}
                             </span>
-                            <span class="arrow">&rarr;</span>
+                            <span class="link-right">
+                                ${priceHtml}
+                                <span class="arrow">&rarr;</span>
+                            </span>
                         </a>
                     `;
                 }).join('');
 
                 const specsHtml = this.getSpecs(product);
 
+                // Get lowest price to display
+                const prices = Object.values(product.prices || {}).filter(p => p);
+                const lowestPrice = prices.length > 0 ? Math.min(...prices.map(p => parseInt(p) || 99999)) : null;
+                const priceHtml = lowestPrice
+                    ? `<div class="product-price"><span class="price-from">från</span>${lowestPrice.toLocaleString()} kr</div>`
+                    : '';
+
                 return `
                     <div class="product-card">
                         ${badgeHtml}
                         <h3 class="product-name">${product.name}</h3>
+                        ${priceHtml}
                         <p class="product-description">${product.description}</p>
                         ${specsHtml}
                         <div class="product-links">

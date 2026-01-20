@@ -58,6 +58,15 @@ from agentfarm.config import AgentFarmConfig, ProviderConfig, ProviderType
 from agentfarm.monetization.users import UserManager, SubscriptionTier
 from agentfarm.monetization.feedback import FeedbackManager, FeedbackEntry
 from agentfarm.monetization.stripe_integration import StripeIntegration
+from agentfarm.monetization.tiers import TierManager, TierLimits
+
+# Optional: Import context injector for RAG indexing
+try:
+    from agentfarm.security.context_injector import ContextInjector
+    CONTEXT_INJECTOR_AVAILABLE = True
+except ImportError:
+    CONTEXT_INJECTOR_AVAILABLE = False
+    ContextInjector = None  # type: ignore
 
 
 # Paths
@@ -113,6 +122,8 @@ _event_bus_task: asyncio.Task | None = None  # Background task for event process
 user_manager: UserManager | None = None
 feedback_manager: FeedbackManager | None = None
 stripe_integration: StripeIntegration | None = None
+tier_manager: TierManager | None = None
+context_injector: ContextInjector | None = None
 
 # Monitoring globals
 gpu_monitor: GPUMonitor | None = None
@@ -1126,10 +1137,329 @@ async def api_files_download_handler(request: web.Request) -> web.Response:
     )
 
 
+async def api_project_download_zip_handler(request: web.Request) -> web.Response:
+    """Download entire project as ZIP file."""
+    import zipfile
+    import io
+
+    path = request.query.get("path", "")
+
+    if not path:
+        return web.json_response({"error": "No path provided"}, status=400)
+
+    project_path = Path(path)
+
+    # Security: Only allow access to projects directory
+    projects_base = Path.home() / "nya projekt"
+    try:
+        project_path = project_path.resolve()
+        if not str(project_path).startswith(str(projects_base.resolve())):
+            return web.json_response({"error": "Access denied"}, status=403)
+    except Exception:
+        return web.json_response({"error": "Invalid path"}, status=400)
+
+    if not project_path.exists() or not project_path.is_dir():
+        return web.json_response({"error": "Project not found"}, status=404)
+
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    project_name = project_path.name
+
+    try:
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in project_path.rglob('*'):
+                if file_path.is_file():
+                    # Skip hidden files and common excludes
+                    if any(part.startswith('.') for part in file_path.parts):
+                        continue
+                    if '__pycache__' in str(file_path):
+                        continue
+                    if file_path.suffix in {'.pyc', '.pyo'}:
+                        continue
+
+                    # Add file to ZIP with relative path
+                    arcname = str(file_path.relative_to(project_path))
+                    zipf.write(file_path, arcname)
+
+        zip_buffer.seek(0)
+        zip_data = zip_buffer.read()
+
+        logger.info("Created ZIP for project %s (%d bytes)", project_name, len(zip_data))
+
+        return web.Response(
+            body=zip_data,
+            content_type='application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="{project_name}.zip"',
+                'Content-Length': str(len(zip_data)),
+            }
+        )
+
+    except Exception as e:
+        logger.error("Failed to create ZIP: %s", e)
+        return web.json_response({"error": f"Failed to create ZIP: {e}"}, status=500)
+
+
+async def api_projects_list_handler(request: web.Request) -> web.Response:
+    """List all projects with metadata."""
+    projects_base = Path.home() / "nya projekt"
+
+    if not projects_base.exists():
+        return web.json_response({"projects": []})
+
+    projects = []
+    for project_dir in sorted(projects_base.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if project_dir.is_dir() and not project_dir.name.startswith('.'):
+            try:
+                stat = project_dir.stat()
+                # Count files
+                file_count = sum(1 for _ in project_dir.rglob('*') if _.is_file())
+                # Calculate total size
+                total_size = sum(f.stat().st_size for f in project_dir.rglob('*') if f.is_file())
+
+                projects.append({
+                    "name": project_dir.name,
+                    "path": str(project_dir),
+                    "created": stat.st_ctime,
+                    "modified": stat.st_mtime,
+                    "file_count": file_count,
+                    "total_size": total_size,
+                })
+            except (PermissionError, OSError):
+                continue
+
+    return web.json_response({
+        "projects": projects[:50],  # Limit to 50 most recent
+        "total": len(projects),
+    })
+
+
+# =============================================================================
+# FILE UPLOAD (SecureVault) API HANDLERS
+# =============================================================================
+
+ALLOWED_FILE_EXTENSIONS = {'.txt', '.md', '.py', '.js', '.json', '.yaml', '.yml', '.csv', '.pdf'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+async def extract_pdf_text(content: bytes) -> str:
+    """Extract text from PDF using pypdf."""
+    try:
+        from pypdf import PdfReader
+        from io import BytesIO
+
+        reader = PdfReader(BytesIO(content))
+        text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        return text.strip()
+    except ImportError:
+        logger.warning("pypdf not installed, PDF text extraction unavailable")
+        return ""
+    except Exception as e:
+        logger.error("PDF extraction failed: %s", e)
+        return ""
+
+
+async def api_files_upload_handler(request: web.Request) -> web.Response:
+    """Upload file to SecureVault (Beta Operator only)."""
+    if not user_manager:
+        return web.json_response({"error": "User manager not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+
+    # Check if user is Beta Operator
+    if not user_manager.is_beta_operator(device_id):
+        return web.json_response({
+            "error": "Filuppladdning kräver Beta Operator",
+            "feature": "file_upload",
+            "upgrade_url": "/api/checkout/beta-operator"
+        }, status=403)
+
+    # Get vault directory
+    vault_dir = Path(current_working_dir) / ".agentfarm" / "vault" / device_id[:16]
+    vault_dir.mkdir(parents=True, exist_ok=True)
+
+    # Parse multipart upload
+    reader = await request.multipart()
+    field = await reader.next()
+
+    if not field or field.name != 'file':
+        return web.json_response({"error": "No file provided"}, status=400)
+
+    filename = field.filename
+    if not filename:
+        return web.json_response({"error": "No filename"}, status=400)
+
+    # Validate file extension
+    ext = '.' + filename.split('.')[-1].lower() if '.' in filename else ''
+    if ext not in ALLOWED_FILE_EXTENSIONS:
+        return web.json_response({
+            "error": f"Invalid file type. Allowed: {', '.join(sorted(ALLOWED_FILE_EXTENSIONS))}"
+        }, status=400)
+
+    # Read file content with size limit
+    content = b''
+    while True:
+        chunk = await field.read_chunk()
+        if not chunk:
+            break
+        content += chunk
+        if len(content) > MAX_FILE_SIZE:
+            return web.json_response({
+                "error": f"File too large. Maximum size: {MAX_FILE_SIZE // 1024 // 1024}MB"
+            }, status=400)
+
+    # Sanitize filename
+    safe_filename = "".join(c for c in filename if c.isalnum() or c in '._-').strip()
+    if not safe_filename:
+        safe_filename = "uploaded_file" + ext
+
+    # Save file to vault
+    file_path = vault_dir / safe_filename
+    file_path.write_bytes(content)
+
+    logger.info("File uploaded: %s (%d bytes) by %s", safe_filename, len(content), device_id[:8])
+
+    # Index for RAG if context injector is available
+    indexed = False
+    if context_injector and CONTEXT_INJECTOR_AVAILABLE:
+        try:
+            # Extract text for indexing
+            if ext == '.pdf':
+                text_content = await extract_pdf_text(content)
+            else:
+                text_content = content.decode('utf-8', errors='replace')
+
+            if text_content:
+                await context_injector.add_document(
+                    filename=safe_filename,
+                    content=text_content,
+                    metadata={
+                        "device_id": device_id[:8],
+                        "uploaded": True,
+                    }
+                )
+                indexed = True
+                logger.info("File indexed for RAG: %s", safe_filename)
+        except Exception as e:
+            logger.warning("Failed to index file: %s", e)
+
+    response = web.json_response({
+        "status": "uploaded",
+        "filename": safe_filename,
+        "size": len(content),
+        "indexed": indexed,
+    })
+
+    # Set device_id cookie if not present
+    if "device_id" not in request.cookies:
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+
+    return response
+
+
+async def api_files_vault_list_handler(request: web.Request) -> web.Response:
+    """List files in user's vault."""
+    if not tier_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    _, limits = tier_manager.get_user_tier(device_id)
+
+    # Even free users can see the list (empty), but upload is blocked
+    vault_dir = Path(current_working_dir) / ".agentfarm" / "vault" / device_id[:16]
+
+    files = []
+    if vault_dir.exists():
+        for item in sorted(vault_dir.iterdir(), key=lambda x: x.name.lower()):
+            if item.is_file():
+                try:
+                    stat = item.stat()
+                    files.append({
+                        "name": item.name,
+                        "size": stat.st_size,
+                        "modified": stat.st_mtime,
+                    })
+                except (PermissionError, OSError):
+                    continue
+
+    response = web.json_response({
+        "files": files,
+        "can_upload": limits.can_upload_files,
+        "count": len(files),
+    })
+
+    # Set device_id cookie if not present
+    if "device_id" not in request.cookies:
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+
+    return response
+
+
+async def api_files_vault_delete_handler(request: web.Request) -> web.Response:
+    """Delete a file from user's vault."""
+    if not tier_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    filename = request.match_info.get("filename", "")
+
+    if not filename:
+        return web.json_response({"error": "No filename provided"}, status=400)
+
+    # Sanitize filename to prevent path traversal
+    safe_filename = "".join(c for c in filename if c.isalnum() or c in '._-').strip()
+    if not safe_filename or safe_filename != filename:
+        return web.json_response({"error": "Invalid filename"}, status=400)
+
+    vault_dir = Path(current_working_dir) / ".agentfarm" / "vault" / device_id[:16]
+    file_path = vault_dir / safe_filename
+
+    if not file_path.exists():
+        return web.json_response({"error": "File not found"}, status=404)
+
+    # Delete file
+    try:
+        file_path.unlink()
+        logger.info("File deleted: %s by %s", safe_filename, device_id[:8])
+    except Exception as e:
+        return web.json_response({"error": f"Failed to delete: {e}"}, status=500)
+
+    # Remove from RAG index if available
+    if context_injector and CONTEXT_INJECTOR_AVAILABLE:
+        try:
+            await context_injector.delete_document(safe_filename)
+        except Exception as e:
+            logger.warning("Failed to remove from index: %s", e)
+
+    return web.json_response({
+        "status": "deleted",
+        "filename": safe_filename,
+    })
+
+
 async def api_wireguard_qr_handler(request: web.Request) -> web.Response:
-    """Generate a new WireGuard peer and return QR code."""
+    """Generate a new WireGuard peer and return QR code. Requires tryout registration."""
     import subprocess
     import re
+
+    # Check if user has access (tryout or paid)
+    if user_manager:
+        device_id = _get_device_id(request)
+        user = user_manager.get_or_create_user(device_id)
+        has_access = (
+            user.is_admin or
+            user.tier == SubscriptionTier.EARLY_ACCESS or
+            user.prompts_remaining > 0
+        )
+        if not has_access:
+            return web.json_response({
+                "error": "VPN-access kräver att du startar en tryout först",
+                "require_tryout": True
+            }, status=403)
 
     try:
         # Get server public key
@@ -1232,13 +1562,40 @@ async def api_user_handler(request: web.Request) -> web.Response:
     device_id = _get_device_id(request)
     user = user_manager.get_or_create_user(device_id)
 
+    # Check if user can run workflows
+    can_run, reason = user_manager.can_run_workflow(device_id)
+
+    # Determine if user is in tryout mode
+    is_tryout = user.prompts_remaining > 0 and not user.is_admin and user.tier != SubscriptionTier.EARLY_ACCESS
+
+    # Check Beta Operator status
+    is_beta = user.is_admin or user.tier in (
+        SubscriptionTier.BETA_OPERATOR,
+        SubscriptionTier.EARLY_ACCESS,
+        SubscriptionTier.PRO
+    )
+
     response = web.json_response({
         "device_id": user.device_id,
         "tier": user.tier.value,
-        "tokens_remaining": user.tokens_remaining,
-        "tokens_used_total": user.tokens_used_total,
+        "is_admin": user.is_admin,
+        "is_beta_operator": is_beta,
+        "is_tryout": is_tryout,
+        "prompts_remaining": user.prompts_remaining if not (user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS) else -1,
+        "tryout_remaining": user.prompts_remaining if is_tryout else None,
+        "prompts_used_total": user.prompts_used_total,
+        "can_run_workflow": can_run,
+        "access_reason": reason,
+        "tokens_remaining": user.tokens_remaining,  # Legacy
+        "tokens_used_total": user.tokens_used_total,  # Legacy
         "has_company_context": bool(user.company_context),
+        "has_custom_prompts": bool(user.agent_custom_prompts),
+        "agent_custom_prompts": user.agent_custom_prompts or {},
         "stripe_enabled": stripe_integration.enabled if stripe_integration else False,
+        # Beta Operator exclusive features
+        "can_upload_files": is_beta,
+        "can_customize_prompts": is_beta,
+        "can_send_feedback": is_beta,
     })
 
     # Set device_id cookie if not present
@@ -1246,6 +1603,65 @@ async def api_user_handler(request: web.Request) -> web.Response:
         response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
 
     return response
+
+
+async def api_user_tryout_handler(request: web.Request) -> web.Response:
+    """Register user for tryout - gives 3 free workflows."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    user = user_manager.get_or_create_user(device_id)
+
+    # Check if already registered for tryout
+    if user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS:
+        return web.json_response({
+            "status": "already_premium",
+            "message": "Du har redan full tillgång",
+            "user": _user_to_dict(user, is_tryout=True)
+        })
+
+    # Register for tryout - give 1 free workflow
+    TRYOUT_PROMPTS = 1
+    if user.prompts_remaining < TRYOUT_PROMPTS:
+        user.prompts_remaining = TRYOUT_PROMPTS
+        user_manager._save_user(user)
+
+    response = web.json_response({
+        "status": "success",
+        "message": f"Välkommen! Du har nu {TRYOUT_PROMPTS} gratis workflows.",
+        "user": _user_to_dict(user, is_tryout=True)
+    })
+
+    # Set device_id cookie
+    if "device_id" not in request.cookies:
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+
+    return response
+
+
+def _user_to_dict(user, is_tryout: bool = False) -> dict:
+    """Convert User to dict for API response."""
+    # Beta Operator check: paid tier with premium features
+    is_beta = user.is_admin or user.tier in (
+        SubscriptionTier.BETA_OPERATOR,
+        SubscriptionTier.EARLY_ACCESS,
+        SubscriptionTier.PRO
+    )
+    return {
+        "device_id": user.device_id,
+        "tier": user.tier.value,
+        "is_admin": user.is_admin,
+        "is_beta_operator": is_beta,
+        "is_tryout": is_tryout or user.prompts_remaining > 0,
+        "prompts_remaining": user.prompts_remaining if not (user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS) else -1,
+        "tryout_remaining": user.prompts_remaining if is_tryout else None,
+        "prompts_used_total": user.prompts_used_total,
+        # Premium features (Beta Operator only)
+        "can_upload_files": is_beta,
+        "can_customize_prompts": is_beta,
+        "can_send_feedback": is_beta,
+    }
 
 
 async def api_user_context_handler(request: web.Request) -> web.Response:
@@ -1275,19 +1691,144 @@ async def api_tokens_handler(request: web.Request) -> web.Response:
     return web.json_response({
         "tokens_remaining": user.tokens_remaining,
         "tokens_used_total": user.tokens_used_total,
+        "prompts_remaining": user.prompts_remaining,
+        "prompts_used_total": user.prompts_used_total,
         "tier": user.tier.value,
-        "unlimited": user.tier == SubscriptionTier.EARLY_ACCESS,
+        "unlimited": user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS,
+    })
+
+
+# =============================================================================
+# CUSTOM AGENT PROMPTS API
+# =============================================================================
+
+async def api_agent_prompts_get_handler(request: web.Request) -> web.Response:
+    """Get custom prompts for all agents."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    prompts = user_manager.get_all_agent_custom_prompts(device_id)
+
+    return web.json_response({
+        "prompts": prompts,
+        "agents": ["planner", "executor", "verifier", "reviewer", "ux"],
+    })
+
+
+async def api_agent_prompts_set_handler(request: web.Request) -> web.Response:
+    """Set custom prompt for an agent. Requires Beta Operator."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+
+    # Check if user is Beta Operator
+    if not user_manager.is_beta_operator(device_id):
+        return web.json_response({
+            "error": "Anpassade systemprompter kräver Beta Operator",
+            "feature": "custom_prompts",
+            "upgrade_url": "/api/checkout/beta-operator"
+        }, status=403)
+
+    data = await request.json()
+    agent_id = data.get("agent_id", "")
+    custom_text = data.get("custom_text", "")
+
+    # Validate agent_id
+    valid_agents = ["planner", "executor", "verifier", "reviewer", "ux"]
+    if agent_id not in valid_agents:
+        return web.json_response({
+            "error": f"Invalid agent_id. Must be one of: {valid_agents}",
+        }, status=400)
+
+    # Validate length
+    if len(custom_text) > 2000:
+        return web.json_response({
+            "error": "Custom prompt too long (max 2000 chars)",
+        }, status=400)
+
+    if custom_text.strip():
+        user_manager.set_agent_custom_prompt(device_id, agent_id, custom_text)
+        logger.info("Set custom prompt for %s agent by user %s", agent_id, device_id[:8])
+    else:
+        user_manager.clear_agent_custom_prompt(device_id, agent_id)
+        logger.info("Cleared custom prompt for %s agent by user %s", agent_id, device_id[:8])
+
+    return web.json_response({
+        "status": "saved",
+        "agent_id": agent_id,
+        "length": len(custom_text),
+    })
+
+
+# =============================================================================
+# ADMIN API
+# =============================================================================
+
+async def api_admin_set_admin_handler(request: web.Request) -> web.Response:
+    """Set admin status for a user. Only admins can do this."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    # Check if requester is admin
+    requester_device_id = _get_device_id(request)
+    if not user_manager.is_admin(requester_device_id):
+        return web.json_response({"error": "Admin access required"}, status=403)
+
+    data = await request.json()
+    target_device_id = data.get("device_id", "")
+    is_admin = data.get("is_admin", True)
+
+    if not target_device_id:
+        return web.json_response({"error": "device_id required"}, status=400)
+
+    user = user_manager.set_admin(target_device_id, is_admin)
+    logger.info("Admin %s set admin=%s for user %s", requester_device_id[:8], is_admin, target_device_id[:8])
+
+    return web.json_response({
+        "status": "updated",
+        "device_id": target_device_id,
+        "is_admin": user.is_admin,
+    })
+
+
+async def api_admin_add_prompts_handler(request: web.Request) -> web.Response:
+    """Add prompts to a user. Admin only."""
+    if not user_manager:
+        return web.json_response({"error": "Not initialized"}, status=503)
+
+    # Check if requester is admin
+    requester_device_id = _get_device_id(request)
+    if not user_manager.is_admin(requester_device_id):
+        return web.json_response({"error": "Admin access required"}, status=403)
+
+    data = await request.json()
+    target_device_id = data.get("device_id", "")
+    amount = data.get("amount", 10)
+
+    if not target_device_id:
+        return web.json_response({"error": "device_id required"}, status=400)
+
+    new_balance = user_manager.add_prompts(target_device_id, amount, "admin_grant")
+    logger.info("Admin %s added %d prompts to user %s", requester_device_id[:8], amount, target_device_id[:8])
+
+    return web.json_response({
+        "status": "added",
+        "device_id": target_device_id,
+        "amount": amount,
+        "new_balance": new_balance,
     })
 
 
 async def api_subscription_checkout_handler(request: web.Request) -> web.Response:
-    """Create Stripe checkout session."""
+    """Create Stripe checkout session for prompt pack purchase."""
     if not stripe_integration or not stripe_integration.enabled:
         return web.json_response({"error": "Stripe not configured"}, status=503)
 
     device_id = _get_device_id(request)
     data = await request.json()
-    product_type = data.get("product_type", "early_access")
+    product_type = data.get("product_type", "prompt_pack")  # Default to prompt pack
 
     session = await stripe_integration.create_checkout_session(device_id, product_type)
     if session:
@@ -1298,6 +1839,49 @@ async def api_subscription_checkout_handler(request: web.Request) -> web.Respons
     else:
         # Fallback to simple URL
         url = stripe_integration.create_checkout_url(device_id, product_type)
+        return web.json_response({"checkout_url": url})
+
+
+async def api_beta_operator_checkout_handler(request: web.Request) -> web.Response:
+    """Create Stripe checkout session for Beta Operator upgrade.
+
+    Beta Operator includes:
+    - 10 workflows
+    - File upload (SecureVault)
+    - Custom system prompts
+    - Direct feedback to developer
+    """
+    if not stripe_integration or not stripe_integration.enabled:
+        return web.json_response({"error": "Stripe not configured"}, status=503)
+
+    device_id = _get_device_id(request)
+
+    # Check if already Beta Operator
+    if user_manager and user_manager.is_beta_operator(device_id):
+        return web.json_response({
+            "error": "Du är redan Beta Operator",
+            "already_upgraded": True,
+        }, status=400)
+
+    session = await stripe_integration.create_checkout_session(device_id, "beta_operator")
+    if session:
+        return web.json_response({
+            "checkout_url": session.url,
+            "session_id": session.id,
+            "product": {
+                "name": "Beta Operator",
+                "description": "10 workflows + premium features",
+                "features": [
+                    "10 AI-drivna workflows",
+                    "Filuppladdning (SecureVault)",
+                    "Anpassade systemprompter",
+                    "Direkt feedback till utvecklaren",
+                ],
+            },
+        })
+    else:
+        # Fallback to simple URL
+        url = stripe_integration.create_checkout_url(device_id, "beta_operator")
         return web.json_response({"checkout_url": url})
 
 
@@ -1323,6 +1907,20 @@ async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
         if device_id:
             user_manager.upgrade_tier(device_id, tier, customer_id)
             logger.info("Upgraded user %s to %s", device_id[:8], tier.value)
+
+    elif action == "upgrade_beta_operator":
+        device_id = result.get("device_id", "")
+        customer_id = result.get("stripe_customer_id")
+        if device_id:
+            user_manager.upgrade_to_beta_operator(device_id, customer_id)
+            logger.info("Upgraded user %s to Beta Operator", device_id[:8])
+
+    elif action == "add_prompts":
+        device_id = result.get("device_id", "")
+        prompts = result.get("prompts", 0)
+        if device_id and prompts:
+            user_manager.add_prompts(device_id, prompts, f"purchase_{result.get('product_type', 'unknown')}")
+            logger.info("Added %d prompts to user %s", prompts, device_id[:8])
 
     elif action == "add_tokens":
         device_id = result.get("device_id", "")
@@ -1351,11 +1949,20 @@ async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
 
 
 async def api_feedback_handler(request: web.Request) -> web.Response:
-    """Submit user feedback."""
+    """Submit user feedback. Requires Beta Operator."""
     if not feedback_manager:
         return web.json_response({"error": "Not initialized"}, status=503)
 
     device_id = _get_device_id(request)
+
+    # Check if user is Beta Operator
+    if user_manager and not user_manager.is_beta_operator(device_id):
+        return web.json_response({
+            "error": "Feedback kräver Beta Operator",
+            "feature": "feedback",
+            "upgrade_url": "/api/checkout/beta-operator"
+        }, status=403)
+
     data = await request.json()
 
     message = data.get("message", "").strip()
@@ -1422,7 +2029,7 @@ async def api_monetization_stats_handler(request: web.Request) -> web.Response:
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
     global llm_router, workflow_persistence, affiliate_manager, user_manager, feedback_manager, stripe_integration
-    global gpu_monitor, performance_tracker
+    global gpu_monitor, performance_tracker, tier_manager, context_injector
 
     setup_event_bus()
 
@@ -1455,6 +2062,22 @@ async def on_startup(app: web.Application) -> None:
     feedback_manager = FeedbackManager(agentfarm_dir)
     stripe_integration = StripeIntegration()
     logger.info("Monetization initialized (Stripe enabled: %s)", stripe_integration.enabled)
+
+    # Initialize TierManager (unified access control)
+    tier_manager = TierManager(storage_dir=agentfarm_dir, enable_vault=False)  # Using file-based vault
+    logger.info("Tier manager initialized")
+
+    # Initialize ContextInjector for RAG indexing (if available)
+    if CONTEXT_INJECTOR_AVAILABLE:
+        try:
+            context_injector = ContextInjector(storage_path=agentfarm_dir / "context")
+            logger.info("Context injector initialized (RAG available: %s)", context_injector.is_available)
+        except Exception as e:
+            logger.warning("Failed to initialize context injector: %s", e)
+            context_injector = None
+    else:
+        context_injector = None
+        logger.info("Context injector not available (optional dependencies not installed)")
 
     # Initialize LLM router with event bus integration
     llm_router = LLMRouter(event_bus=event_bus)
@@ -1516,13 +2139,31 @@ def create_app() -> web.Application:
     app.router.add_get('/api/files', api_files_list_handler)
     app.router.add_get('/api/files/content', api_files_content_handler)
     app.router.add_get('/api/files/download', api_files_download_handler)
+    app.router.add_get('/api/projects', api_projects_list_handler)
+    app.router.add_get('/api/projects/download-zip', api_project_download_zip_handler)
+
+    # File upload (SecureVault) routes
+    app.router.add_post('/api/files/upload', api_files_upload_handler)
+    app.router.add_get('/api/files/vault', api_files_vault_list_handler)
+    app.router.add_delete('/api/files/vault/{filename}', api_files_vault_delete_handler)
+
     app.router.add_post('/api/wireguard/new-peer', api_wireguard_qr_handler)
 
     # Monetization routes
     app.router.add_get('/api/user', api_user_handler)
+    app.router.add_post('/api/user/tryout', api_user_tryout_handler)
     app.router.add_post('/api/user/context', api_user_context_handler)
+
+    # Custom agent prompts
+    app.router.add_get('/api/user/agent-prompts', api_agent_prompts_get_handler)
+    app.router.add_post('/api/user/agent-prompts', api_agent_prompts_set_handler)
+
+    # Admin endpoints
+    app.router.add_post('/api/admin/set-admin', api_admin_set_admin_handler)
+    app.router.add_post('/api/admin/add-prompts', api_admin_add_prompts_handler)
     app.router.add_get('/api/tokens', api_tokens_handler)
     app.router.add_post('/api/subscription/checkout', api_subscription_checkout_handler)
+    app.router.add_post('/api/checkout/beta-operator', api_beta_operator_checkout_handler)
     app.router.add_post('/webhook/stripe', api_stripe_webhook_handler)
     app.router.add_post('/api/feedback', api_feedback_handler)
     app.router.add_get('/api/feedback', api_feedback_list_handler)

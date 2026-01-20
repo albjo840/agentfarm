@@ -16,20 +16,29 @@ class SubscriptionTier(str, Enum):
     """Subscription tiers for AgentFarm."""
 
     FREE = "free"
+    TRYOUT = "tryout"  # Has tried the service (1 free workflow)
+    BETA_OPERATOR = "beta_operator"  # Paid tier: 10 workflows + premium features
     EARLY_ACCESS = "early_access"
     PRO = "pro"
 
 
 class UserProfile(BaseModel):
-    """User profile for token tracking and subscriptions."""
+    """User profile for prompt tracking and subscriptions."""
 
     device_id: str = Field(..., description="Unique device fingerprint")
     email: str | None = Field(default=None, description="Optional email for account linking")
     tier: SubscriptionTier = Field(default=SubscriptionTier.FREE)
     stripe_customer_id: str | None = Field(default=None)
-    tokens_remaining: int = Field(default=100, description="Available tokens")
+    tokens_remaining: int = Field(default=0, description="Legacy - use prompts_remaining")
     tokens_used_total: int = Field(default=0, description="Lifetime token usage")
+    prompts_remaining: int = Field(default=0, description="Available prompts (workflows)")
+    prompts_used_total: int = Field(default=0, description="Lifetime prompt usage")
     company_context: str | None = Field(default=None, description="Custom company instructions")
+    agent_custom_prompts: dict[str, str] = Field(
+        default_factory=dict,
+        description="Custom system prompt additions per agent: {agent_id: custom_text}"
+    )
+    is_admin: bool = Field(default=False, description="Admin has unlimited access")
     created_at: float = Field(default_factory=time.time)
     last_active: float = Field(default_factory=time.time)
 
@@ -70,7 +79,7 @@ class UserManager:
         return self.users_dir / f"{safe_id}.json"
 
     def get_or_create_user(self, device_id: str) -> UserProfile:
-        """Get existing user or create new one with free tier."""
+        """Get existing user or create new one (no free prompts)."""
         user_path = self._user_path(device_id)
 
         if user_path.exists():
@@ -84,10 +93,9 @@ class UserManager:
             except (json.JSONDecodeError, ValueError):
                 pass
 
-        # Create new user
-        user = UserProfile(device_id=device_id)
+        # Create new user - NO free prompts, must purchase
+        user = UserProfile(device_id=device_id, prompts_remaining=0)
         self._save_user(user)
-        self._log_transaction(device_id, 100, "initial_grant")
         return user
 
     def _save_user(self, user: UserProfile) -> None:
@@ -264,6 +272,7 @@ class UserManager:
         transactions = self.get_transactions(limit=10000)
 
         total_tokens_used = sum(u.tokens_used_total for u in users)
+        total_prompts_used = sum(u.prompts_used_total for u in users)
         tier_counts = {tier.value: 0 for tier in SubscriptionTier}
         for user in users:
             tier_counts[user.tier.value] += 1
@@ -272,6 +281,154 @@ class UserManager:
             "total_users": len(users),
             "tier_counts": tier_counts,
             "total_tokens_used": total_tokens_used,
+            "total_prompts_used": total_prompts_used,
             "transactions_count": len(transactions),
             "active_last_24h": sum(1 for u in users if time.time() - u.last_active < 86400),
         }
+
+    # =========================================================================
+    # PROMPT-BASED ACCESS (New Model)
+    # =========================================================================
+
+    def can_run_workflow(self, device_id: str) -> tuple[bool, str]:
+        """Check if user can run a workflow.
+
+        Returns:
+            Tuple of (allowed, reason)
+        """
+        user = self.get_or_create_user(device_id)
+
+        # Admins have unlimited access
+        if user.is_admin:
+            return True, "admin"
+
+        # Early Access tier has unlimited prompts
+        if user.tier == SubscriptionTier.EARLY_ACCESS:
+            return True, "early_access"
+
+        # Check prompt balance
+        if user.prompts_remaining > 0:
+            return True, f"{user.prompts_remaining} prompts remaining"
+
+        return False, "no_prompts"
+
+    def use_prompt(self, device_id: str, workflow_id: str | None = None) -> tuple[bool, int]:
+        """Use one prompt for a workflow. Returns (success, remaining).
+
+        Admins and Early Access don't consume prompts.
+        """
+        user = self.get_or_create_user(device_id)
+
+        # Admins don't consume prompts
+        if user.is_admin:
+            user.prompts_used_total += 1
+            self._save_user(user)
+            return True, -1  # -1 indicates unlimited
+
+        # Early Access doesn't consume prompts
+        if user.tier == SubscriptionTier.EARLY_ACCESS:
+            user.prompts_used_total += 1
+            self._save_user(user)
+            return True, -1
+
+        # Check and deduct prompt
+        if user.prompts_remaining <= 0:
+            return False, 0
+
+        user.prompts_remaining -= 1
+        user.prompts_used_total += 1
+        self._save_user(user)
+        self._log_transaction(device_id, -1, "workflow_prompt", workflow_id)
+
+        return True, user.prompts_remaining
+
+    def add_prompts(self, device_id: str, amount: int, reason: str = "purchase") -> int:
+        """Add prompts to user's balance. Returns new balance."""
+        user = self.get_or_create_user(device_id)
+        user.prompts_remaining += amount
+        self._save_user(user)
+        self._log_transaction(device_id, amount, f"prompts_{reason}")
+        return user.prompts_remaining
+
+    def get_prompts_remaining(self, device_id: str) -> int:
+        """Get user's remaining prompts. Returns -1 for unlimited (admin/early_access)."""
+        user = self.get_or_create_user(device_id)
+        if user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS:
+            return -1
+        return user.prompts_remaining
+
+    # =========================================================================
+    # CUSTOM AGENT PROMPTS
+    # =========================================================================
+
+    def set_agent_custom_prompt(self, device_id: str, agent_id: str, custom_text: str) -> None:
+        """Set custom system prompt addition for an agent.
+
+        Args:
+            device_id: User's device fingerprint
+            agent_id: Agent ID (planner, executor, verifier, reviewer, ux)
+            custom_text: Custom text to append to agent's system prompt
+        """
+        user = self.get_or_create_user(device_id)
+        if not user.agent_custom_prompts:
+            user.agent_custom_prompts = {}
+        user.agent_custom_prompts[agent_id] = custom_text
+        self._save_user(user)
+
+    def get_agent_custom_prompt(self, device_id: str, agent_id: str) -> str | None:
+        """Get custom system prompt addition for an agent."""
+        user = self.get_user(device_id)
+        if not user or not user.agent_custom_prompts:
+            return None
+        return user.agent_custom_prompts.get(agent_id)
+
+    def get_all_agent_custom_prompts(self, device_id: str) -> dict[str, str]:
+        """Get all custom agent prompts for a user."""
+        user = self.get_user(device_id)
+        if not user or not user.agent_custom_prompts:
+            return {}
+        return user.agent_custom_prompts
+
+    def clear_agent_custom_prompt(self, device_id: str, agent_id: str) -> None:
+        """Remove custom prompt for an agent."""
+        user = self.get_or_create_user(device_id)
+        if user.agent_custom_prompts and agent_id in user.agent_custom_prompts:
+            del user.agent_custom_prompts[agent_id]
+            self._save_user(user)
+
+    # =========================================================================
+    # ADMIN MANAGEMENT
+    # =========================================================================
+
+    def set_admin(self, device_id: str, is_admin: bool = True) -> UserProfile:
+        """Set admin status for a user."""
+        user = self.get_or_create_user(device_id)
+        user.is_admin = is_admin
+        self._save_user(user)
+        return user
+
+    def is_admin(self, device_id: str) -> bool:
+        """Check if user is an admin."""
+        user = self.get_user(device_id)
+        return user.is_admin if user else False
+
+    def is_beta_operator(self, device_id: str) -> bool:
+        """Check if user is a Beta Operator (paid tier with premium features)."""
+        user = self.get_user(device_id)
+        if not user:
+            return False
+        # Admins and higher tiers also have beta operator privileges
+        if user.is_admin:
+            return True
+        return user.tier in (SubscriptionTier.BETA_OPERATOR, SubscriptionTier.EARLY_ACCESS, SubscriptionTier.PRO)
+
+    def upgrade_to_beta_operator(self, device_id: str, stripe_customer_id: str | None = None) -> UserProfile:
+        """Upgrade user to Beta Operator tier with 10 workflows."""
+        user = self.get_or_create_user(device_id)
+        user.tier = SubscriptionTier.BETA_OPERATOR
+        user.prompts_remaining += 10  # Add 10 workflows
+        if stripe_customer_id:
+            user.stripe_customer_id = stripe_customer_id
+        self._save_user(user)
+        self._log_transaction(device_id, 10, "beta_operator_upgrade")
+        return user

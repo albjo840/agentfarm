@@ -1408,7 +1408,19 @@ section {
    MONETIZATION UI COMPONENTS
    ============================================================================= */
 
-/* Credits display in header */
+/* Prompts display in header (was credits-display) */
+.prompts-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.prompts-display .value {
+    color: var(--green);
+    font-weight: bold;
+}
+
+/* Legacy credits display - keep for backwards compat */
 .credits-display {
     display: flex;
     align-items: center;
@@ -1461,6 +1473,135 @@ section {
 .upgrade-btn:hover {
     background: rgba(255, 0, 255, 0.15);
     box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+}
+
+/* Tryout Button */
+.tryout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: tryout-glow 2s ease-in-out infinite;
+}
+
+@keyframes tryout-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+    50% { box-shadow: 0 0 25px rgba(255, 0, 255, 0.7), 0 0 35px rgba(0, 255, 255, 0.5); }
+}
+
+.tryout-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.5);
+}
+
+.tryout-btn.registered {
+    background: var(--green);
+    animation: none;
+}
+
+.tryout-icon {
+    font-size: 0.9rem;
+}
+
+/* Beta Operator Button */
+.beta-operator-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #ff8800, #ff00ff);
+    border: 2px solid #ff8800;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: beta-glow 2s ease-in-out infinite;
+}
+
+@keyframes beta-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 136, 0, 0.5); }
+    50% { box-shadow: 0 0 25px rgba(255, 0, 255, 0.7), 0 0 35px rgba(255, 136, 0, 0.5); }
+}
+
+.beta-operator-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 136, 0, 0.7), 0 0 40px rgba(255, 0, 255, 0.5);
+}
+
+.beta-operator-btn.active {
+    background: linear-gradient(135deg, var(--green), #00b8b0);
+    border-color: var(--green);
+    animation: none;
+}
+
+.beta-operator-icon {
+    font-size: 0.9rem;
+}
+
+/* Locked buttons */
+.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.locked::after {
+    content: '🔒';
+    margin-left: 0.3rem;
+    font-size: 0.7rem;
+}
+
+/* Beta Operator Overlay (for locked sections) */
+.beta-operator-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 20, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 10;
+    border-radius: inherit;
+}
+
+.beta-operator-overlay .overlay-text {
+    color: var(--orange);
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+}
+
+.beta-upgrade-btn {
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, #ff8800, #ff00ff);
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.beta-upgrade-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 136, 0, 0.7);
 }
 
 .feedback-btn:hover {
@@ -1601,6 +1742,49 @@ section {
 .tier-card.tier-early-access {
     border-color: var(--magenta);
     box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+/* Prompt pack purchase card */
+.purchase-section {
+    display: flex;
+    justify-content: center;
+}
+
+.purchase-info {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(0, 255, 136, 0.05);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+.purchase-info .admin-note {
+    color: var(--cyan);
+    margin-top: 0.5rem;
+    font-weight: bold;
+}
+
+/* Tier badge styling */
+.tier-badge.admin {
+    background: var(--cyan);
+    color: var(--bg-dark);
+}
+
+.tier-badge.early_access {
+    background: var(--magenta);
+    color: var(--bg-dark);
+}
+
+.tier-badge.tryout {
+    background: var(--green);
+    color: var(--bg-dark);
+}
+
+.checkout-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .tier-badge-hot {
@@ -1830,4 +2014,818 @@ section {
     50% {
         box-shadow: 0 0 15px currentColor;
     }
+}
+
+/* =============================================================================
+   EXPANDABLE MESSAGES
+   ============================================================================= */
+
+.message.expandable .message-content {
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+}
+
+.message.expandable:not(.expanded) .message-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(transparent, var(--bg-panel));
+    pointer-events: none;
+}
+
+.message.expanded .message-content {
+    max-height: none;
+    overflow: visible;
+}
+
+.message.expanded .message-content::after {
+    display: none;
+}
+
+.msg-expand-btn {
+    display: block;
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    margin-top: 0.5rem;
+    background: rgba(0, 255, 242, 0.1);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.msg-expand-btn:hover {
+    background: rgba(0, 255, 242, 0.2);
+    box-shadow: 0 0 10px var(--cyan);
+}
+
+/* Message Actions (Copy button) */
+.message-actions {
+    display: flex;
+    gap: 0.3rem;
+    margin-left: auto;
+}
+
+.msg-copy-btn {
+    padding: 0.2rem 0.4rem;
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.msg-copy-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.msg-copy-btn.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.1);
+}
+
+.copy-icon {
+    font-size: 0.75rem;
+}
+
+/* Update message header to accommodate actions */
+.message-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.message-time {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-right: auto;
+}
+
+/* =============================================================================
+   AGENT STATUS INDICATORS
+   ============================================================================= */
+
+.agent-status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.agent-status-indicator.idle {
+    background: var(--text-dim);
+    box-shadow: none;
+}
+
+.agent-status-indicator.working {
+    background: var(--yellow);
+    box-shadow: 0 0 10px var(--yellow);
+    animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.agent-status-indicator.speaking {
+    background: var(--cyan);
+    box-shadow: 0 0 15px var(--cyan);
+    animation: status-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* Agent status row in status bar */
+.agent-status-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.agent-status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+}
+
+.agent-status-item .agent-status-label {
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+}
+
+/* =============================================================================
+   FILE UPLOAD SECTION (SecureVault)
+   ============================================================================= */
+
+.file-upload-section {
+    grid-column: 1 / 3;
+    margin-top: 0.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.file-upload-section.locked {
+    opacity: 0.7;
+}
+
+.file-upload-section.locked .file-drop-zone,
+.file-upload-section.locked .uploaded-files-list {
+    pointer-events: none;
+    filter: blur(2px);
+}
+
+.file-upload-section.locked .upgrade-prompt-overlay {
+    display: flex;
+}
+
+.file-upload-section .upgrade-prompt-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 15, 0.85);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    z-index: 10;
+}
+
+.upgrade-prompt-overlay .upgrade-text {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    color: var(--magenta);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 10px var(--magenta);
+}
+
+.upgrade-prompt-overlay .upgrade-btn-inline {
+    padding: 0.6rem 1.5rem;
+    background: var(--magenta);
+    border: none;
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upgrade-prompt-overlay .upgrade-btn-inline:hover {
+    box-shadow: 0 0 20px var(--magenta);
+}
+
+/* Tryout Prompt Overlay */
+.file-upload-section.locked .tryout-prompt-overlay {
+    display: flex;
+}
+
+.file-upload-section .tryout-prompt-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 15, 0.9);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    z-index: 10;
+}
+
+.tryout-prompt-overlay .tryout-text {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    color: var(--cyan);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 10px var(--cyan);
+}
+
+.tryout-prompt-overlay .tryout-btn-inline {
+    padding: 0.6rem 1.5rem;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.tryout-prompt-overlay .tryout-btn-inline:hover {
+    box-shadow: 0 0 20px var(--cyan), 0 0 30px var(--magenta);
+    transform: scale(1.05);
+}
+
+/* Tryout Modal */
+.tryout-modal-content {
+    max-width: 500px;
+    border-color: var(--cyan);
+    box-shadow: 0 0 50px rgba(0, 255, 255, 0.4), 0 0 80px rgba(255, 0, 255, 0.2);
+}
+
+.tryout-modal-content .modal-header {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(255, 0, 255, 0.1));
+    border-bottom-color: var(--cyan);
+}
+
+.tryout-modal-content .modal-header h3 {
+    color: #fff;
+    text-shadow: 0 0 15px var(--cyan);
+}
+
+.tryout-hero {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.tryout-intro {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.tryout-features {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    background: rgba(0, 255, 255, 0.05);
+    border-left: 3px solid var(--cyan);
+}
+
+.feature-icon {
+    font-size: 1.3rem;
+}
+
+.feature-text {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.tryout-start-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.tryout-start-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.6), 0 0 50px rgba(255, 0, 255, 0.4);
+}
+
+.tryout-disclaimer {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* Beta Operator Modal */
+.beta-operator-modal-content {
+    max-width: 500px;
+    border-color: var(--orange);
+    box-shadow: 0 0 50px rgba(255, 136, 0, 0.4), 0 0 80px rgba(255, 0, 255, 0.2);
+}
+
+.beta-operator-modal-content .modal-header {
+    background: linear-gradient(135deg, rgba(255, 136, 0, 0.2), rgba(255, 0, 255, 0.1));
+    border-bottom-color: var(--orange);
+}
+
+.beta-operator-modal-content .modal-header h3 {
+    color: #fff;
+    text-shadow: 0 0 15px var(--orange);
+}
+
+.beta-hero {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.beta-intro {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.beta-price {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.price-amount {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--orange);
+    text-shadow: 0 0 20px rgba(255, 136, 0, 0.5);
+}
+
+.price-period {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.beta-features {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+}
+
+.beta-features .feature-item {
+    border-left-color: var(--orange);
+    background: rgba(255, 136, 0, 0.05);
+}
+
+.beta-features .feature-item.included {
+    border-left-color: var(--green);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.beta-checkout-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--orange), var(--magenta));
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.beta-checkout-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 30px rgba(255, 136, 0, 0.6), 0 0 50px rgba(255, 0, 255, 0.4);
+}
+
+.beta-disclaimer {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* Tier Badge for Beta Operator */
+.tier-badge.beta-operator {
+    background: linear-gradient(135deg, var(--orange), var(--magenta));
+    color: #000;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+}
+
+.file-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    margin: 1rem;
+    padding: 1.5rem;
+    border: 2px dashed var(--cyan);
+    background: rgba(0, 255, 242, 0.03);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.file-drop-zone:hover {
+    background: rgba(0, 255, 242, 0.08);
+    border-color: var(--cyan);
+}
+
+.file-drop-zone.drag-active {
+    background: rgba(0, 255, 242, 0.15);
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px var(--cyan), inset 0 0 20px rgba(0, 255, 242, 0.1);
+}
+
+.drop-zone-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--cyan);
+    text-shadow: 0 0 10px var(--cyan);
+}
+
+.drop-zone-text {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+}
+
+.file-drop-zone.drag-active .drop-zone-text {
+    color: var(--cyan);
+}
+
+.drop-zone-hint {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 0.5rem;
+}
+
+/* Uploaded files list */
+.uploaded-files-list {
+    padding: 0 1rem 1rem;
+}
+
+.vault-empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    padding: 1rem;
+}
+
+.vault-file-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.vault-file-item:hover {
+    border-color: var(--cyan);
+    background: rgba(0, 255, 242, 0.05);
+}
+
+.vault-file-icon {
+    font-size: 1rem;
+    width: 24px;
+    text-align: center;
+}
+
+.vault-file-name {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vault-file-size {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    min-width: 60px;
+    text-align: right;
+}
+
+.vault-file-delete {
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vault-file-delete:hover {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255, 0, 68, 0.1);
+}
+
+/* Mobile responsive for file upload */
+@media (max-width: 768px) {
+    .file-upload-section {
+        grid-column: 1;
+    }
+
+    .file-drop-zone {
+        min-height: 80px;
+        padding: 1rem;
+    }
+
+    .drop-zone-icon {
+        font-size: 1.5rem;
+    }
+}
+
+/* =============================================================================
+   DOWNLOAD ZIP BUTTON
+   ============================================================================= */
+
+.download-container {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.download-container.hidden {
+    display: none;
+}
+
+.download-zip-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(180deg, var(--green) 0%, #00aa44 100%);
+    border: 2px solid var(--green);
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+
+.download-zip-btn:hover {
+    background: linear-gradient(180deg, #00ff88 0%, var(--green) 100%);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
+    transform: translateY(-2px);
+}
+
+.download-zip-btn:active {
+    transform: translateY(0);
+}
+
+.download-zip-btn .download-icon {
+    font-size: 1.2rem;
+}
+
+/* Pulse animation when download available */
+@keyframes download-pulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.3); }
+    50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.6); }
+}
+
+.download-container:not(.hidden) .download-zip-btn {
+    animation: download-pulse 2s ease-in-out infinite;
+}
+
+.download-container:not(.hidden) .download-zip-btn:hover {
+    animation: none;
+}
+
+/* =============================================================================
+   AGENT PROMPTS MODAL & BUTTON
+   ============================================================================= */
+
+.agent-prompts-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--magenta);
+    color: var(--magenta);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.agent-prompts-btn:hover {
+    background: rgba(255, 0, 255, 0.1);
+    box-shadow: 0 0 10px var(--magenta);
+}
+
+.agent-prompts-btn .agent-prompts-icon {
+    font-size: 1rem;
+}
+
+/* Agent Prompts Modal */
+.agent-prompts-modal-content {
+    max-width: 600px;
+}
+
+.agent-prompts-info {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.agent-prompts-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.agent-tab {
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-dim);
+    color: var(--text-dim);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.agent-tab:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.agent-tab.active {
+    background: rgba(0, 255, 242, 0.15);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 242, 0.3);
+}
+
+.agent-prompt-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.agent-prompt-hint {
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.5);
+    border-left: 3px solid var(--cyan);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.agent-prompt-hint strong {
+    color: var(--cyan);
+}
+
+#agent-prompt-text {
+    width: 100%;
+    min-height: 150px;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--border-dim);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    resize: vertical;
+}
+
+#agent-prompt-text:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 242, 0.2);
+}
+
+#agent-prompt-text::placeholder {
+    color: var(--text-dim);
+}
+
+.agent-prompt-chars {
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.clear-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-dim);
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255, 0, 68, 0.1);
+}
+
+/* File upload section improvements */
+.section-subtitle {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: normal;
+}
+
+.file-upload-info {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+}
+
+.file-upload-info p {
+    margin: 0;
+}
+
+.drop-zone-formats {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+}
+
+/* Tier-gated button styling */
+.tier-gated-btn.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tier-gated-btn.locked:hover {
+    box-shadow: none;
 }

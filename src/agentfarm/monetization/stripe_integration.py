@@ -20,12 +20,16 @@ class StripeConfig(BaseModel):
 
     secret_key: str = Field(..., description="Stripe secret key (sk_...)")
     webhook_secret: str = Field(..., description="Webhook signing secret (whsec_...)")
-    early_access_price_id: str = Field(..., description="Price ID for Early Access subscription")
+    early_access_price_id: str = Field(default="", description="Price ID for Early Access subscription (optional)")
+    prompt_pack_price_id: str = Field(default="", description="Price ID for 10-prompt pack")
+    prompt_pack_amount: int = Field(default=10, description="Prompts per pack")
+    beta_operator_price_id: str = Field(default="", description="Price ID for Beta Operator (10 workflows + premium features)")
+    beta_operator_prompts: int = Field(default=10, description="Workflows included with Beta Operator")
     token_pack_price_ids: dict[str, str] = Field(
         default_factory=lambda: {
-            "small": "",  # 500 tokens
-            "medium": "",  # 2000 tokens
-            "large": "",  # 5000 tokens
+            "small": "",  # Legacy
+            "medium": "",
+            "large": "",
         }
     )
     success_url: str = Field(default="http://localhost:8080/?payment=success")
@@ -72,6 +76,10 @@ class StripeIntegration:
                 secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
                 webhook_secret=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
                 early_access_price_id=os.getenv("STRIPE_EARLY_ACCESS_PRICE_ID", ""),
+                prompt_pack_price_id=os.getenv("STRIPE_PROMPT_PACK_PRICE_ID", ""),
+                prompt_pack_amount=int(os.getenv("STRIPE_PROMPT_PACK_AMOUNT", "10")),
+                beta_operator_price_id=os.getenv("STRIPE_BETA_OPERATOR_PRICE_ID", ""),
+                beta_operator_prompts=int(os.getenv("STRIPE_BETA_OPERATOR_PROMPTS", "10")),
                 success_url=os.getenv("STRIPE_SUCCESS_URL", "http://localhost:8080/?payment=success"),
                 cancel_url=os.getenv("STRIPE_CANCEL_URL", "http://localhost:8080/?payment=cancelled"),
             )
@@ -196,7 +204,23 @@ class StripeIntegration:
                 "stripe_customer_id": customer_id,
             }
         elif mode == "payment":
-            # One-time token pack purchase
+            # Check if it's a Beta Operator purchase
+            if product_type == "beta_operator":
+                return {
+                    "action": "upgrade_beta_operator",
+                    "device_id": device_id,
+                    "prompts": self.config.beta_operator_prompts,
+                    "stripe_customer_id": customer_id,
+                }
+            # Check if it's a prompt pack purchase
+            if product_type == "prompt_pack":
+                return {
+                    "action": "add_prompts",
+                    "device_id": device_id,
+                    "prompts": self.config.prompt_pack_amount,
+                    "product_type": product_type,
+                }
+            # Legacy: token pack purchase
             tokens = self._get_token_pack_amount(product_type)
             return {
                 "action": "add_tokens",
@@ -273,15 +297,12 @@ class StripeIntegration:
         }
         return token_packs.get(product_type, 0)
 
-    def create_checkout_url(self, device_id: str, product_type: str = "early_access") -> str:
+    def create_checkout_url(self, device_id: str, product_type: str = "prompt_pack") -> str:
         """Generate Stripe checkout URL.
-
-        Note: This is a simplified version. For production, use the Stripe SDK
-        or make actual API calls to create checkout sessions.
 
         Args:
             device_id: User's device fingerprint
-            product_type: "early_access" or "token_pack_small/medium/large"
+            product_type: "prompt_pack" (default) or "early_access"
 
         Returns:
             Checkout URL (or placeholder if not configured)
@@ -290,10 +311,17 @@ class StripeIntegration:
             return f"{self.config.cancel_url}&error=stripe_not_configured"
 
         # Determine price ID
-        if product_type == "early_access":
+        if product_type == "beta_operator":
+            price_id = self.config.beta_operator_price_id
+            mode = "payment"
+        elif product_type == "prompt_pack":
+            price_id = self.config.prompt_pack_price_id
+            mode = "payment"
+        elif product_type == "early_access":
             price_id = self.config.early_access_price_id
             mode = "subscription"
         else:
+            # Legacy token packs
             price_id = self.config.token_pack_price_ids.get(
                 product_type.replace("token_pack_", ""), ""
             )
@@ -302,37 +330,15 @@ class StripeIntegration:
         if not price_id:
             return f"{self.config.cancel_url}&error=invalid_product"
 
-        # In production, you would make an API call to create a checkout session
-        # For now, return a placeholder that indicates what would be created
-        # The actual implementation would use httpx to call Stripe API:
-        #
-        # async with httpx.AsyncClient() as client:
-        #     response = await client.post(
-        #         f"{self.STRIPE_API_BASE}/checkout/sessions",
-        #         auth=(self.config.secret_key, ""),
-        #         data={
-        #             "mode": mode,
-        #             "line_items[0][price]": price_id,
-        #             "line_items[0][quantity]": 1,
-        #             "success_url": self.config.success_url,
-        #             "cancel_url": self.config.cancel_url,
-        #             "client_reference_id": device_id,
-        #             "metadata[device_id]": device_id,
-        #             "metadata[product_type]": product_type,
-        #         },
-        #     )
-        #     session = response.json()
-        #     return session["url"]
-
         logger.info(f"Would create checkout session: device={device_id}, product={product_type}")
         return f"https://checkout.stripe.com/placeholder?device_id={device_id}&product={product_type}"
 
-    async def create_checkout_session(self, device_id: str, product_type: str = "early_access") -> CheckoutSession | None:
+    async def create_checkout_session(self, device_id: str, product_type: str = "prompt_pack") -> CheckoutSession | None:
         """Create a Stripe checkout session via API.
 
         Args:
             device_id: User's device fingerprint
-            product_type: Product to purchase
+            product_type: "prompt_pack" (default) or "early_access"
 
         Returns:
             CheckoutSession with URL, or None if failed
@@ -345,10 +351,17 @@ class StripeIntegration:
             import httpx
 
             # Determine price ID and mode
-            if product_type == "early_access":
+            if product_type == "beta_operator":
+                price_id = self.config.beta_operator_price_id
+                mode = "payment"
+            elif product_type == "prompt_pack":
+                price_id = self.config.prompt_pack_price_id
+                mode = "payment"
+            elif product_type == "early_access":
                 price_id = self.config.early_access_price_id
                 mode = "subscription"
             else:
+                # Legacy token packs
                 pack_size = product_type.replace("token_pack_", "")
                 price_id = self.config.token_pack_price_ids.get(pack_size, "")
                 mode = "payment"

@@ -38,6 +38,20 @@ let currentProjectPath = null;
 // Streaming message tracking
 let streamingMessages = {}; // request_id -> {agent, content, messageId}
 
+// Message expansion settings
+const MESSAGE_TRUNCATE_LENGTH = 200;
+let expandedMessages = new Set(); // Track expanded message IDs
+
+// Agent status tracking
+let agentStates = {
+    orchestrator: 'idle',
+    planner: 'idle',
+    executor: 'idle',
+    verifier: 'idle',
+    reviewer: 'idle',
+    ux: 'idle'
+};
+
 // DOM Elements
 const messagesContainer = document.getElementById('messages');
 const taskInput = document.getElementById('task-input');
@@ -45,10 +59,17 @@ const executeBtn = document.getElementById('execute-btn');
 
 // Initialize
 function init() {
+    console.log('App init() called');
+    console.log('window.RobotVisualizer:', window.RobotVisualizer);
+
     // Initialize robot visualizer
     if (window.RobotVisualizer) {
+        console.log('Creating RobotVisualizer...');
         robotVisualizer = new RobotVisualizer('robot-arena');
         robotVisualizer.init();
+        console.log('RobotVisualizer initialized');
+    } else {
+        console.warn('RobotVisualizer not found - robots will not be displayed');
     }
 
     setupEventListeners();
@@ -173,6 +194,8 @@ function handleServerMessage(data) {
             executeBtn.disabled = false;
             executeBtn.querySelector('span').textContent = 'EXECUTE';
             setActiveAgent('orchestrator');
+            // Reset all agent states to idle
+            Object.keys(agentStates).forEach(id => setAgentState(id, 'idle'));
             // Stop idle behavior when workflow ends
             if (robotVisualizer) {
                 robotVisualizer.stopIdleBehavior();
@@ -198,6 +221,29 @@ function handleServerMessage(data) {
                 addMessage('orchestrator', `Summary: ${data.summary.substring(0, 300)}...`);
             }
             addMessage('orchestrator', `Total tokens used: ${data.tokens?.toLocaleString() || '0'}`);
+            break;
+
+        case 'workflow_error':
+            // Detailed error with traceback
+            isRunning = false;
+            executeBtn.disabled = false;
+            executeBtn.querySelector('span').textContent = 'EXECUTE';
+            setActiveAgent('orchestrator');
+            // Reset all agent states to idle
+            Object.keys(agentStates).forEach(id => setAgentState(id, 'idle'));
+            // Stop idle behavior when workflow ends
+            if (robotVisualizer) {
+                robotVisualizer.stopIdleBehavior();
+                AGENTS.forEach(agent => {
+                    robotVisualizer.returnHome(agent.id);
+                    robotVisualizer.setWorking(agent.id, false);
+                });
+            }
+            // Show full error message with traceback (expandable)
+            const errorMsg = data.error || 'Unknown error';
+            const traceback = data.traceback || '';
+            const fullError = traceback ? `${errorMsg}\n\n--- TRACEBACK ---\n${traceback}` : errorMsg;
+            addMessage('orchestrator', `✗ WORKFLOW ERROR:\n${fullError}`);
             break;
 
         case 'pong':
@@ -333,6 +379,18 @@ function addMessage(agentId, content) {
     };
 
     messages.push(message);
+
+    // Set agent to 'speaking' state briefly when they send a message
+    if (agentStates[agentId] !== undefined) {
+        setAgentState(agentId, 'speaking');
+        // Return to working/idle after speaking animation
+        setTimeout(() => {
+            if (agentStates[agentId] === 'speaking') {
+                setAgentState(agentId, activeAgent === agentId ? 'working' : 'idle');
+            }
+        }, 2000);
+    }
+
     renderMessages();
 }
 
@@ -406,16 +464,38 @@ function renderMessages() {
         const name = msg.agent.name || msg.agent.id.toUpperCase();
         const streamingCursor = msg.streaming ? '<span class="streaming-cursor">▌</span>' : '';
         const streamingClass = msg.streaming ? ' streaming' : '';
+
+        // Check if message needs truncation
+        const content = msg.content || '';
+        const isExpanded = expandedMessages.has(msg.id);
+        const needsTruncation = content.length > MESSAGE_TRUNCATE_LENGTH && !msg.streaming;
+        const displayContent = needsTruncation && !isExpanded
+            ? content.substring(0, MESSAGE_TRUNCATE_LENGTH) + '...'
+            : content;
+
+        const expandableClass = needsTruncation ? ' expandable' : '';
+        const expandedClass = isExpanded ? ' expanded' : '';
+
         return `
-            <div class="message ${msg.agent.id}${streamingClass}">
+            <div class="message ${msg.agent.id}${streamingClass}${expandableClass}${expandedClass}" data-msg-id="${msg.id}">
                 <div class="message-header">
                     <span class="message-agent" style="color: ${color};">
                         ${name}
                     </span>
                     <span class="message-time">${msg.time}</span>
                     ${msg.streaming ? '<span class="streaming-badge">STREAMING</span>' : ''}
+                    <div class="message-actions">
+                        <button class="msg-copy-btn" onclick="copyMessageToClipboard(${msg.id})" title="Kopiera">
+                            <span class="copy-icon">⎘</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="message-content">${escapeHtml(msg.content)}${streamingCursor}</div>
+                <div class="message-content">${escapeHtml(displayContent)}${streamingCursor}</div>
+                ${needsTruncation ? `
+                    <button class="msg-expand-btn" onclick="toggleMessageExpand(${msg.id})">
+                        ${isExpanded ? '▲ COLLAPSE' : '▼ EXPAND'}
+                    </button>
+                ` : ''}
             </div>
         `;
     }).join('');
@@ -424,9 +504,52 @@ function renderMessages() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+// Toggle message expansion
+function toggleMessageExpand(msgId) {
+    if (expandedMessages.has(msgId)) {
+        expandedMessages.delete(msgId);
+    } else {
+        expandedMessages.add(msgId);
+    }
+    renderMessages();
+}
+
+// Copy message content to clipboard
+async function copyMessageToClipboard(msgId) {
+    const msg = messages.find(m => m.id === msgId);
+    if (!msg) return;
+
+    try {
+        await navigator.clipboard.writeText(msg.content);
+        // Show feedback
+        const btn = document.querySelector(`[data-msg-id="${msgId}"] .msg-copy-btn`);
+        if (btn) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="copy-icon">✓</span>';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('copied');
+            }, 1500);
+        }
+    } catch (err) {
+        console.error('Failed to copy:', err);
+    }
+}
+
 // Set active agent
 function setActiveAgent(agentId) {
     activeAgent = agentId;
+
+    // Update agent states - set new agent to working, others to idle
+    Object.keys(agentStates).forEach(id => {
+        if (id === agentId) {
+            setAgentState(id, 'working');
+        } else if (agentStates[id] === 'working') {
+            setAgentState(id, 'idle');
+        }
+    });
+
     if (robotVisualizer) {
         robotVisualizer.setActive(agentId);
         // Animate data transfer from orchestrator to active agent
@@ -434,6 +557,23 @@ function setActiveAgent(agentId) {
             robotVisualizer.animateDataTransfer('orchestrator', agentId);
         }
     }
+}
+
+// Set agent state (idle, working, speaking)
+function setAgentState(agentId, state) {
+    agentStates[agentId] = state;
+    updateAgentStatusIndicators();
+}
+
+// Update agent status indicators in UI
+function updateAgentStatusIndicators() {
+    Object.keys(agentStates).forEach(agentId => {
+        const indicator = document.querySelector(`.agent-status-indicator[data-agent="${agentId}"]`);
+        if (indicator) {
+            indicator.classList.remove('idle', 'working', 'speaking');
+            indicator.classList.add(agentStates[agentId]);
+        }
+    });
 }
 
 // Update workflow stage
@@ -465,8 +605,33 @@ function setStageStatus(stageId, status) {
 
 // Execute task via WebSocket (multi-provider mode)
 function executeTask(task) {
-    if (isRunning || !ws || ws.readyState !== WebSocket.OPEN) {
-        addMessage('orchestrator', 'Cannot execute: system busy or not connected.');
+    console.log('executeTask called with:', task);
+    console.log('isRunning:', isRunning, 'ws:', ws?.readyState);
+    console.log('currentUserData:', currentUserData);
+
+    if (isRunning) {
+        addMessage('orchestrator', 'System är upptaget. Vänta tills pågående workflow är klart.');
+        return;
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addMessage('orchestrator', 'Inte ansluten till servern. Ladda om sidan.');
+        return;
+    }
+
+    // Check if user has access (tryout, prompts, or admin)
+    const hasAccess = currentUserData?.is_admin ||
+                      currentUserData?.is_tryout ||
+                      currentUserData?.prompts_remaining > 0 ||
+                      currentUserData?.tier === 'early_access';
+
+    console.log('hasAccess:', hasAccess);
+
+    if (!hasAccess) {
+        // Show tryout modal
+        console.log('No access - opening tryout modal');
+        openModal('tryout-modal');
+        addMessage('orchestrator', '🔒 Du behöver starta en tryout för att köra workflows. Klicka på TRYOUT-knappen!');
         return;
     }
 
@@ -586,12 +751,75 @@ function showLaunchButton(projectPath) {
         pathEl.textContent = projectPath;
         container.classList.remove('hidden');
     }
+
+    // Also show download button
+    showDownloadButton(projectPath);
 }
 
 function hideLaunchButton() {
     const container = document.getElementById('launch-container');
     if (container) {
         container.classList.add('hidden');
+    }
+    hideDownloadButton();
+}
+
+function showDownloadButton(projectPath) {
+    let downloadContainer = document.getElementById('download-container');
+
+    // Create download container if it doesn't exist
+    if (!downloadContainer) {
+        downloadContainer = document.createElement('div');
+        downloadContainer.id = 'download-container';
+        downloadContainer.className = 'download-container';
+        downloadContainer.innerHTML = `
+            <button class="download-zip-btn" onclick="downloadProjectZip()">
+                <span class="download-icon">📦</span>
+                <span>DOWNLOAD ZIP</span>
+            </button>
+        `;
+        // Insert after launch container or in message flow
+        const launchContainer = document.getElementById('launch-container');
+        if (launchContainer && launchContainer.parentNode) {
+            launchContainer.parentNode.insertBefore(downloadContainer, launchContainer.nextSibling);
+        }
+    }
+
+    downloadContainer.classList.remove('hidden');
+    downloadContainer.dataset.path = projectPath;
+}
+
+function hideDownloadButton() {
+    const downloadContainer = document.getElementById('download-container');
+    if (downloadContainer) {
+        downloadContainer.classList.add('hidden');
+    }
+}
+
+async function downloadProjectZip() {
+    if (!currentProjectPath) {
+        addMessage('orchestrator', '✗ No project path available');
+        return;
+    }
+
+    addMessage('orchestrator', '📦 Förbereder ZIP-nedladdning...');
+
+    try {
+        // Create download link
+        const downloadUrl = `/api/projects/download-zip?path=${encodeURIComponent(currentProjectPath)}`;
+
+        // Create temporary link and click it
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '';  // Let server set filename
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        addMessage('orchestrator', '✓ ZIP-nedladdning startad');
+    } catch (err) {
+        console.error('Download error:', err);
+        addMessage('orchestrator', `✗ Nedladdning misslyckades: ${err.message}`);
     }
 }
 
@@ -778,6 +1006,14 @@ function escapeAttr(str) {
 
 // QR Code Modal functions
 async function generateNewVPNQR() {
+    // Check if user has access first
+    if (!currentUserData?.is_admin && !currentUserData?.is_tryout && !currentUserData?.prompts_remaining) {
+        // Show tryout modal instead
+        openModal('tryout-modal');
+        addMessage('orchestrator', '🔒 VPN-access kräver att du startar en tryout först.');
+        return;
+    }
+
     const qrModal = document.getElementById('qr-modal');
     const qrCode = document.getElementById('qr-code');
     const qrInfo = document.getElementById('qr-info');
@@ -799,6 +1035,11 @@ async function generateNewVPNQR() {
             qrCode.textContent = result.qr_text;
             qrInfo.innerHTML = `IP: <strong>${result.ip}</strong><br>Skanna QR-koden med WireGuard-appen`;
             addMessage('orchestrator', `🔐 Ny VPN-peer skapad: ${result.ip}`);
+        } else if (result.require_tryout) {
+            // Close QR modal and open tryout modal
+            qrModal.classList.add('hidden');
+            openModal('tryout-modal');
+            addMessage('orchestrator', '🔒 VPN-access kräver att du startar en tryout först.');
         } else {
             qrCode.textContent = '❌ Fel';
             qrInfo.textContent = result.error || 'Kunde inte generera QR-kod';
@@ -964,6 +1205,7 @@ function trackTokensFromEvent(data) {
 document.addEventListener('DOMContentLoaded', () => {
     init();
     musicController.init();
+    initFileUpload();
 
     // Wire up launch button
     const launchBtn = document.getElementById('launch-btn');
@@ -1034,16 +1276,42 @@ async function initMonetization() {
     // Load user data
     await loadUserData();
 
-    // Wire up upgrade button
-    const upgradeBtn = document.getElementById('upgrade-btn');
-    if (upgradeBtn) {
-        upgradeBtn.addEventListener('click', () => openModal('upgrade-modal'));
+    // Wire up Beta Operator button
+    const betaOperatorBtn = document.getElementById('beta-operator-btn');
+    if (betaOperatorBtn) {
+        betaOperatorBtn.addEventListener('click', () => {
+            if (currentUserData?.is_beta_operator || currentUserData?.is_admin) {
+                // Already Beta Operator - show status
+                addMessage('orchestrator', '✓ Du är redan Beta Operator!');
+            } else {
+                // Show Beta Operator upgrade modal
+                openModal('beta-operator-modal');
+            }
+        });
     }
 
-    // Wire up feedback button
+    // Wire up Beta Operator checkout button
+    const checkoutBetaBtn = document.getElementById('checkout-beta-operator');
+    if (checkoutBetaBtn) {
+        checkoutBetaBtn.addEventListener('click', () => startCheckout('beta_operator'));
+    }
+
+    // Wire up start tryout button (for first-time users)
+    const startTryoutBtn = document.getElementById('start-tryout-btn');
+    if (startTryoutBtn) {
+        startTryoutBtn.addEventListener('click', startTryout);
+    }
+
+    // Wire up feedback button - now Beta Operator only
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
-        feedbackBtn.addEventListener('click', () => openModal('feedback-modal'));
+        feedbackBtn.addEventListener('click', () => {
+            if (currentUserData?.is_beta_operator || currentUserData?.is_admin) {
+                openModal('feedback-modal');
+            } else {
+                openModal('beta-operator-modal');
+            }
+        });
     }
 
     // Wire up modal close buttons
@@ -1063,19 +1331,17 @@ async function initMonetization() {
         });
     });
 
-    // Wire up checkout button
-    const checkoutBtn = document.getElementById('checkout-early-access');
-    if (checkoutBtn) {
-        checkoutBtn.addEventListener('click', () => startCheckout('early_access'));
-    }
-
-    // Wire up token pack buttons
-    document.querySelectorAll('.token-pack').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const pack = btn.getAttribute('data-pack');
-            startCheckout(`token_pack_${pack}`);
+    // Wire up agent prompts button - Beta Operator only
+    const agentPromptsBtn = document.getElementById('agent-prompts-btn');
+    if (agentPromptsBtn) {
+        agentPromptsBtn.addEventListener('click', () => {
+            if (currentUserData?.is_beta_operator || currentUserData?.is_admin) {
+                openModal('agent-prompts-modal');
+            } else {
+                openModal('beta-operator-modal');
+            }
         });
-    });
+    }
 
     // Wire up feedback submit
     const submitFeedbackBtn = document.getElementById('submit-feedback');
@@ -1112,42 +1378,208 @@ async function loadUserData() {
         const response = await fetch('/api/user');
         if (response.ok) {
             currentUserData = await response.json();
-            updateCreditsDisplay();
+            updatePromptsDisplay();
         }
     } catch (e) {
         console.error('Failed to load user data:', e);
     }
 }
 
-function updateCreditsDisplay() {
+async function startTryout() {
+    console.log('startTryout called');
+    const btn = document.getElementById('start-tryout-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>REGISTRERAR...</span>';
+    }
+
+    try {
+        const response = await fetch('/api/user/tryout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        console.log('Tryout response status:', response.status);
+        console.log('Tryout response headers:', response.headers.get('content-type'));
+
+        // Get raw text first to debug
+        const text = await response.text();
+        console.log('Tryout raw response:', text.substring(0, 200));
+
+        // Try to parse as JSON
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Raw response was:', text);
+            alert('Server returnerade ogiltig data. Kolla konsolen för detaljer.');
+            return;
+        }
+
+        console.log('Tryout response data:', data);
+
+        if (response.ok) {
+            currentUserData = data.user;
+            updateUserStatusDisplay();
+
+            // Close modal
+            closeModal('tryout-modal');
+
+            // Show welcome message
+            addMessage('orchestrator', '🎉 Välkommen! Du har nu 1 gratis workflow att testa. Skriv in en uppgift och klicka EXECUTE!');
+
+            // Update tryout button
+            updateTryoutButton();
+        } else {
+            alert('Kunde inte starta tryout: ' + (data.error || 'Okänt fel'));
+        }
+    } catch (e) {
+        console.error('Tryout error:', e);
+        alert('Ett fel uppstod: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>▶ STARTA TRYOUT</span>';
+        }
+    }
+}
+
+function updateBetaOperatorButton() {
+    const betaBtn = document.getElementById('beta-operator-btn');
+    if (!betaBtn) return;
+
+    if (currentUserData?.is_admin) {
+        betaBtn.innerHTML = '<span class="beta-operator-icon">★</span><span class="beta-operator-label">ADMIN</span>';
+        betaBtn.classList.add('active');
+    } else if (currentUserData?.is_beta_operator) {
+        const remaining = currentUserData.prompts_remaining || 0;
+        betaBtn.innerHTML = `<span class="beta-operator-icon">⚡</span><span class="beta-operator-label">${remaining} KVAR</span>`;
+        betaBtn.classList.add('active');
+    } else if (currentUserData?.is_tryout || currentUserData?.prompts_remaining > 0) {
+        const remaining = currentUserData.prompts_remaining || 0;
+        betaBtn.innerHTML = `<span class="beta-operator-icon">▶</span><span class="beta-operator-label">${remaining} KVAR</span>`;
+        betaBtn.classList.remove('active');
+    } else {
+        betaBtn.innerHTML = '<span class="beta-operator-icon">⚡</span><span class="beta-operator-label">BETA OPERATOR</span>';
+        betaBtn.classList.remove('active');
+    }
+}
+
+// Legacy alias
+function updateTryoutButton() {
+    updateBetaOperatorButton();
+}
+
+function updateUserStatusDisplay() {
     if (!currentUserData) return;
 
-    const creditsEl = document.getElementById('credits-balance');
+    const statusEl = document.getElementById('user-status');
     const tierBadge = document.getElementById('tier-badge');
-    const freeCurrent = document.getElementById('free-current');
-    const checkoutBtn = document.getElementById('checkout-early-access');
 
-    if (creditsEl) {
-        if (currentUserData.tier === 'early_access') {
-            creditsEl.textContent = '∞';
+    // Update status display
+    if (statusEl) {
+        if (currentUserData.is_admin) {
+            statusEl.textContent = 'ADMIN';
+        } else if (currentUserData.is_beta_operator) {
+            statusEl.textContent = 'BETA OP';
+        } else if (currentUserData.tier === 'early_access') {
+            statusEl.textContent = 'PRO';
+        } else if (currentUserData.is_tryout || currentUserData.prompts_remaining > 0) {
+            statusEl.textContent = 'TRYOUT';
         } else {
-            creditsEl.textContent = currentUserData.tokens_remaining;
+            statusEl.textContent = 'GÄST';
         }
     }
 
+    // Update tier badge
     if (tierBadge) {
-        tierBadge.textContent = currentUserData.tier.toUpperCase().replace('_', ' ');
-        tierBadge.className = 'tier-badge ' + currentUserData.tier;
-    }
-
-    // Update tier comparison in upgrade modal
-    if (currentUserData.tier === 'early_access') {
-        if (freeCurrent) freeCurrent.style.display = 'none';
-        if (checkoutBtn) {
-            checkoutBtn.textContent = 'AKTIV';
-            checkoutBtn.disabled = true;
+        if (currentUserData.is_admin) {
+            tierBadge.textContent = 'ADMIN';
+            tierBadge.className = 'tier-badge admin';
+        } else if (currentUserData.is_beta_operator) {
+            tierBadge.textContent = 'BETA OPERATOR';
+            tierBadge.className = 'tier-badge beta-operator';
+        } else if (currentUserData.tier === 'early_access') {
+            tierBadge.textContent = 'EARLY ACCESS';
+            tierBadge.className = 'tier-badge early_access';
+        } else if (currentUserData.is_tryout || currentUserData.prompts_remaining > 0) {
+            tierBadge.textContent = '';
+            tierBadge.className = 'tier-badge tryout';
+        } else {
+            tierBadge.textContent = '';
+            tierBadge.className = 'tier-badge';
         }
     }
+
+    // Update Beta Operator button
+    updateBetaOperatorButton();
+
+    // Update gated sections
+    updateGatedSections();
+}
+
+function updateGatedSections() {
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const feedbackBtn = document.getElementById('feedback-btn');
+    const agentPromptsBtn = document.getElementById('agent-prompts-btn');
+
+    // Beta Operator features require paid access
+    const isBetaOperator = currentUserData?.is_admin ||
+                          currentUserData?.is_beta_operator ||
+                          currentUserData?.tier === 'early_access';
+
+    // Basic workflow access (tryout or paid)
+    const hasWorkflowAccess = currentUserData?.is_admin ||
+                              currentUserData?.is_beta_operator ||
+                              currentUserData?.is_tryout ||
+                              currentUserData?.prompts_remaining > 0 ||
+                              currentUserData?.tier === 'early_access';
+
+    // File upload - Beta Operator only
+    if (fileUploadSection) {
+        if (isBetaOperator) {
+            fileUploadSection.classList.remove('locked');
+            const overlay = document.getElementById('file-upload-overlay');
+            if (overlay) overlay.style.display = 'none';
+        } else {
+            fileUploadSection.classList.add('locked');
+            const overlay = document.getElementById('file-upload-overlay');
+            if (overlay) overlay.style.display = 'flex';
+        }
+    }
+
+    // Feedback button - Beta Operator only
+    if (feedbackBtn) {
+        if (isBetaOperator) {
+            feedbackBtn.classList.remove('locked');
+            feedbackBtn.title = 'Skicka feedback';
+        } else {
+            feedbackBtn.classList.add('locked');
+            feedbackBtn.title = 'Beta Operator krävs';
+        }
+    }
+
+    // Agent prompts button - Beta Operator only
+    if (agentPromptsBtn) {
+        if (isBetaOperator) {
+            agentPromptsBtn.classList.remove('locked');
+            agentPromptsBtn.title = 'Anpassa agent system prompts';
+        } else {
+            agentPromptsBtn.classList.add('locked');
+            agentPromptsBtn.title = 'Beta Operator krävs';
+        }
+    }
+}
+
+// Legacy function - redirect to new one
+function updatePromptsDisplay() {
+    updateUserStatusDisplay();
+}
+
+// Alias for backwards compatibility
+function updateCreditsDisplay() {
+    updatePromptsDisplay();
 }
 
 function openModal(modalId) {
@@ -1166,7 +1598,12 @@ function closeModal(modalId) {
 
 async function startCheckout(productType) {
     try {
-        const response = await fetch('/api/subscription/checkout', {
+        // Use dedicated endpoint for Beta Operator
+        const endpoint = productType === 'beta_operator'
+            ? '/api/checkout/beta-operator'
+            : '/api/subscription/checkout';
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ product_type: productType })
@@ -1179,7 +1616,12 @@ async function startCheckout(productType) {
             }
         } else {
             const error = await response.json();
-            alert('Kunde inte starta checkout: ' + (error.error || 'Okänt fel'));
+            if (error.already_upgraded) {
+                addMessage('orchestrator', '✓ Du är redan Beta Operator!');
+                closeModal('beta-operator-modal');
+            } else {
+                alert('Kunde inte starta checkout: ' + (error.error || 'Okänt fel'));
+            }
         }
     } catch (e) {
         console.error('Checkout error:', e);
@@ -1281,12 +1723,207 @@ async function saveCompanyContext() {
     }
 }
 
+// =============================================================================
+// FILE UPLOAD (SecureVault)
+// =============================================================================
+
+const ALLOWED_FILE_TYPES = ['.txt', '.md', '.py', '.js', '.json', '.yaml', '.yml', '.csv', '.pdf'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+let uploadedVaultFiles = [];
+
+function initFileUpload() {
+    const dropZone = document.getElementById('file-drop-zone');
+    const fileInput = document.getElementById('file-input-hidden');
+    const uploadSection = document.getElementById('file-upload-section');
+
+    if (!dropZone || !fileInput) return;
+
+    // Click to open file picker
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            uploadFiles(e.target.files);
+        }
+    });
+
+    // Drag and drop handlers
+    dropZone.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-active');
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-active');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-active');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-active');
+
+        if (e.dataTransfer.files.length > 0) {
+            uploadFiles(e.dataTransfer.files);
+        }
+    });
+
+    // Load existing vault files
+    loadVaultFiles();
+
+    // Check tier and update UI
+    checkFileUploadTier();
+}
+
+async function checkFileUploadTier() {
+    const uploadSection = document.getElementById('file-upload-section');
+    if (!uploadSection) return;
+
+    try {
+        const response = await fetch('/api/user');
+        if (response.ok) {
+            const user = await response.json();
+            const canUpload = user.tier === 'early_access';
+
+            if (canUpload) {
+                uploadSection.classList.remove('locked');
+                uploadSection.classList.add('unlocked');
+            } else {
+                uploadSection.classList.add('locked');
+                uploadSection.classList.remove('unlocked');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to check tier for file upload:', e);
+    }
+}
+
+async function uploadFiles(files) {
+    const uploadSection = document.getElementById('file-upload-section');
+
+    // Check if locked (free tier)
+    if (uploadSection && uploadSection.classList.contains('locked')) {
+        addMessage('orchestrator', '⚠️ Filuppladdning kräver Early Access. Klicka på UPGRADE för att låsa upp.');
+        return;
+    }
+
+    for (const file of files) {
+        // Validate file type
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!ALLOWED_FILE_TYPES.includes(ext)) {
+            addMessage('orchestrator', `✗ Ogiltig filtyp: ${file.name}. Tillåtna: ${ALLOWED_FILE_TYPES.join(', ')}`);
+            continue;
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            addMessage('orchestrator', `✗ Filen är för stor: ${file.name}. Max ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+            continue;
+        }
+
+        // Upload file
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/files/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                addMessage('orchestrator', `✓ Fil uppladdad: ${file.name}`);
+                loadVaultFiles(); // Refresh list
+            } else {
+                addMessage('orchestrator', `✗ Uppladdning misslyckades: ${result.error || 'Okänt fel'}`);
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            addMessage('orchestrator', `✗ Uppladdning misslyckades: ${err.message}`);
+        }
+    }
+}
+
+async function loadVaultFiles() {
+    const listContainer = document.getElementById('uploaded-files-list');
+    if (!listContainer) return;
+
+    try {
+        const response = await fetch('/api/files/vault');
+        if (response.ok) {
+            const data = await response.json();
+            uploadedVaultFiles = data.files || [];
+            renderUploadedFiles();
+        }
+    } catch (e) {
+        console.error('Failed to load vault files:', e);
+    }
+}
+
+function renderUploadedFiles() {
+    const listContainer = document.getElementById('uploaded-files-list');
+    if (!listContainer) return;
+
+    if (uploadedVaultFiles.length === 0) {
+        listContainer.innerHTML = '<div class="vault-empty">Inga filer uppladdade</div>';
+        return;
+    }
+
+    listContainer.innerHTML = uploadedVaultFiles.map(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const icon = getFileIcon(file.name);
+        const size = formatFileSize(file.size);
+
+        return `
+            <div class="vault-file-item" data-filename="${escapeAttr(file.name)}">
+                <span class="vault-file-icon">${icon}</span>
+                <span class="vault-file-name">${escapeHtml(file.name)}</span>
+                <span class="vault-file-size">${size}</span>
+                <button class="vault-file-delete" onclick="deleteVaultFile('${escapeAttr(file.name)}')" title="Ta bort">
+                    <span>✕</span>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteVaultFile(filename) {
+    try {
+        const response = await fetch(`/api/files/vault/${encodeURIComponent(filename)}`, {
+            method: 'DELETE',
+        });
+
+        if (response.ok) {
+            addMessage('orchestrator', `✓ Fil borttagen: ${filename}`);
+            loadVaultFiles();
+        } else {
+            const result = await response.json();
+            addMessage('orchestrator', `✗ Kunde inte ta bort: ${result.error || 'Okänt fel'}`);
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
+    }
+}
+
 // Check for payment result in URL
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('payment') === 'success') {
     setTimeout(() => {
-        addMessage('system', 'Betalning genomförd! Välkommen till Early Access.', 'success');
-        loadUserData(); // Refresh user data
+        addMessage('system', '✓ Betalning genomförd! Dina prompts har lagts till.', 'success');
+        loadUserData(); // Refresh user data to show new prompts
     }, 1000);
     // Clear URL params
     window.history.replaceState({}, document.title, window.location.pathname);
@@ -1296,3 +1933,165 @@ if (urlParams.get('payment') === 'success') {
     }, 1000);
     window.history.replaceState({}, document.title, window.location.pathname);
 }
+
+// =============================================================================
+// AGENT CUSTOM PROMPTS
+// =============================================================================
+
+const AGENT_HINTS = {
+    planner: 'PLANNER - Ansvarar för att bryta ned uppgiften i steg och skapa en plan.',
+    ux_designer: 'UX DESIGNER - Skapar UI/UX-design och wireframes för frontend-uppgifter.',
+    executor: 'EXECUTOR - Skriver och redigerar kod enligt planen.',
+    verifier: 'VERIFIER - Testar och verifierar att koden fungerar korrekt.',
+    reviewer: 'REVIEWER - Granskar kodens kvalitet, säkerhet och best practices.'
+};
+
+let currentAgentTab = 'planner';
+let agentCustomPrompts = {};
+
+function initAgentPrompts() {
+    const agentPromptsBtn = document.getElementById('agent-prompts-btn');
+    if (agentPromptsBtn) {
+        agentPromptsBtn.addEventListener('click', () => {
+            // Check if user has prompts or is admin
+            if (!currentUserData) {
+                openModal('upgrade-modal');
+                return;
+            }
+            if (!currentUserData.is_admin && !currentUserData.prompts_remaining && currentUserData.tier !== 'early_access') {
+                openModal('upgrade-modal');
+                return;
+            }
+            openAgentPromptsModal();
+        });
+    }
+
+    // Tab switching
+    document.querySelectorAll('.agent-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            switchAgentTab(tab.dataset.agent);
+        });
+    });
+
+    // Save button
+    const saveBtn = document.getElementById('save-agent-prompt');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveAgentPrompt);
+    }
+
+    // Clear button
+    const clearBtn = document.getElementById('clear-agent-prompt');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAgentPrompt);
+    }
+
+    // Character counter
+    const textarea = document.getElementById('agent-prompt-text');
+    if (textarea) {
+        textarea.addEventListener('input', updateCharCount);
+    }
+}
+
+async function openAgentPromptsModal() {
+    // Load existing prompts from server
+    try {
+        const response = await fetch('/api/user/agent-prompts');
+        if (response.ok) {
+            const data = await response.json();
+            agentCustomPrompts = data.prompts || {};
+        }
+    } catch (e) {
+        console.error('Failed to load agent prompts:', e);
+    }
+
+    // Set first tab
+    switchAgentTab('planner');
+    openModal('agent-prompts-modal');
+}
+
+function switchAgentTab(agentId) {
+    currentAgentTab = agentId;
+
+    // Update active tab
+    document.querySelectorAll('.agent-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.agent === agentId);
+    });
+
+    // Update hint
+    const hintEl = document.getElementById('agent-prompt-hint');
+    if (hintEl) {
+        hintEl.innerHTML = `<strong>${agentId.toUpperCase().replace('_', ' ')}</strong> - ${AGENT_HINTS[agentId] || ''}`;
+    }
+
+    // Update textarea with saved prompt
+    const textarea = document.getElementById('agent-prompt-text');
+    if (textarea) {
+        textarea.value = agentCustomPrompts[agentId] || '';
+        updateCharCount();
+    }
+}
+
+function updateCharCount() {
+    const textarea = document.getElementById('agent-prompt-text');
+    const countEl = document.getElementById('agent-prompt-char-count');
+    if (textarea && countEl) {
+        const count = textarea.value.length;
+        countEl.textContent = count;
+        countEl.style.color = count > 500 ? 'var(--red)' : 'inherit';
+    }
+}
+
+async function saveAgentPrompt() {
+    const textarea = document.getElementById('agent-prompt-text');
+    const saveBtn = document.getElementById('save-agent-prompt');
+    if (!textarea) return;
+
+    const customText = textarea.value.trim();
+
+    if (customText.length > 500) {
+        addMessage('system', 'Prompten får max vara 500 tecken.', 'error');
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'SPARAR...';
+
+    try {
+        const response = await fetch('/api/user/agent-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: currentAgentTab,
+                custom_text: customText
+            })
+        });
+
+        if (response.ok) {
+            agentCustomPrompts[currentAgentTab] = customText;
+            addMessage('system', `✓ Prompt för ${currentAgentTab.toUpperCase()} sparad.`, 'success');
+        } else {
+            const error = await response.json();
+            addMessage('system', `✗ Kunde inte spara: ${error.error || 'Okänt fel'}`, 'error');
+        }
+    } catch (e) {
+        console.error('Save agent prompt error:', e);
+        addMessage('system', '✗ Ett fel uppstod.', 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'SPARA';
+    }
+}
+
+async function clearAgentPrompt() {
+    const textarea = document.getElementById('agent-prompt-text');
+    if (!textarea) return;
+
+    if (!confirm(`Rensa prompt för ${currentAgentTab.toUpperCase()}?`)) return;
+
+    textarea.value = '';
+    updateCharCount();
+    await saveAgentPrompt();
+}
+
+// Initialize agent prompts when DOM is ready
+document.addEventListener('DOMContentLoaded', initAgentPrompts);
