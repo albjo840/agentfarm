@@ -133,6 +133,10 @@ performance_tracker: PerformanceTracker | None = None
 from agentfarm.queue import JobQueue, JobPriority, Job, init_job_queue, shutdown_job_queue, get_job_queue
 job_queue: JobQueue | None = None
 
+# Session Sandbox Manager
+from agentfarm.tools.sandbox import SandboxManager, init_sandbox_manager, shutdown_sandbox_manager, get_sandbox_manager
+sandbox_manager: SandboxManager | None = None
+
 
 async def _broadcast_event_handler(event: Event) -> None:
     """Handler that broadcasts all events to WebSocket clients.
@@ -2200,10 +2204,30 @@ async def api_queue_cancel_handler(request: web.Request) -> web.Response:
         return web.json_response({"error": "Job not found or not authorized"}, status=404)
 
 
+async def api_sandbox_handler(request: web.Request) -> web.Response:
+    """Get sandbox manager stats and user's session info."""
+    manager = get_sandbox_manager()
+    if not manager:
+        return web.json_response({"error": "Sandbox not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+
+    # Get global stats
+    stats = manager.get_stats()
+
+    # Get user's session info if exists
+    session_info = manager.get_session_info(device_id)
+
+    return web.json_response({
+        "stats": stats,
+        "your_session": session_info,
+    })
+
+
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
     global llm_router, workflow_persistence, affiliate_manager, user_manager, feedback_manager, stripe_integration
-    global gpu_monitor, performance_tracker, tier_manager, context_injector, job_queue
+    global gpu_monitor, performance_tracker, tier_manager, context_injector, job_queue, sandbox_manager
 
     setup_event_bus()
 
@@ -2220,6 +2244,14 @@ async def on_startup(app: web.Application) -> None:
         on_status_change=on_job_status_change,
     )
     logger.info("Job queue initialized (max_concurrent=4)")
+
+    # Initialize Session Sandbox Manager for user isolation
+    sandbox_manager = await init_sandbox_manager(
+        base_dir=Path(current_working_dir),
+        max_age_hours=4,  # Cleanup sessions after 4 hours
+        start_cleanup=True,
+    )
+    logger.info("Sandbox manager initialized (max_age=4h)")
 
     # Initialize hardware monitoring
     gpu_monitor = GPUMonitor()
@@ -2284,6 +2316,9 @@ async def on_cleanup(app: web.Application) -> None:
     # Shutdown job queue first (let running jobs complete)
     await shutdown_job_queue()
 
+    # Cleanup all session sandboxes
+    await shutdown_sandbox_manager()
+
     if workflow_persistence:
         workflow_persistence.stop()
     event_bus.stop()
@@ -2326,6 +2361,8 @@ def create_app() -> web.Application:
     # Job Queue routes
     app.router.add_get('/api/queue', api_queue_handler)
     app.router.add_post('/api/queue/cancel', api_queue_cancel_handler)
+    # Sandbox routes
+    app.router.add_get('/api/sandbox', api_sandbox_handler)
     app.router.add_get('/api/workflows', api_workflows_handler)
     app.router.add_get('/api/workflows/{id}', api_workflow_detail_handler)
     app.router.add_post('/api/workflows/{id}/pause', api_workflow_pause_handler)
