@@ -129,6 +129,10 @@ context_injector: ContextInjector | None = None
 gpu_monitor: GPUMonitor | None = None
 performance_tracker: PerformanceTracker | None = None
 
+# Job Queue
+from agentfarm.queue import JobQueue, JobPriority, Job, init_job_queue, shutdown_job_queue, get_job_queue
+job_queue: JobQueue | None = None
+
 
 async def _broadcast_event_handler(event: Event) -> None:
     """Handler that broadcasts all events to WebSocket clients.
@@ -2153,12 +2157,69 @@ async def api_monetization_stats_handler(request: web.Request) -> web.Response:
     })
 
 
+async def api_queue_handler(request: web.Request) -> web.Response:
+    """Get job queue status and user's position."""
+    queue = get_job_queue()
+    if not queue:
+        return web.json_response({"error": "Queue not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+
+    # Get queue info
+    info = await queue.get_queue_info()
+
+    # Get user's position if queued
+    user_position = await queue.get_user_position(device_id)
+    user_jobs = await queue.get_user_jobs(device_id)
+
+    return web.json_response({
+        "queue": info,
+        "your_position": user_position,
+        "your_jobs": [j.to_dict() for j in user_jobs],
+    })
+
+
+async def api_queue_cancel_handler(request: web.Request) -> web.Response:
+    """Cancel a queued job."""
+    queue = get_job_queue()
+    if not queue:
+        return web.json_response({"error": "Queue not initialized"}, status=503)
+
+    device_id = _get_device_id(request)
+    data = await request.json()
+    job_id = data.get("job_id")
+
+    if not job_id:
+        return web.json_response({"error": "job_id required"}, status=400)
+
+    success = await queue.cancel(job_id, device_id=device_id)
+
+    if success:
+        return web.json_response({"status": "cancelled", "job_id": job_id})
+    else:
+        return web.json_response({"error": "Job not found or not authorized"}, status=404)
+
+
 async def on_startup(app: web.Application) -> None:
     """Called when app starts - set up event bus, router, and persistence."""
     global llm_router, workflow_persistence, affiliate_manager, user_manager, feedback_manager, stripe_integration
-    global gpu_monitor, performance_tracker, tier_manager, context_injector
+    global gpu_monitor, performance_tracker, tier_manager, context_injector, job_queue
 
     setup_event_bus()
+
+    # Initialize Job Queue for GPU workflow management
+    async def on_job_status_change(job: Job) -> None:
+        """Broadcast job status changes to all WebSocket clients."""
+        await ws_clients.broadcast({
+            "type": "queue_update",
+            "job": job.to_dict(),
+        })
+
+    job_queue = await init_job_queue(
+        max_concurrent=4,  # Match OLLAMA_NUM_PARALLEL
+        on_status_change=on_job_status_change,
+    )
+    logger.info("Job queue initialized (max_concurrent=4)")
 
     # Initialize hardware monitoring
     gpu_monitor = GPUMonitor()
@@ -2220,6 +2281,9 @@ async def on_startup(app: web.Application) -> None:
 
 async def on_cleanup(app: web.Application) -> None:
     """Called when app shuts down - stop event bus, router, and persistence."""
+    # Shutdown job queue first (let running jobs complete)
+    await shutdown_job_queue()
+
     if workflow_persistence:
         workflow_persistence.stop()
     event_bus.stop()
@@ -2259,6 +2323,9 @@ def create_app() -> web.Application:
     app.router.add_post('/api/interrupt', api_interrupt_handler)
     app.router.add_get('/api/router', api_router_handler)
     app.router.add_post('/api/router/test', api_router_test_handler)
+    # Job Queue routes
+    app.router.add_get('/api/queue', api_queue_handler)
+    app.router.add_post('/api/queue/cancel', api_queue_cancel_handler)
     app.router.add_get('/api/workflows', api_workflows_handler)
     app.router.add_get('/api/workflows/{id}', api_workflow_detail_handler)
     app.router.add_post('/api/workflows/{id}/pause', api_workflow_pause_handler)
