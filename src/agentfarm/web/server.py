@@ -1567,7 +1567,7 @@ async def api_files_upload_handler(request: web.Request) -> web.Response:
 
     # Set device_id cookie if not present
     if "device_id" not in request.cookies:
-        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
 
     return response
 
@@ -1605,7 +1605,7 @@ async def api_files_vault_list_handler(request: web.Request) -> web.Response:
 
     # Set device_id cookie if not present
     if "device_id" not in request.cookies:
-        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
 
     return response
 
@@ -1810,7 +1810,7 @@ async def api_user_handler(request: web.Request) -> web.Response:
     })
 
     # Always set device_id cookie to ensure persistence
-    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
 
     return response
 
@@ -1833,7 +1833,7 @@ async def api_user_tryout_handler(request: web.Request) -> web.Response:
     })
 
     # Always set device_id cookie
-    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
 
     return response
 
@@ -2127,16 +2127,37 @@ async def api_beta_operator_checkout_handler(request: web.Request) -> web.Respon
 
 async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
     """Handle Stripe webhook events."""
+    logger.info("=== STRIPE WEBHOOK RECEIVED ===")
+
     if not stripe_integration or not user_manager:
+        logger.error("Stripe webhook: Not initialized (stripe_integration=%s, user_manager=%s)",
+                     stripe_integration is not None, user_manager is not None)
         return web.json_response({"error": "Not initialized"}, status=503)
 
     payload = await request.read()
     signature = request.headers.get("Stripe-Signature", "")
 
+    logger.info("Stripe webhook: payload size=%d, has_signature=%s", len(payload), bool(signature))
+
+    # Try to peek at the event type before full processing
+    try:
+        import json as json_module
+        peek_data = json_module.loads(payload)
+        event_type = peek_data.get("type", "unknown")
+        event_id = peek_data.get("id", "unknown")
+        # Get device_id from the event data
+        session_data = peek_data.get("data", {}).get("object", {})
+        client_ref_id = session_data.get("client_reference_id", "")
+        metadata = session_data.get("metadata", {})
+        logger.info("Stripe webhook: event_type=%s, event_id=%s, client_reference_id=%s, metadata=%s",
+                    event_type, event_id, client_ref_id[:16] if client_ref_id else "EMPTY", metadata)
+    except Exception as e:
+        logger.warning("Stripe webhook: Could not peek at payload: %s", e)
+
     result = await stripe_integration.handle_webhook(payload, signature)
     action = result.get("action", "")
 
-    logger.info("Stripe webhook action: %s", action)
+    logger.info("Stripe webhook result: action=%s, full_result=%s", action, result)
 
     # Process the action
     if action == "upgrade_tier":
@@ -2151,9 +2172,18 @@ async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
     elif action == "upgrade_beta_operator":
         device_id = result.get("device_id", "")
         customer_id = result.get("stripe_customer_id")
+        logger.info("Stripe webhook: upgrade_beta_operator - device_id=%s, customer_id=%s",
+                    device_id[:16] if device_id else "EMPTY", customer_id[:8] if customer_id else "EMPTY")
         if device_id:
             user_manager.upgrade_to_beta_operator(device_id, customer_id)
-            logger.info("Upgraded user %s to Beta Operator", device_id[:8])
+            logger.info("SUCCESS: Upgraded user %s to Beta Operator", device_id[:16])
+            # Verify the upgrade worked
+            user = user_manager.get_user(device_id)
+            if user:
+                logger.info("VERIFIED: User tier=%s, prompts=%d, is_beta=%s",
+                            user.tier.value, user.prompts_remaining, user_manager.is_beta_operator(device_id))
+        else:
+            logger.error("FAILED: No device_id in webhook result - cannot upgrade user!")
 
     elif action == "add_prompts":
         device_id = result.get("device_id", "")
@@ -2186,6 +2216,92 @@ async def api_stripe_webhook_handler(request: web.Request) -> web.Response:
         return web.json_response({"error": "Invalid signature"}, status=400)
 
     return web.json_response({"received": True, "action": action})
+
+
+async def api_stripe_debug_handler(request: web.Request) -> web.Response:
+    """Debug endpoint to check Stripe webhook configuration."""
+    device_id = _get_device_id(request)
+
+    # Check if admin
+    if user_manager and not user_manager.is_admin(device_id):
+        return web.json_response({"error": "Admin access required"}, status=403)
+
+    result = {
+        "stripe_enabled": stripe_integration.enabled if stripe_integration else False,
+        "webhook_url": "http://taborsen.duckdns.org:8080/webhook/stripe",
+        "webhook_secret_configured": bool(stripe_integration and stripe_integration.config.webhook_secret),
+        "webhook_secret_prefix": (stripe_integration.config.webhook_secret[:8] + "...")
+            if stripe_integration and stripe_integration.config.webhook_secret else None,
+        "beta_operator_price_id": stripe_integration.config.beta_operator_price_id if stripe_integration else None,
+        "success_url": stripe_integration.config.success_url if stripe_integration else None,
+        "instructions": [
+            "1. Go to Stripe Dashboard -> Developers -> Webhooks",
+            "2. Click 'Add endpoint'",
+            "3. Enter URL: http://taborsen.duckdns.org:8080/webhook/stripe",
+            "4. Select event: checkout.session.completed",
+            "5. Click 'Add endpoint'",
+            "6. Copy the 'Signing secret' (whsec_...) to STRIPE_WEBHOOK_SECRET in .env",
+            "7. Restart the server",
+            "NOTE: For test mode, HTTP is allowed. For live mode, use HTTPS.",
+        ],
+    }
+
+    # Check user's current status
+    if user_manager:
+        user = user_manager.get_user(device_id)
+        if user:
+            result["your_status"] = {
+                "device_id_prefix": device_id[:16],
+                "tier": user.tier.value,
+                "is_beta_operator": user_manager.is_beta_operator(device_id),
+                "prompts_remaining": user.prompts_remaining,
+            }
+
+    return web.json_response(result)
+
+
+async def api_stripe_test_webhook_handler(request: web.Request) -> web.Response:
+    """Test endpoint to manually trigger a beta operator upgrade (admin only)."""
+    device_id = _get_device_id(request)
+
+    # Check if admin
+    if user_manager and not user_manager.is_admin(device_id):
+        return web.json_response({"error": "Admin access required"}, status=403)
+
+    data = await request.json()
+    target_device_id = data.get("device_id", device_id)
+
+    if not user_manager:
+        return web.json_response({"error": "User manager not initialized"}, status=503)
+
+    # Get user before upgrade
+    user_before = user_manager.get_user(target_device_id)
+    before_status = {
+        "tier": user_before.tier.value if user_before else "not_found",
+        "prompts": user_before.prompts_remaining if user_before else 0,
+        "is_beta": user_manager.is_beta_operator(target_device_id) if user_before else False,
+    }
+
+    # Perform upgrade
+    user_manager.upgrade_to_beta_operator(target_device_id, None)
+
+    # Get user after upgrade
+    user_after = user_manager.get_user(target_device_id)
+    after_status = {
+        "tier": user_after.tier.value if user_after else "not_found",
+        "prompts": user_after.prompts_remaining if user_after else 0,
+        "is_beta": user_manager.is_beta_operator(target_device_id) if user_after else False,
+    }
+
+    logger.info("Manual upgrade test: device=%s, before=%s, after=%s",
+                target_device_id[:16], before_status, after_status)
+
+    return web.json_response({
+        "success": True,
+        "device_id": target_device_id[:16] + "...",
+        "before": before_status,
+        "after": after_status,
+    })
 
 
 async def api_feedback_handler(request: web.Request) -> web.Response:
@@ -2501,6 +2617,8 @@ def create_app() -> web.Application:
     app.router.add_post('/api/subscription/checkout', api_subscription_checkout_handler)
     app.router.add_post('/api/checkout/beta-operator', api_beta_operator_checkout_handler)
     app.router.add_post('/webhook/stripe', api_stripe_webhook_handler)
+    app.router.add_get('/api/stripe/debug', api_stripe_debug_handler)
+    app.router.add_post('/api/stripe/test-upgrade', api_stripe_test_webhook_handler)
     app.router.add_post('/api/feedback', api_feedback_handler)
     app.router.add_get('/api/feedback', api_feedback_list_handler)
     app.router.add_get('/api/monetization/stats', api_monetization_stats_handler)

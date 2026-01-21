@@ -163,11 +163,19 @@ class StripeIntegration:
         Returns:
             Dict with action to take: {"action": "...", "device_id": "...", ...}
         """
+        logger.info("handle_webhook: Verifying signature (secret starts with: %s...)",
+                    self.config.webhook_secret[:10] if self.config.webhook_secret else "EMPTY")
+
         if not self.verify_webhook_signature(payload, signature):
+            logger.error("handle_webhook: Signature verification FAILED")
+            logger.error("handle_webhook: signature header = %s", signature[:50] if signature else "EMPTY")
             return {"action": "invalid_signature", "error": "Signature verification failed"}
+
+        logger.info("handle_webhook: Signature verification PASSED")
 
         event = self.parse_webhook_event(payload)
         if not event:
+            logger.error("handle_webhook: Failed to parse event from payload")
             return {"action": "parse_error", "error": "Failed to parse event"}
 
         logger.info(f"Processing Stripe event: {event.type}")
