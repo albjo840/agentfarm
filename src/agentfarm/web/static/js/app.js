@@ -493,11 +493,6 @@ function renderMessages() {
                     </span>
                     <span class="message-time">${msg.time}</span>
                     ${msg.streaming ? '<span class="streaming-badge">STREAMING</span>' : ''}
-                    <div class="message-actions">
-                        <button class="msg-copy-btn" onclick="copyMessageToClipboard(${msg.id})" title="Kopiera">
-                            <span class="copy-icon">⎘</span>
-                        </button>
-                    </div>
                 </div>
                 <div class="message-content">${escapeHtml(displayContent)}${streamingCursor}</div>
                 ${needsTruncation ? `
@@ -628,19 +623,19 @@ function executeTask(task) {
         return;
     }
 
-    // Check if user has access (tryout, prompts, or admin)
+    // Check if user has access (prompts remaining, admin, or early_access)
     const hasAccess = currentUserData?.is_admin ||
-                      currentUserData?.is_tryout ||
                       currentUserData?.prompts_remaining > 0 ||
+                      currentUserData?.prompts_remaining === -1 ||  // Unlimited
                       currentUserData?.tier === 'early_access';
 
-    console.log('hasAccess:', hasAccess);
+    console.log('hasAccess:', hasAccess, 'prompts:', currentUserData?.prompts_remaining);
 
     if (!hasAccess) {
-        // Show tryout modal
-        console.log('No access - opening tryout modal');
-        openModal('tryout-modal');
-        addMessage('orchestrator', '🔒 Du behöver starta en tryout för att köra workflows. Klicka på TRYOUT-knappen!');
+        // No prompts left - show Beta Operator upgrade modal
+        console.log('No prompts - opening upgrade modal');
+        openModal('beta-operator-modal');
+        addMessage('orchestrator', '🔒 Du har använt din gratis workflow! Uppgradera till Beta Operator för 10 fler.');
         return;
     }
 
@@ -1017,11 +1012,16 @@ function escapeAttr(str) {
 
 // QR Code Modal functions
 async function generateNewVPNQR() {
-    // Check if user has access first
-    if (!currentUserData?.is_admin && !currentUserData?.is_tryout && !currentUserData?.prompts_remaining) {
-        // Show tryout modal instead
-        openModal('tryout-modal');
-        addMessage('orchestrator', '🔒 VPN-access kräver att du startar en tryout först.');
+    // Check if user has any workflow access
+    const hasAccess = currentUserData?.is_admin ||
+                      currentUserData?.prompts_remaining > 0 ||
+                      currentUserData?.prompts_remaining === -1 ||
+                      currentUserData?.tier === 'early_access';
+
+    if (!hasAccess) {
+        // No access - show upgrade modal
+        openModal('beta-operator-modal');
+        addMessage('orchestrator', '🔒 VPN-access kräver att du uppgraderar till Beta Operator.');
         return;
     }
 
@@ -1046,11 +1046,11 @@ async function generateNewVPNQR() {
             qrCode.textContent = result.qr_text;
             qrInfo.innerHTML = `IP: <strong>${result.ip}</strong><br>Skanna QR-koden med WireGuard-appen`;
             addMessage('orchestrator', `🔐 Ny VPN-peer skapad: ${result.ip}`);
-        } else if (result.require_tryout) {
-            // Close QR modal and open tryout modal
+        } else if (result.require_tryout || result.require_upgrade) {
+            // Close QR modal and show upgrade
             qrModal.classList.add('hidden');
-            openModal('tryout-modal');
-            addMessage('orchestrator', '🔒 VPN-access kräver att du startar en tryout först.');
+            openModal('beta-operator-modal');
+            addMessage('orchestrator', '🔒 VPN-access kräver Beta Operator.');
         } else {
             qrCode.textContent = '❌ Fel';
             qrInfo.textContent = result.error || 'Kunde inte generera QR-kod';
@@ -1492,19 +1492,20 @@ function updateUserStatusDisplay() {
 
     const statusEl = document.getElementById('user-status');
     const tierBadge = document.getElementById('tier-badge');
+    const prompts = currentUserData.prompts_remaining;
 
-    // Update status display
+    // Update status display (shows prompts remaining)
     if (statusEl) {
         if (currentUserData.is_admin) {
             statusEl.textContent = 'ADMIN';
         } else if (currentUserData.is_beta_operator) {
-            statusEl.textContent = 'BETA OP';
+            statusEl.textContent = `${prompts} WF`;  // e.g. "10 WF"
         } else if (currentUserData.tier === 'early_access') {
-            statusEl.textContent = 'PRO';
-        } else if (currentUserData.is_tryout || currentUserData.prompts_remaining > 0) {
-            statusEl.textContent = 'TRYOUT';
+            statusEl.textContent = '∞ WF';
+        } else if (prompts > 0) {
+            statusEl.textContent = `${prompts} WF`;  // e.g. "1 WF"
         } else {
-            statusEl.textContent = 'GÄST';
+            statusEl.textContent = '0 WF';  // Out of workflows
         }
     }
 
@@ -1519,12 +1520,14 @@ function updateUserStatusDisplay() {
         } else if (currentUserData.tier === 'early_access') {
             tierBadge.textContent = 'EARLY ACCESS';
             tierBadge.className = 'tier-badge early_access';
-        } else if (currentUserData.is_tryout || currentUserData.prompts_remaining > 0) {
-            tierBadge.textContent = '';
+        } else if (prompts > 0) {
+            tierBadge.textContent = 'TRYOUT';
             tierBadge.className = 'tier-badge tryout';
+            tierBadge.onclick = null;
         } else {
-            tierBadge.textContent = '';
-            tierBadge.className = 'tier-badge';
+            tierBadge.textContent = 'UPPGRADERA';
+            tierBadge.className = 'tier-badge upgrade';
+            tierBadge.onclick = () => openModal('beta-operator-modal');
         }
     }
 
@@ -1619,6 +1622,83 @@ function togglePrivacySection() {
         content.classList.toggle('hidden');
         toggle.classList.toggle('expanded');
     }
+}
+
+// Datastream Modal - Show all events from all agents
+function openDatastreamModal() {
+    const modal = document.getElementById('datastream-modal');
+    if (!modal) return;
+
+    // Render all messages to the modal
+    renderDatastreamMessages();
+
+    // Set up filter listeners
+    setupDatastreamFilters();
+
+    modal.classList.remove('hidden');
+}
+
+function renderDatastreamMessages() {
+    const container = document.getElementById('datastream-messages');
+    if (!container) return;
+
+    // Get all messages from messageHistory
+    const html = messageHistory.map(msg => {
+        const agentId = msg.agent?.id || 'orchestrator';
+        const agentName = msg.agent?.name || 'SYSTEM';
+        const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('sv-SE') : '';
+        const content = escapeHtml(msg.content || '');
+
+        // Determine border color class
+        let borderClass = agentId;
+
+        return `
+            <div class="message ${borderClass}" data-agent-filter="${agentId}">
+                <div class="message-header">
+                    <span class="message-time">${time}</span>
+                    <span class="message-agent ${agentId}">${agentName}</span>
+                </div>
+                <div class="message-content">${content}</div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html || '<div class="no-messages">Inga händelser ännu</div>';
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function setupDatastreamFilters() {
+    const filters = ['planner', 'executor', 'verifier', 'reviewer', 'ux', 'orchestrator'];
+
+    filters.forEach(agent => {
+        const checkbox = document.getElementById(`filter-${agent}`);
+        if (checkbox) {
+            // Remove old listener and add new
+            checkbox.onchange = () => applyDatastreamFilters();
+        }
+    });
+}
+
+function applyDatastreamFilters() {
+    const container = document.getElementById('datastream-messages');
+    if (!container) return;
+
+    const filters = {
+        planner: document.getElementById('filter-planner')?.checked ?? true,
+        executor: document.getElementById('filter-executor')?.checked ?? true,
+        verifier: document.getElementById('filter-verifier')?.checked ?? true,
+        reviewer: document.getElementById('filter-reviewer')?.checked ?? true,
+        ux: document.getElementById('filter-ux')?.checked ?? true,
+        orchestrator: document.getElementById('filter-orchestrator')?.checked ?? true,
+    };
+
+    container.querySelectorAll('.message').forEach(msg => {
+        const agentFilter = msg.dataset.agentFilter || 'orchestrator';
+        const isVisible = filters[agentFilter] ?? true;
+        msg.classList.toggle('hidden-by-filter', !isVisible);
+    });
 }
 
 async function startCheckout(productType) {

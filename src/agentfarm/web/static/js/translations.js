@@ -120,6 +120,11 @@ const TRANSLATIONS = {
         "feedback.rating": "BETYG (valfritt)",
         "feedback.submit": "SKICKA",
 
+        // Datastream modal
+        "datastream.title": "ALLA HÄNDELSER",
+        "datastream.no_events": "Inga händelser ännu",
+        "datastream.expand": "Expandera",
+
         // Context modal
         "context.title": "FÖRETAGSKONTEXT",
         "context.info": "Lägg till bakgrundinformation om ditt företag eller projekt. Agenterna kommer att ta hänsyn till detta i sina svar.",
@@ -303,6 +308,11 @@ const TRANSLATIONS = {
         "feedback.email_placeholder": "your@email.com",
         "feedback.rating": "RATING (optional)",
         "feedback.submit": "SUBMIT",
+
+        // Datastream modal
+        "datastream.title": "ALL EVENTS",
+        "datastream.no_events": "No events yet",
+        "datastream.expand": "Expand",
 
         // Context modal
         "context.title": "COMPANY CONTEXT",

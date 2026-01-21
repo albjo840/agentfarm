@@ -77,6 +77,9 @@
                 <div class="section-header">
                     <span class="icon">▷</span>
                     <h2 data-i18n="section.data_stream">DATASTRÖM</h2>
+                    <button class="expand-datastream-btn" onclick="openDatastreamModal()" data-i18n-title="datastream.expand" title="Expandera">
+                        <span class="expand-icon">⛶</span>
+                    </button>
                 </div>
                 <div class="messages-container" id="messages">
                     <!-- Messages rendered by JS -->
@@ -578,6 +581,47 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
             <div class="modal-footer agent-panel-footer">
                 <button id="save-all-prompts" class="submit-btn">💾 SPARA ALLA</button>
                 <button id="clear-all-prompts" class="clear-btn">🗑️ RENSA ALLA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Datastream Fullscreen Modal -->
+    <div id="datastream-modal" class="modal hidden">
+        <div class="modal-content datastream-modal-content">
+            <div class="modal-header datastream-header">
+                <h3 data-i18n="datastream.title">📡 ALLA HÄNDELSER</h3>
+                <div class="datastream-controls">
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-planner" checked>
+                        <span class="agent-badge planner">PLANNER</span>
+                    </label>
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-executor" checked>
+                        <span class="agent-badge executor">EXECUTOR</span>
+                    </label>
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-verifier" checked>
+                        <span class="agent-badge verifier">VERIFIER</span>
+                    </label>
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-reviewer" checked>
+                        <span class="agent-badge reviewer">REVIEWER</span>
+                    </label>
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-ux" checked>
+                        <span class="agent-badge ux">UX</span>
+                    </label>
+                    <label class="filter-label">
+                        <input type="checkbox" id="filter-orchestrator" checked>
+                        <span class="agent-badge orchestrator">SYSTEM</span>
+                    </label>
+                </div>
+                <button class="modal-close" data-modal="datastream-modal">&times;</button>
+            </div>
+            <div class="modal-body datastream-body">
+                <div class="datastream-messages" id="datastream-messages">
+                    <!-- All messages rendered here -->
+                </div>
             </div>
         </div>
     </div>

@@ -79,7 +79,7 @@ class UserManager:
         return self.users_dir / f"{safe_id}.json"
 
     def get_or_create_user(self, device_id: str) -> UserProfile:
-        """Get existing user or create new one (no free prompts)."""
+        """Get existing user or create new one with 1 free tryout workflow."""
         user_path = self._user_path(device_id)
 
         if user_path.exists():
@@ -93,8 +93,12 @@ class UserManager:
             except (json.JSONDecodeError, ValueError):
                 pass
 
-        # Create new user - NO free prompts, must purchase
-        user = UserProfile(device_id=device_id, prompts_remaining=0)
+        # Create new user with 1 FREE tryout workflow (no guest mode)
+        user = UserProfile(
+            device_id=device_id,
+            tier=SubscriptionTier.TRYOUT,
+            prompts_remaining=1,  # 1 free workflow to try
+        )
         self._save_user(user)
         return user
 

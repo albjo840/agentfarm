@@ -632,9 +632,15 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
 
     # Create correlation ID for this workflow
     correlation_id = str(uuid.uuid4())[:8]
+    # Track current active agent for proper token metrics matching
+    current_active_agent = "orchestrator"
+    # Track previous token count to calculate delta (tokens_update is cumulative)
+    previous_tokens = 0
 
     async def event_callback(event_name: str, data: dict[str, Any]) -> None:
         """Callback that emits events to the event bus."""
+        nonlocal current_active_agent, previous_tokens
+
         # Handle stage_change specially - broadcast directly to WebSocket
         if event_name == 'stage_change':
             await ws_clients.broadcast({
@@ -642,7 +648,7 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
                 'stage': data.get('stage'),
                 'status': data.get('status'),
             })
-            # Also emit LLM events for performance tracking when stage completes
+            # Map stage name to agent name
             agent = data.get('stage', 'orchestrator')
             if agent == 'ux_design':
                 agent = 'designer'
@@ -656,6 +662,8 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
                 agent = 'planner'
 
             if data.get('status') == 'active':
+                # Track the currently active agent
+                current_active_agent = agent
                 # Emit LLM_REQUEST when stage starts
                 await event_bus.emit(Event(
                     type=EventType.LLM_REQUEST,
@@ -680,7 +688,7 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
             'tokens_update': EventType.AGENT_MESSAGE,
         }
         event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
-        source = data.get('agent', 'orchestrator')
+        source = data.get('agent', current_active_agent)
 
         await event_bus.emit(Event(
             type=event_type,
@@ -691,23 +699,29 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
 
         # Emit LLM_RESPONSE for tokens_update events (for PerformanceTracker)
         if event_name == 'tokens_update' and data.get('tokens'):
-            tokens = data.get('tokens', 0)
-            # Estimate input/output split (roughly 70/30)
-            input_tokens = int(tokens * 0.7)
-            output_tokens = tokens - input_tokens
-            await event_bus.emit(Event(
-                type=EventType.LLM_RESPONSE,
-                source=source,
-                data={
-                    'request_id': f"{correlation_id}-{source}",
-                    'model': 'ollama',
-                    'agent': source,
-                    'input_tokens': input_tokens,
-                    'output_tokens': output_tokens,
-                    'success': True,
-                },
-                correlation_id=correlation_id,
-            ))
+            total_tokens = data.get('tokens', 0)
+            # Calculate delta (tokens used by this agent only)
+            delta_tokens = total_tokens - previous_tokens
+            previous_tokens = total_tokens
+
+            if delta_tokens > 0:
+                # Estimate input/output split (roughly 70/30)
+                input_tokens = int(delta_tokens * 0.7)
+                output_tokens = delta_tokens - input_tokens
+                # Use the current active agent for request_id matching
+                await event_bus.emit(Event(
+                    type=EventType.LLM_RESPONSE,
+                    source=current_active_agent,
+                    data={
+                        'request_id': f"{correlation_id}-{current_active_agent}",
+                        'model': 'ollama',
+                        'agent': current_active_agent,
+                        'input_tokens': input_tokens,
+                        'output_tokens': output_tokens,
+                        'success': True,
+                    },
+                    correlation_id=correlation_id,
+                ))
 
     try:
         await event_bus.emit(Event(
@@ -814,9 +828,15 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
 
     # Create correlation ID for this workflow
     correlation_id = str(uuid.uuid4())[:8]
+    # Track current active agent for proper token metrics matching
+    current_active_agent = "orchestrator"
+    # Track previous token count to calculate delta (tokens_update is cumulative)
+    previous_tokens = 0
 
     async def event_callback(event_name: str, data: dict[str, Any]) -> None:
         """Callback that emits events to the event bus."""
+        nonlocal current_active_agent, previous_tokens
+
         # Handle stage_change specially - broadcast directly to WebSocket
         if event_name == 'stage_change':
             await ws_clients.broadcast({
@@ -824,7 +844,7 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
                 'stage': data.get('stage'),
                 'status': data.get('status'),
             })
-            # Also emit LLM events for performance tracking when stage starts
+            # Map stage name to agent name
             agent = data.get('stage', 'orchestrator')
             if agent == 'ux_design':
                 agent = 'designer'
@@ -838,6 +858,8 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
                 agent = 'planner'
 
             if data.get('status') == 'active':
+                # Track the currently active agent
+                current_active_agent = agent
                 # Emit LLM_REQUEST when stage starts
                 await event_bus.emit(Event(
                     type=EventType.LLM_REQUEST,
@@ -861,7 +883,7 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
             'tokens_update': EventType.AGENT_MESSAGE,
         }
         event_type = event_type_map.get(event_name, EventType.AGENT_MESSAGE)
-        source = data.get('agent', 'orchestrator')
+        source = data.get('agent', current_active_agent)
 
         await event_bus.emit(Event(
             type=event_type,
@@ -872,23 +894,29 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
 
         # Emit LLM_RESPONSE for tokens_update events (for PerformanceTracker)
         if event_name == 'tokens_update' and data.get('tokens'):
-            tokens = data.get('tokens', 0)
-            # Estimate input/output split (roughly 70/30)
-            input_tokens = int(tokens * 0.7)
-            output_tokens = tokens - input_tokens
-            await event_bus.emit(Event(
-                type=EventType.LLM_RESPONSE,
-                source=source,
-                data={
-                    'request_id': f"{correlation_id}-{source}",
-                    'model': 'ollama',
-                    'agent': source,
-                    'input_tokens': input_tokens,
-                    'output_tokens': output_tokens,
-                    'success': True,
-                },
-                correlation_id=correlation_id,
-            ))
+            total_tokens = data.get('tokens', 0)
+            # Calculate delta (tokens used by this agent only)
+            delta_tokens = total_tokens - previous_tokens
+            previous_tokens = total_tokens
+
+            if delta_tokens > 0:
+                # Estimate input/output split (roughly 70/30)
+                input_tokens = int(delta_tokens * 0.7)
+                output_tokens = delta_tokens - input_tokens
+                # Use the current active agent for request_id matching
+                await event_bus.emit(Event(
+                    type=EventType.LLM_RESPONSE,
+                    source=current_active_agent,
+                    data={
+                        'request_id': f"{correlation_id}-{current_active_agent}",
+                        'model': 'ollama',
+                        'agent': current_active_agent,
+                        'input_tokens': input_tokens,
+                        'output_tokens': output_tokens,
+                        'success': True,
+                    },
+                    correlation_id=correlation_id,
+                ))
 
     try:
         # Notify start via event bus
@@ -1781,44 +1809,31 @@ async def api_user_handler(request: web.Request) -> web.Response:
         "can_send_feedback": is_beta,
     })
 
-    # Set device_id cookie if not present
-    if "device_id" not in request.cookies:
-        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+    # Always set device_id cookie to ensure persistence
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
 
     return response
 
 
 async def api_user_tryout_handler(request: web.Request) -> web.Response:
-    """Register user for tryout - gives 3 free workflows."""
+    """Legacy tryout endpoint - users now auto-start with 1 free workflow.
+
+    Kept for backwards compatibility. Just returns current user state.
+    """
     if not user_manager:
         return web.json_response({"error": "Not initialized"}, status=503)
 
     device_id = _get_device_id(request)
-    user = user_manager.get_or_create_user(device_id)
-
-    # Check if already registered for tryout
-    if user.is_admin or user.tier == SubscriptionTier.EARLY_ACCESS:
-        return web.json_response({
-            "status": "already_premium",
-            "message": "Du har redan full tillgång",
-            "user": _user_to_dict(user, is_tryout=True)
-        })
-
-    # Register for tryout - give 1 free workflow
-    TRYOUT_PROMPTS = 1
-    if user.prompts_remaining < TRYOUT_PROMPTS:
-        user.prompts_remaining = TRYOUT_PROMPTS
-        user_manager._save_user(user)
+    user = user_manager.get_or_create_user(device_id)  # Auto-creates with 1 free workflow
 
     response = web.json_response({
         "status": "success",
-        "message": f"Välkommen! Du har nu {TRYOUT_PROMPTS} gratis workflows.",
-        "user": _user_to_dict(user, is_tryout=True)
+        "message": f"Du har {user.prompts_remaining} workflow(s) kvar.",
+        "user": _user_to_dict(user, is_tryout=user.prompts_remaining > 0)
     })
 
-    # Set device_id cookie
-    if "device_id" not in request.cookies:
-        response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
+    # Always set device_id cookie
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True)
 
     return response
 

@@ -21,9 +21,15 @@ a302bf4 feat: Add language toggle, animated hardware visuals, larger task input
 0775fd8 feat: Add product images and new badge types to hardware page
 ```
 
-## Session 2026-01-21: Internationalization & Privacy
+## Session 2026-01-21: Internationalization, Privacy & Token Metrics Fix
 
 ### Slutfört i denna session
+
+- [x] **Token Metrics Fix** - Request ID matchning mellan LLM_REQUEST/LLM_RESPONSE
+  - Problem: `tokens_update` saknade `agent` fält → source blev 'orchestrator' istället för aktiv agent
+  - Lösning: Spårar `current_active_agent` och `previous_tokens` i event_callback
+  - Delta-beräkning: Tokens per stage istället för kumulativa totaler
+  - Request IDs matchar nu korrekt mellan REQUEST och RESPONSE
 
 - [x] **i18n System** - Komplett svenska/engelska språkväxling
   - `translations.js` med 100+ översättningar
@@ -65,8 +71,8 @@ src/agentfarm/web/
 ├── static/js/app.js              # togglePrivacySection(), i18n init
 ├── static/css/retro.css          # Privacy section, language toggle CSS
 ├── templates/index.html          # data-i18n attrs, privacy section
-└── templates/hardware.html       # Full i18n, animated visuals
-└── server.py                     # LLM event emission for metrics
+├── templates/hardware.html       # Full i18n, animated visuals
+└── server.py                     # Token metrics fix: current_active_agent + delta tracking
 
 .agentfarm/
 └── affiliates.json               # Amazon.se integration
