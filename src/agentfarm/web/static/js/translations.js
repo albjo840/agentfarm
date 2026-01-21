@@ -58,7 +58,7 @@ const TRANSLATIONS = {
 
         // Footer
         "footer.tagline": "NEURAL ORCHESTRATION SYSTEM",
-        "footer.prompts": "PROMPTER",
+        "footer.prompts": "DINA PROMPTER",
         "footer.beta_operator": "BETA OPERATOR",
         "footer.feedback": "FEEDBACK",
         "footer.hardware": "HÅRDVARA",
@@ -197,7 +197,7 @@ const TRANSLATIONS = {
 
         // Footer
         "footer.tagline": "NEURAL ORCHESTRATION SYSTEM",
-        "footer.prompts": "PROMPTS",
+        "footer.prompts": "YOUR PROMPTS",
         "footer.beta_operator": "BETA OPERATOR",
         "footer.feedback": "FEEDBACK",
         "footer.hardware": "HARDWARE",

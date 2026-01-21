@@ -150,38 +150,232 @@
             }
         }
 
-        /* Category tabs */
-        .category-tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
+        /* My Stack Section */
+        .my-stack-section {
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 255, 255, 0.1) 100%);
+            border: 2px solid var(--magenta);
+            padding: 30px;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .my-stack-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--magenta), var(--cyan), var(--magenta));
+        }
+
+        .my-stack-header {
+            text-align: center;
             margin-bottom: 30px;
-            flex-wrap: wrap;
         }
 
-        .category-tab {
-            padding: 10px 25px;
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-dim);
+        .my-stack-header h2 {
             font-family: 'Orbitron', monospace;
-            font-size: 0.85rem;
-            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--magenta);
+            text-shadow: 0 0 20px var(--magenta);
+            margin: 0 0 10px 0;
+            letter-spacing: 0.2em;
+        }
+
+        .my-stack-subtitle {
+            font-family: 'Share Tech Mono', monospace;
+            color: #b0c8d0;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        .my-stack-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .stack-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 255, 0.3);
             transition: all 0.3s ease;
-            letter-spacing: 0.1em;
         }
 
-        .category-tab:hover {
+        .stack-item:hover {
             border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .stack-visual {
+            flex-shrink: 0;
+            width: 100px;
+            height: 80px;
+            position: relative;
+        }
+
+        .stack-visual.gpu .gpu-body {
+            width: 90px;
+            height: 55px;
+            background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%);
+            border: 2px solid var(--cyan);
+            border-radius: 3px;
+            position: absolute;
+            top: 10px;
+            left: 5px;
+        }
+
+        .stack-visual.gpu .gpu-fans {
+            display: flex;
+            gap: 6px;
+            position: absolute;
+            top: 20px;
+            left: 15px;
+        }
+
+        .stack-visual.gpu .fan {
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--magenta);
+            border-radius: 50%;
+            animation: spin-fan 2s linear infinite;
+        }
+
+        .stack-visual.gpu .gpu-vram {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.55rem;
+            color: var(--green);
+            text-shadow: 0 0 8px var(--green);
+        }
+
+        .stack-visual.gpu .gpu-pcie {
+            width: 70px;
+            height: 6px;
+            background: #444;
+            position: absolute;
+            bottom: 2px;
+            left: 15px;
+        }
+
+        .stack-visual.cpu .cpu-body {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3a3a4a 0%, #2a2a3a 100%);
+            border: 2px solid var(--cyan);
+            position: absolute;
+            top: 10px;
+            left: 20px;
+        }
+
+        .stack-visual.cpu .cpu-die {
+            width: 30px;
+            height: 30px;
+            background: #1a1a2a;
+            border: 2px solid var(--magenta);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse-die 2s ease-in-out infinite;
+        }
+
+        .stack-visual.cpu .cpu-pins { display: none; }
+
+        .stack-visual.cpu .cpu-label {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.5rem;
+            color: var(--green);
+            text-shadow: 0 0 8px var(--green);
+        }
+
+        .stack-visual.ram {
+            height: 50px;
+        }
+
+        .stack-visual.ram .ram-heatsink {
+            width: 90px;
+            height: 10px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--cyan));
+            position: absolute;
+            top: 8px;
+            left: 5px;
+            clip-path: polygon(0 100%, 5% 0, 95% 0, 100% 100%);
+        }
+
+        .stack-visual.ram .ram-stick {
+            width: 90px;
+            height: 28px;
+            background: linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 100%);
+            border: 2px solid var(--green);
+            position: absolute;
+            top: 15px;
+            left: 5px;
+        }
+
+        .stack-visual.ram .ram-chips {
+            display: flex;
+            gap: 4px;
+            position: absolute;
+            top: 22px;
+            left: 12px;
+        }
+
+        .stack-visual.ram .chip {
+            width: 8px;
+            height: 14px;
+            background: #111;
+            border: 1px solid #444;
+        }
+
+        .stack-visual.ram .ram-label {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.5rem;
             color: var(--cyan);
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            text-shadow: 0 0 8px var(--cyan);
         }
 
-        .category-tab.active {
-            background: var(--cyan);
-            color: var(--bg);
-            border-color: var(--cyan);
-            box-shadow: 0 0 20px var(--cyan);
+        .stack-info h3 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1rem;
+            color: #ffffff;
+            margin: 0 0 8px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .stack-info p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: #a0c0d0;
+            margin: 0 0 12px 0;
+        }
+
+        .stack-link {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .stack-link:hover {
+            color: var(--magenta);
+            text-shadow: 0 0 10px var(--magenta);
         }
 
         /* Product grid */
@@ -860,14 +1054,65 @@
             </div>
         </section>
 
-        <!-- Category tabs -->
-        <div class="category-tabs">
-            <button class="category-tab active" data-category="all">ALLA</button>
-            <button class="category-tab" data-category="gpu">GPU</button>
-            <button class="category-tab" data-category="sbc">EDGE / SBC</button>
-            <button class="category-tab" data-category="cpu">CPU</button>
-            <button class="category-tab" data-category="ram">MINNE</button>
-        </div>
+        <!-- My Stack Section -->
+        <section class="my-stack-section">
+            <div class="my-stack-header">
+                <h2>⚡ MIN STACK</h2>
+                <p class="my-stack-subtitle">Hårdvaran som driver AgentFarm</p>
+            </div>
+            <div class="my-stack-grid">
+                <div class="stack-item">
+                    <div class="stack-visual gpu">
+                        <div class="gpu-body"></div>
+                        <div class="gpu-fans">
+                            <div class="fan"></div>
+                            <div class="fan"></div>
+                            <div class="fan"></div>
+                        </div>
+                        <div class="gpu-vram">16GB VRAM</div>
+                        <div class="gpu-pcie"></div>
+                    </div>
+                    <div class="stack-info">
+                        <h3>AMD Radeon RX 7800 XT</h3>
+                        <p>16GB GDDR6 · ROCm 6.x · Ollama inference</p>
+                        <a href="https://www.amazon.se/s?k=AMD+Radeon+RX+7800+XT&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                    </div>
+                </div>
+                <div class="stack-item">
+                    <div class="stack-visual cpu">
+                        <div class="cpu-body">
+                            <div class="cpu-die"></div>
+                            <div class="cpu-pins top"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                            <div class="cpu-pins bottom"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                            <div class="cpu-pins left"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                            <div class="cpu-pins right"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                        </div>
+                        <div class="cpu-label">16 CORES</div>
+                    </div>
+                    <div class="stack-info">
+                        <h3>AMD Ryzen 9 7950X</h3>
+                        <p>16 kärnor · 32 trådar · 5.7GHz boost</p>
+                        <a href="https://www.amazon.se/s?k=AMD+Ryzen+9+7950X&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                    </div>
+                </div>
+                <div class="stack-item">
+                    <div class="stack-visual ram">
+                        <div class="ram-heatsink"></div>
+                        <div class="ram-stick"></div>
+                        <div class="ram-chips">
+                            <div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                            <div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                        </div>
+                        <div class="ram-label">64GB</div>
+                    </div>
+                    <div class="stack-info">
+                        <h3>Corsair Vengeance DDR5 64GB</h3>
+                        <p>2x32GB · DDR5-5600 · CL36</p>
+                        <a href="https://www.amazon.se/s?k=Corsair+Vengeance+DDR5+64GB+5600&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- Products grid -->
         <div id="products-grid" class="products-grid">
@@ -921,11 +1166,9 @@
         // Hardware Terminal JavaScript
         const HardwareTerminal = {
             products: [],
-            currentCategory: 'all',
 
             async init() {
                 await this.loadProducts();
-                this.setupCategoryTabs();
                 this.renderProducts();
             },
 
@@ -933,38 +1176,24 @@
                 try {
                     const response = await fetch('/api/affiliates/products');
                     if (!response.ok) throw new Error('Failed to load products');
-                    this.products = await response.json();
+                    // Filter out SBC category
+                    const allProducts = await response.json();
+                    this.products = allProducts.filter(p => p.category !== 'sbc');
                 } catch (error) {
                     console.error('Error loading products:', error);
                     this.products = [];
                 }
             },
 
-            setupCategoryTabs() {
-                document.querySelectorAll('.category-tab').forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
-                        tab.classList.add('active');
-                        this.currentCategory = tab.dataset.category;
-                        this.renderProducts();
-                    });
-                });
-            },
-
             renderProducts() {
                 const grid = document.getElementById('products-grid');
 
-                let filtered = this.products;
-                if (this.currentCategory !== 'all') {
-                    filtered = this.products.filter(p => p.category === this.currentCategory);
-                }
-
-                if (filtered.length === 0) {
-                    grid.innerHTML = '<div class="no-products">INGA PRODUKTER I DENNA KATEGORI</div>';
+                if (this.products.length === 0) {
+                    grid.innerHTML = '<div class="no-products">INGA PRODUKTER</div>';
                     return;
                 }
 
-                grid.innerHTML = filtered.map(product => this.renderProductCard(product)).join('');
+                grid.innerHTML = this.products.map(product => this.renderProductCard(product)).join('');
             },
 
             renderProductCard(product) {
