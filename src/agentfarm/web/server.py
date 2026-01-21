@@ -2228,21 +2228,21 @@ async def api_stripe_debug_handler(request: web.Request) -> web.Response:
 
     result = {
         "stripe_enabled": stripe_integration.enabled if stripe_integration else False,
-        "webhook_url": "http://taborsen.duckdns.org:8080/webhook/stripe",
+        "webhook_url": "https://lenajosefsson.se/stripe/",
         "webhook_secret_configured": bool(stripe_integration and stripe_integration.config.webhook_secret),
         "webhook_secret_prefix": (stripe_integration.config.webhook_secret[:8] + "...")
             if stripe_integration and stripe_integration.config.webhook_secret else None,
         "beta_operator_price_id": stripe_integration.config.beta_operator_price_id if stripe_integration else None,
         "success_url": stripe_integration.config.success_url if stripe_integration else None,
         "instructions": [
-            "1. Go to Stripe Dashboard -> Developers -> Webhooks",
-            "2. Click 'Add endpoint'",
-            "3. Enter URL: http://taborsen.duckdns.org:8080/webhook/stripe",
-            "4. Select event: checkout.session.completed",
-            "5. Click 'Add endpoint'",
-            "6. Copy the 'Signing secret' (whsec_...) to STRIPE_WEBHOOK_SECRET in .env",
-            "7. Restart the server",
-            "NOTE: For test mode, HTTP is allowed. For live mode, use HTTPS.",
+            "1. Upload stripe_webhook_proxy.php to lenajosefsson.se/stripe/index.php",
+            "2. Go to Stripe Dashboard -> Developers -> Webhooks",
+            "3. Click 'Add endpoint'",
+            "4. Enter URL: https://lenajosefsson.se/stripe/",
+            "5. Select event: checkout.session.completed",
+            "6. Click 'Add endpoint'",
+            "7. Copy the 'Signing secret' (whsec_...) to STRIPE_WEBHOOK_SECRET in .env",
+            "8. Restart the server",
         ],
     }
 

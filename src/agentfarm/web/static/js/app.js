@@ -2026,17 +2026,54 @@ async function deleteVaultFile(filename) {
 // Check for payment result in URL
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('payment') === 'success') {
-    setTimeout(() => {
-        addMessage('system', '✓ Betalning genomförd! Dina prompts har lagts till.', 'success');
-        loadUserData(); // Refresh user data to show new prompts
-    }, 1000);
-    // Clear URL params
+    // Clear URL params immediately
     window.history.replaceState({}, document.title, window.location.pathname);
+
+    // Show pending message
+    addMessage('system', '⏳ Betalning genomförd! Uppdaterar din status...', 'info');
+
+    // Poll for upgrade status (webhook might take a moment)
+    async function pollForUpgrade(attempts = 0) {
+        const maxAttempts = 10;
+        const pollInterval = 2000; // 2 seconds
+
+        try {
+            const response = await fetch('/api/user');
+            if (response.ok) {
+                const data = await response.json();
+                currentUserData = data;
+                updateUserStatusDisplay();
+
+                // Check if upgrade was successful
+                if (data.is_beta_operator || data.prompts_remaining > 1) {
+                    addMessage('system', `✓ Välkommen Beta Operator! Du har nu ${data.prompts_remaining} workflows.`, 'success');
+                    return;
+                }
+            }
+
+            // Retry if not upgraded yet
+            if (attempts < maxAttempts) {
+                setTimeout(() => pollForUpgrade(attempts + 1), pollInterval);
+            } else {
+                // Give up after max attempts
+                addMessage('system', '⚠️ Betalningen registrerades men uppgraderingen kan ta några minuter. Ladda om sidan om en stund.', 'warning');
+            }
+        } catch (err) {
+            console.error('Poll error:', err);
+            if (attempts < maxAttempts) {
+                setTimeout(() => pollForUpgrade(attempts + 1), pollInterval);
+            }
+        }
+    }
+
+    // Start polling after a short delay
+    setTimeout(() => pollForUpgrade(), 1500);
+
 } else if (urlParams.get('payment') === 'cancelled') {
+    window.history.replaceState({}, document.title, window.location.pathname);
     setTimeout(() => {
         addMessage('system', 'Betalning avbruten.', 'warning');
-    }, 1000);
-    window.history.replaceState({}, document.title, window.location.pathname);
+    }, 500);
 }
 
 // =============================================================================
