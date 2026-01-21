@@ -642,6 +642,31 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
                 'stage': data.get('stage'),
                 'status': data.get('status'),
             })
+            # Also emit LLM events for performance tracking when stage completes
+            agent = data.get('stage', 'orchestrator')
+            if agent == 'ux_design':
+                agent = 'designer'
+            elif agent == 'execute':
+                agent = 'executor'
+            elif agent == 'verify':
+                agent = 'verifier'
+            elif agent == 'review':
+                agent = 'reviewer'
+            elif agent == 'plan':
+                agent = 'planner'
+
+            if data.get('status') == 'active':
+                # Emit LLM_REQUEST when stage starts
+                await event_bus.emit(Event(
+                    type=EventType.LLM_REQUEST,
+                    source=agent,
+                    data={
+                        'request_id': f"{correlation_id}-{agent}",
+                        'model': 'ollama',
+                        'agent': agent,
+                    },
+                    correlation_id=correlation_id,
+                ))
             return
 
         # Map old event names to EventType
@@ -663,6 +688,26 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
             data=data,
             correlation_id=correlation_id,
         ))
+
+        # Emit LLM_RESPONSE for tokens_update events (for PerformanceTracker)
+        if event_name == 'tokens_update' and data.get('tokens'):
+            tokens = data.get('tokens', 0)
+            # Estimate input/output split (roughly 70/30)
+            input_tokens = int(tokens * 0.7)
+            output_tokens = tokens - input_tokens
+            await event_bus.emit(Event(
+                type=EventType.LLM_RESPONSE,
+                source=source,
+                data={
+                    'request_id': f"{correlation_id}-{source}",
+                    'model': 'ollama',
+                    'agent': source,
+                    'input_tokens': input_tokens,
+                    'output_tokens': output_tokens,
+                    'success': True,
+                },
+                correlation_id=correlation_id,
+            ))
 
     try:
         await event_bus.emit(Event(
@@ -779,6 +824,31 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
                 'stage': data.get('stage'),
                 'status': data.get('status'),
             })
+            # Also emit LLM events for performance tracking when stage starts
+            agent = data.get('stage', 'orchestrator')
+            if agent == 'ux_design':
+                agent = 'designer'
+            elif agent == 'execute':
+                agent = 'executor'
+            elif agent == 'verify':
+                agent = 'verifier'
+            elif agent == 'review':
+                agent = 'reviewer'
+            elif agent == 'plan':
+                agent = 'planner'
+
+            if data.get('status') == 'active':
+                # Emit LLM_REQUEST when stage starts
+                await event_bus.emit(Event(
+                    type=EventType.LLM_REQUEST,
+                    source=agent,
+                    data={
+                        'request_id': f"{correlation_id}-{agent}",
+                        'model': 'ollama',
+                        'agent': agent,
+                    },
+                    correlation_id=correlation_id,
+                ))
             return
 
         event_type_map = {
@@ -799,6 +869,26 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
             data=data,
             correlation_id=correlation_id,
         ))
+
+        # Emit LLM_RESPONSE for tokens_update events (for PerformanceTracker)
+        if event_name == 'tokens_update' and data.get('tokens'):
+            tokens = data.get('tokens', 0)
+            # Estimate input/output split (roughly 70/30)
+            input_tokens = int(tokens * 0.7)
+            output_tokens = tokens - input_tokens
+            await event_bus.emit(Event(
+                type=EventType.LLM_RESPONSE,
+                source=source,
+                data={
+                    'request_id': f"{correlation_id}-{source}",
+                    'model': 'ollama',
+                    'agent': source,
+                    'input_tokens': input_tokens,
+                    'output_tokens': output_tokens,
+                    'success': True,
+                },
+                correlation_id=correlation_id,
+            ))
 
     try:
         # Notify start via event bus

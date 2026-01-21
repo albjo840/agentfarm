@@ -862,6 +862,53 @@
             line-height: 1.6;
         }
 
+        /* Hardware Top Bar */
+        .hardware-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .hardware-top-bar .language-toggle {
+            display: flex;
+            gap: 5px;
+        }
+
+        .hardware-top-bar .lang-btn {
+            width: 2.2rem;
+            height: 2.2rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-color, #00fff2);
+            background: transparent;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hardware-top-bar .lang-btn:hover {
+            opacity: 0.9;
+            border-color: var(--cyan);
+        }
+
+        .hardware-top-bar .lang-btn.active {
+            opacity: 1;
+            border-color: var(--cyan);
+            background: rgba(0, 255, 242, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 242, 0.3);
+        }
+
+        .hardware-top-bar .flag {
+            font-size: 1.1rem;
+        }
+
+        .hardware-top-bar .back-link {
+            margin-bottom: 0;
+        }
+
         /* Back link */
         .back-link {
             display: inline-flex;
@@ -1019,36 +1066,46 @@
     <div class="crt-effect"></div>
 
     <div class="hardware-container">
-        <!-- Back link -->
-        <a href="/" class="back-link">
-            <span>&larr;</span>
-            <span>TILLBAKA TILL TERMINAL</span>
-        </a>
+        <!-- Top bar with back link and language toggle -->
+        <div class="hardware-top-bar">
+            <a href="/" class="back-link">
+                <span>&larr;</span>
+                <span data-i18n="hw.back">TILLBAKA TILL TERMINAL</span>
+            </a>
+            <div class="language-toggle">
+                <button class="lang-btn" data-lang="sv" title="Svenska">
+                    <span class="flag">🇸🇪</span>
+                </button>
+                <button class="lang-btn" data-lang="en" title="English">
+                    <span class="flag">🇬🇧</span>
+                </button>
+            </div>
+        </div>
 
         <!-- Header -->
         <header class="hardware-header">
-            <h1>HARDWARE TERMINAL</h1>
-            <p class="subtitle">BYGG DIN EGNA AI-DATOR - KÖR LLMs LOKALT</p>
-            <span class="rocm-badge">AMD ROCm OPTIMERAT</span>
+            <h1 data-i18n="hw.title">HARDWARE TERMINAL</h1>
+            <p class="subtitle" data-i18n="hw.subtitle">BYGG DIN EGNA AI-DATOR - KÖR LLMs LOKALT</p>
+            <span class="rocm-badge" data-i18n="hw.rocm_badge">AMD ROCm OPTIMERAT</span>
         </header>
 
         <!-- Hero CTA Section -->
         <section class="hero-cta">
             <div class="hero-content">
-                <h2>🚀 Kör AI-modeller lokalt på din egen GPU</h2>
-                <p>Med AgentFarm och rätt hårdvara kan du köra LLaMA, Qwen, Mistral och andra open source-modeller helt privat - utan molntjänster eller månadsavgifter.</p>
+                <h2 data-i18n="hw.hero_title">🚀 Kör AI-modeller lokalt på din egen GPU</h2>
+                <p data-i18n="hw.hero_desc">Med AgentFarm och rätt hårdvara kan du köra LLaMA, Qwen, Mistral och andra open source-modeller helt privat - utan molntjänster eller månadsavgifter.</p>
                 <div class="hero-benefits">
                     <div class="benefit">
                         <span class="benefit-icon">🔒</span>
-                        <span>100% privat - ingen data lämnar din dator</span>
+                        <span data-i18n="hw.benefit_private">100% privat - ingen data lämnar din dator</span>
                     </div>
                     <div class="benefit">
                         <span class="benefit-icon">💰</span>
-                        <span>Engångskostnad - inga API-avgifter</span>
+                        <span data-i18n="hw.benefit_cost">Engångskostnad - inga API-avgifter</span>
                     </div>
                     <div class="benefit">
                         <span class="benefit-icon">⚡</span>
-                        <span>Snabb inference - 50+ tokens/sek</span>
+                        <span data-i18n="hw.benefit_speed">Snabb inference - 50+ tokens/sek</span>
                     </div>
                 </div>
             </div>
@@ -1057,8 +1114,8 @@
         <!-- My Stack Section -->
         <section class="my-stack-section">
             <div class="my-stack-header">
-                <h2>⚡ MIN STACK</h2>
-                <p class="my-stack-subtitle">Hårdvaran som driver AgentFarm</p>
+                <h2 data-i18n="hw.my_stack">⚡ MIN STACK</h2>
+                <p class="my-stack-subtitle" data-i18n="hw.my_stack_desc">Hårdvaran som driver AgentFarm</p>
             </div>
             <div class="my-stack-grid">
                 <div class="stack-item">
@@ -1075,7 +1132,7 @@
                     <div class="stack-info">
                         <h3>AMD Radeon RX 7800 XT</h3>
                         <p>16GB GDDR6 · ROCm 6.x · Ollama inference</p>
-                        <a href="https://www.amazon.se/s?k=AMD+Radeon+RX+7800+XT&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=AMD+Radeon+RX+7800+XT&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
                 <div class="stack-item">
@@ -1092,7 +1149,7 @@
                     <div class="stack-info">
                         <h3>AMD Ryzen 9 7950X</h3>
                         <p>16 kärnor · 32 trådar · 5.7GHz boost</p>
-                        <a href="https://www.amazon.se/s?k=AMD+Ryzen+9+7950X&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=AMD+Ryzen+9+7950X&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
                 <div class="stack-item">
@@ -1108,7 +1165,7 @@
                     <div class="stack-info">
                         <h3>Corsair Vengeance DDR5 64GB</h3>
                         <p>2x32GB · DDR5-5600 · CL36</p>
-                        <a href="https://www.amazon.se/s?k=Corsair+Vengeance+DDR5+64GB+5600&tag=agentfarm-21" target="_blank" class="stack-link">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=Corsair+Vengeance+DDR5+64GB+5600&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
             </div>
@@ -1116,53 +1173,61 @@
 
         <!-- Products grid -->
         <div id="products-grid" class="products-grid">
-            <div class="loading">LADDAR PRODUKTER</div>
+            <div class="loading" data-i18n="hw.loading">LADDAR PRODUKTER</div>
         </div>
 
         <!-- Info section -->
         <section class="info-section">
-            <h2>🎯 VARFÖR AMD FÖR AI/ML?</h2>
+            <h2 data-i18n="hw.info_title">🎯 VARFÖR AMD FÖR AI/ML?</h2>
             <div class="info-grid">
                 <div class="info-item">
-                    <h3>🔧 ROCm 6.x SUPPORT</h3>
-                    <p>Full PyTorch och TensorFlow-kompatibilitet via ROCm. Kör lokala LLMs utan CUDA-beroende - helt open source.</p>
+                    <h3 data-i18n="hw.info_rocm">🔧 ROCm 6.x SUPPORT</h3>
+                    <p data-i18n="hw.info_rocm_desc">Full PyTorch och TensorFlow-kompatibilitet via ROCm. Kör lokala LLMs utan CUDA-beroende - helt open source.</p>
                 </div>
                 <div class="info-item">
-                    <h3>💾 VRAM ÄR NYCKELN</h3>
-                    <p>24GB VRAM på 7900 XTX klarar 70B-modeller med kvantisering. 16GB på 7800 XT räcker för de flesta 7B-13B modeller.</p>
+                    <h3 data-i18n="hw.info_vram">💾 VRAM ÄR NYCKELN</h3>
+                    <p data-i18n="hw.info_vram_desc">24GB VRAM på 7900 XTX klarar 70B-modeller med kvantisering. 16GB på 7800 XT räcker för de flesta 7B-13B modeller.</p>
                 </div>
                 <div class="info-item">
-                    <h3>🐧 UBUNTU 22.04 LTS</h3>
-                    <p>ROCm fungerar bäst på Ubuntu 22.04 LTS. Vi kör AgentFarm på exakt denna setup - testat och verifierat.</p>
+                    <h3 data-i18n="hw.info_ubuntu">🐧 UBUNTU 22.04 LTS</h3>
+                    <p data-i18n="hw.info_ubuntu_desc">ROCm fungerar bäst på Ubuntu 22.04 LTS. Vi kör AgentFarm på exakt denna setup - testat och verifierat.</p>
                 </div>
                 <div class="info-item">
-                    <h3>💰 MER VRAM PER KRONA</h3>
-                    <p>AMD-kort ger ofta mer VRAM per krona jämfört med NVIDIA. Perfekt för hobbyprojekt, startups och privatpersoner.</p>
+                    <h3 data-i18n="hw.info_value">💰 MER VRAM PER KRONA</h3>
+                    <p data-i18n="hw.info_value_desc">AMD-kort ger ofta mer VRAM per krona jämfört med NVIDIA. Perfekt för hobbyprojekt, startups och privatpersoner.</p>
                 </div>
             </div>
         </section>
 
         <!-- CTA Section -->
         <section class="try-cta">
-            <h2>🤖 VILL DU TESTA AGENTERNA?</h2>
-            <p>Prova AgentFarm gratis och se hur AI-agenter kan hjälpa dig skapa kod, tester och dokumentation.</p>
+            <h2 data-i18n="hw.try_title">🤖 VILL DU TESTA AGENTERNA?</h2>
+            <p data-i18n="hw.try_desc">Prova AgentFarm gratis och se hur AI-agenter kan hjälpa dig skapa kod, tester och dokumentation.</p>
             <a href="/" class="try-btn">
                 <span class="try-icon">▶</span>
-                <span>PROVA NU - GRATIS</span>
+                <span data-i18n="hw.try_btn">PROVA NU - GRATIS</span>
             </a>
         </section>
 
         <!-- Footer -->
         <footer class="hardware-footer">
             <p>
-                🔗 Affiliate-länkar - vi får en liten provision om du köper via våra länkar. Det kostar dig inget extra!
+                <span data-i18n="hw.footer_affiliate">🔗 Affiliate-länkar - vi får en liten provision om du köper via våra länkar. Det kostar dig inget extra!</span>
                 <br><br>
-                <a href="/">← Tillbaka till AgentFarm</a>
+                <a href="/" data-i18n="hw.footer_back">← Tillbaka till AgentFarm</a>
             </p>
         </footer>
     </div>
 
+    <script src="/static/js/translations.js"></script>
     <script>
+        // Initialize language toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.i18n && window.i18n.initLanguageToggle) {
+                window.i18n.initLanguageToggle();
+            }
+        });
+
         // Hardware Terminal JavaScript
         const HardwareTerminal = {
             products: [],
@@ -1187,9 +1252,10 @@
 
             renderProducts() {
                 const grid = document.getElementById('products-grid');
+                const t = window.i18n ? window.i18n.t : (k) => k;
 
                 if (this.products.length === 0) {
-                    grid.innerHTML = '<div class="no-products">INGA PRODUKTER</div>';
+                    grid.innerHTML = `<div class="no-products">${t('hw.no_products')}</div>`;
                     return;
                 }
 
