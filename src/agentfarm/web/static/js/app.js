@@ -1612,6 +1612,15 @@ function closeModal(modalId) {
     }
 }
 
+function togglePrivacySection() {
+    const content = document.getElementById('privacy-content');
+    const toggle = document.querySelector('.privacy-toggle');
+    if (content && toggle) {
+        content.classList.toggle('hidden');
+        toggle.classList.toggle('expanded');
+    }
+}
+
 async function startCheckout(productType) {
     try {
         // Use dedicated endpoint for Beta Operator

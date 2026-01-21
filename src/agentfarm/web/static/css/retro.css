@@ -2538,6 +2538,125 @@ section {
     text-align: center;
 }
 
+/* Privacy & Security Section */
+.privacy-section {
+    margin: 1.5rem 0;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.privacy-toggle {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--cyan);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.privacy-toggle:hover {
+    background: rgba(0, 255, 242, 0.1);
+}
+
+.privacy-toggle .privacy-icon {
+    font-size: 1.1rem;
+}
+
+.privacy-toggle .toggle-arrow {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+    font-size: 0.7rem;
+}
+
+.privacy-toggle.expanded .toggle-arrow {
+    transform: rotate(180deg);
+}
+
+.privacy-content {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.privacy-content.hidden {
+    display: none;
+}
+
+.privacy-intro {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.privacy-item {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(0, 255, 242, 0.1);
+}
+
+.privacy-item:last-of-type {
+    border-bottom: none;
+}
+
+.privacy-item h4 {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    color: var(--green);
+    margin: 0 0 0.5rem 0;
+    letter-spacing: 0.05em;
+}
+
+.privacy-item p {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin: 0;
+    line-height: 1.6;
+}
+
+.privacy-item ul {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+    list-style: none;
+}
+
+.privacy-item ul li {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    position: relative;
+    padding-left: 1rem;
+}
+
+.privacy-item ul li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--cyan);
+}
+
+.privacy-consent {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--orange);
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 136, 0, 0.3);
+    line-height: 1.5;
+}
+
 /* Tier Badge for Beta Operator */
 .tier-badge.beta-operator {
     background: linear-gradient(135deg, var(--orange), var(--magenta));

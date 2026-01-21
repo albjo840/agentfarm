@@ -82,6 +82,21 @@ const TRANSLATIONS = {
         "beta.button": "BLI BETA OPERATOR",
         "beta.disclaimer": "Du får direkt tillgång. Betalning hanteras säkert via Stripe.",
 
+        // Privacy section
+        "beta.privacy_title": "INTEGRITET & DATASÄKERHET",
+        "beta.privacy_intro": "Denna tjänst är byggd med \"Privacy by Design\" som grundprincip. Din data hanteras med högsta möjliga säkerhetsstandard.",
+        "beta.privacy_airgap_title": "Total isolering (Air-gapped)",
+        "beta.privacy_airgap_desc": "Till skillnad från molnbaserade AI-tjänster lämnar din data aldrig den lokala infrastrukturen. All bearbetning sker på dedikerad hårdvara (AMD Radeon 7800 XT) som är logiskt isolerad under tiden agenter arbetar med din kontext.",
+        "beta.privacy_vpn_title": "Krypterad åtkomst",
+        "beta.privacy_vpn_desc": "All kommunikation sker via en punkt-till-punkt-krypterad WireGuard VPN-tunnel. Ingen utomstående kan se eller avlyssna den data du delar.",
+        "beta.privacy_gdpr_title": "GDPR-efterlevnad",
+        "beta.privacy_gdpr_purpose": "Vi samlar endast in data som krävs för att utföra dina uppgifter",
+        "beta.privacy_gdpr_training": "Din data används aldrig för att träna AI-modellerna",
+        "beta.privacy_gdpr_delete": "När sessionen avslutas raderas din data från arbetsminne och lagring",
+        "beta.privacy_nis2_title": "NIS2 & Cybersäkerhet",
+        "beta.privacy_nis2_desc": "Genom att använda denna lokala lösning minskar du exponering mot tredjepartsrisker i molnet, vilket underlättar efterlevnad av NIS2-direktivet.",
+        "beta.privacy_consent": "Genom att genomföra betalningen godkänner du att din data hanteras enligt ovanstående säkerhetsprotokoll.",
+
         // Tryout modal
         "tryout.title": "PROVA AGENTFARM",
         "tryout.intro": "Testa AI-agenter som skapar kod åt dig - helt gratis!",
@@ -250,6 +265,21 @@ const TRANSLATIONS = {
         "beta.feature_zip": "ZIP download of projects",
         "beta.button": "BECOME BETA OPERATOR",
         "beta.disclaimer": "Instant access. Payment handled securely via Stripe.",
+
+        // Privacy section
+        "beta.privacy_title": "PRIVACY & DATA SECURITY",
+        "beta.privacy_intro": "This service is built with \"Privacy by Design\" as a core principle. Your data is handled with the highest possible security standards.",
+        "beta.privacy_airgap_title": "Total Isolation (Air-gapped)",
+        "beta.privacy_airgap_desc": "Unlike cloud-based AI services, your data never leaves the local infrastructure. All processing occurs on dedicated hardware (AMD Radeon 7800 XT) that is logically isolated while agents work with your context.",
+        "beta.privacy_vpn_title": "Encrypted Access",
+        "beta.privacy_vpn_desc": "All communication occurs via a point-to-point encrypted WireGuard VPN tunnel. No outsider can see or intercept the data you share.",
+        "beta.privacy_gdpr_title": "GDPR Compliance",
+        "beta.privacy_gdpr_purpose": "We only collect data required to perform your tasks",
+        "beta.privacy_gdpr_training": "Your data is never used to train the AI models",
+        "beta.privacy_gdpr_delete": "When your session ends, your data is deleted from working memory and storage",
+        "beta.privacy_nis2_title": "NIS2 & Cybersecurity",
+        "beta.privacy_nis2_desc": "By using this local solution, you reduce exposure to third-party cloud risks, facilitating compliance with the NIS2 directive.",
+        "beta.privacy_consent": "By completing the payment, you agree that your data will be handled according to the above security protocols.",
 
         // Tryout modal
         "tryout.title": "TRY AGENTFARM",

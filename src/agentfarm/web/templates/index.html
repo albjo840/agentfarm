@@ -312,6 +312,49 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                         <span class="feature-text">ZIP-nedladdning av projekt</span>
                     </div>
                 </div>
+
+                <!-- Privacy & Security Section -->
+                <div class="privacy-section">
+                    <button class="privacy-toggle" onclick="togglePrivacySection()">
+                        <span class="privacy-icon">🔐</span>
+                        <span data-i18n="beta.privacy_title">INTEGRITET & DATASÄKERHET</span>
+                        <span class="toggle-arrow">▼</span>
+                    </button>
+                    <div class="privacy-content hidden" id="privacy-content">
+                        <p class="privacy-intro" data-i18n="beta.privacy_intro">
+                            Denna tjänst är byggd med "Privacy by Design" som grundprincip. Din data hanteras med högsta möjliga säkerhetsstandard.
+                        </p>
+
+                        <div class="privacy-item">
+                            <h4>🛡️ <span data-i18n="beta.privacy_airgap_title">Total isolering (Air-gapped)</span></h4>
+                            <p data-i18n="beta.privacy_airgap_desc">Till skillnad från molnbaserade AI-tjänster lämnar din data aldrig den lokala infrastrukturen. All bearbetning sker på dedikerad hårdvara (AMD Radeon 7800 XT) som är logiskt isolerad under tiden agenter arbetar med din kontext.</p>
+                        </div>
+
+                        <div class="privacy-item">
+                            <h4>🔒 <span data-i18n="beta.privacy_vpn_title">Krypterad åtkomst</span></h4>
+                            <p data-i18n="beta.privacy_vpn_desc">All kommunikation sker via en punkt-till-punkt-krypterad WireGuard VPN-tunnel. Ingen utomstående kan se eller avlyssna den data du delar.</p>
+                        </div>
+
+                        <div class="privacy-item">
+                            <h4>📋 <span data-i18n="beta.privacy_gdpr_title">GDPR-efterlevnad</span></h4>
+                            <ul>
+                                <li data-i18n="beta.privacy_gdpr_purpose">Vi samlar endast in data som krävs för att utföra dina uppgifter</li>
+                                <li data-i18n="beta.privacy_gdpr_training">Din data används aldrig för att träna AI-modellerna</li>
+                                <li data-i18n="beta.privacy_gdpr_delete">När sessionen avslutas raderas din data från arbetsminne och lagring</li>
+                            </ul>
+                        </div>
+
+                        <div class="privacy-item">
+                            <h4>🏛️ <span data-i18n="beta.privacy_nis2_title">NIS2 & Cybersäkerhet</span></h4>
+                            <p data-i18n="beta.privacy_nis2_desc">Genom att använda denna lokala lösning minskar du exponering mot tredjepartsrisker i molnet, vilket underlättar efterlevnad av NIS2-direktivet.</p>
+                        </div>
+
+                        <p class="privacy-consent" data-i18n="beta.privacy_consent">
+                            Genom att genomföra betalningen godkänner du att din data hanteras enligt ovanstående säkerhetsprotokoll.
+                        </p>
+                    </div>
+                </div>
+
                 <button id="checkout-beta-operator" class="beta-checkout-btn">
                     <span>⚡ BLI BETA OPERATOR</span>
                 </button>
