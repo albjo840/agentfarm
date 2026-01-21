@@ -30,13 +30,14 @@ src/agentfarm/web/
 ├── templates/
 │   ├── index.html         # Main dashboard
 │   ├── mobile.html        # Mobile interface
-│   └── hardware.html      # Hardware terminal
+│   └── hardware.html      # Hardware terminal (affiliate-länkar)
 └── static/
     ├── css/
     │   └── retro.css      # 80s sci-fi styling
     └── js/
         ├── app.js         # Main application
-        └── robots.js      # Robot visualizer
+        ├── robots.js      # Robot visualizer
+        └── translations.js # i18n system (SV/EN)
 ```
 
 ## Server (`server.py`)
@@ -318,6 +319,80 @@ const IdleBehavior = {
 - `scanline` - CRT scanline effect
 - `flicker` - Text flickering
 - `badge-glow` - Badge highlight
+
+## Internationalization (i18n)
+
+AgentFarm stöder svenska och engelska med flagg-toggle i header.
+
+### translations.js
+
+```javascript
+const TRANSLATIONS = {
+    sv: {
+        "header.system": "SYSTEM",
+        "input.placeholder": "Beskriv vad du vill skapa...",
+        "beta.privacy_title": "INTEGRITET & DATASÄKERHET",
+        // 100+ översättningar...
+    },
+    en: {
+        "header.system": "SYSTEM",
+        "input.placeholder": "Describe what you want to create...",
+        "beta.privacy_title": "PRIVACY & DATA SECURITY",
+        // 100+ translations...
+    }
+};
+
+// API
+window.i18n = {
+    t,                    // Get translation: t('key')
+    setLanguage,          // Switch language: setLanguage('en')
+    applyTranslations,    // Re-apply all translations
+    initLanguageToggle,   // Initialize toggle buttons
+    getCurrentLanguage,   // Get current language
+};
+```
+
+### HTML Attributes
+
+```html
+<!-- Text content -->
+<span data-i18n="header.system">SYSTEM</span>
+
+<!-- Placeholder -->
+<input data-i18n-placeholder="input.placeholder" placeholder="...">
+
+<!-- Title/tooltip -->
+<button data-i18n-title="button.tooltip" title="...">
+```
+
+### Translation Keys
+
+| Prefix | Beskrivning |
+|--------|-------------|
+| `header.*` | Header-element |
+| `section.*` | Sektionsrubriker |
+| `input.*` | Input-fält och hints |
+| `stage.*` | Workflow-steg |
+| `beta.*` | Beta Operator modal + privacy |
+| `tryout.*` | Tryout modal |
+| `feedback.*` | Feedback modal |
+| `agents.*` | Agent-konfiguration |
+| `hw.*` | Hardware-sidan |
+
+### Language Toggle
+
+```html
+<div class="language-toggle">
+    <button class="lang-btn" data-lang="sv" title="Svenska">
+        <span class="flag">🇸🇪</span>
+    </button>
+    <button class="lang-btn" data-lang="en" title="English">
+        <span class="flag">🇬🇧</span>
+    </button>
+</div>
+```
+
+Språkval sparas i `localStorage` under nyckeln `agentfarm_lang`.
 
 ## Running the Server
 

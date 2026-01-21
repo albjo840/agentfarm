@@ -35,7 +35,7 @@ AgentFarm använder ett tvåstegs-system: **Tryout** (gratis) och **Beta Operato
 │  │  • /hardware sida           │    │  • Unlimited prompts (∞)    │   │
 │  │  • GPU-prestanda stats      │    │  • Full access to all       │   │
 │  │  • Affiliate-länkar         │    │    features                 │   │
-│  │  • Adtraction integration   │    │  • Set via scripts/         │   │
+│  │  • Amazon Associates (SE)   │    │  • Set via scripts/         │   │
 │  │                             │    │    set_admin.py             │   │
 │  └─────────────────────────────┘    └─────────────────────────────┘   │
 │                                                                         │
@@ -135,6 +135,22 @@ STRIPE_CANCEL_URL=http://taborsen.duckdns.org:8080/?payment=cancelled
                                          └──────────────┘
 ```
 
+### Privacy Disclaimer (Beta Operator Modal)
+
+En expanderbar "Integritet & Datasäkerhet"-sektion visas i Beta Operator-modalen:
+
+| Sektion | Innehåll |
+|---------|----------|
+| 🛡️ Air-gapped | Data lämnar aldrig lokal infrastruktur, bearbetas på AMD 7800 XT |
+| 🔒 VPN | Punkt-till-punkt WireGuard-tunnel, ingen avlyssning möjlig |
+| 📋 GDPR | Dataminimering, ingen träning på data, radering vid session-slut |
+| 🏛️ NIS2 | Minskad tredjepartsrisk, underlättar compliance |
+
+**Consent-text:**
+> "Genom att genomföra betalningen godkänner du att din data hanteras enligt ovanstående säkerhetsprotokoll."
+
+Translations finns för svenska (`beta.privacy_*`) och engelska.
+
 ### API Endpoints
 
 | Endpoint | Metod | Beskrivning |
@@ -176,12 +192,41 @@ url, click = manager.track_click(
 
 ### Konfigurerade retailers
 
-| Retailer | Status |
-|----------|--------|
-| Dustin | Aktiv |
-| Komplett | Aktiv |
-| Inet | Aktiv |
-| Adtraction | Konfigureras |
+| Retailer | Status | Affiliate Tag |
+|----------|--------|---------------|
+| Amazon.se | ✅ Aktiv | `tag=agentfarm-21` |
+
+### affiliates.json
+
+```json
+{
+  "retailers": {
+    "amazon": {
+      "name": "Amazon.se",
+      "affiliate_param": "tag=agentfarm-21"
+    }
+  },
+  "products": [
+    {
+      "id": "amd_7900xtx",
+      "name": "AMD Radeon RX 7900 XTX",
+      "category": "gpu",
+      "badge": "RECOMMENDED",
+      "links": {
+        "amazon": "https://www.amazon.se/s?k=AMD+Radeon+RX+7900+XTX&tag=agentfarm-21"
+      }
+    }
+    // ... 12 produkter (4 GPU, 4 CPU, 4 RAM)
+  ]
+}
+```
+
+### Hardware Page Features
+
+- **My Stack** - Visar utvecklarens egen hårdvara (RX 7800 XT, Ryzen 9 7950X, 64GB DDR5)
+- **Animerade visualiseringar** - GPU-fläktar snurrar, CPU-die pulsar, RAM-chips flimrar
+- **i18n-support** - Svenska och engelska översättningar
+- **Badge-typer**: RECOMMENDED, BEST VALUE, BUDGET, TOP PERFORMANCE, HIGH CAPACITY, EXTREME
 
 ## Feedback System (Beta Operator only)
 

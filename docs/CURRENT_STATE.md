@@ -1,6 +1,6 @@
 # AgentFarm - Current State
 
-> **Uppdaterad:** 2026-01-17
+> **Uppdaterad:** 2026-01-21
 >
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -8,18 +8,71 @@
 
 ```
 Branch: feature/affiliate-ads
-Status: Eval tests fixade, feature-complete
+Status: Full i18n, Amazon affiliates, Privacy disclaimer
 ```
 
 ## Senaste Commits
 
 ```
-fafb0d1 fix: Update eval tests with setup_files and fix test suite
-360aff0 feat: Add affiliate price scraper using Groq API (separate from agent system)
-21e599c feat: Add comprehensive agent chain tests and evals
-b53e05b feat: Add MultiAgentParallelExecutor for cross-agent parallel execution
-8bf8ffc docs: Add WireGuard QR troubleshooting guide
+d7751fd feat: Add privacy disclaimer to Beta Operator modal
+09f75bf feat: Add hardware page i18n and fix token metrics tracking
+b97735a feat: Rename Prompts to 'Your prompts', add My Stack section
+a302bf4 feat: Add language toggle, animated hardware visuals, larger task input
+0775fd8 feat: Add product images and new badge types to hardware page
 ```
+
+## Session 2026-01-21: Internationalization & Privacy
+
+### Slutfört i denna session
+
+- [x] **i18n System** - Komplett svenska/engelska språkväxling
+  - `translations.js` med 100+ översättningar
+  - Flagg-toggle (🇸🇪/🇬🇧) i header
+  - `data-i18n` attribut på alla översättningsbara element
+  - localStorage-persistens av språkval
+  - Stöd för `data-i18n-placeholder` och `data-i18n-title`
+
+- [x] **Hardware Page Updates**
+  - Amazon.se affiliate-integration (tag: `agentfarm-21`)
+  - Animerade CSS-visualiseringar (GPU-fläktar, CPU-die, RAM-chips)
+  - "My Stack" sektion med användarens hårdvara
+  - Borttagna kategori-tabs och SBC-produkter
+  - Full i18n-support med `hw.*` translations
+
+- [x] **Token Metrics Fix**
+  - Event callback emittar nu `LLM_REQUEST`/`LLM_RESPONSE` events
+  - PerformanceTracker får data från workflow stages
+  - Dashboard visar tokens/sek och latency under workflows
+
+- [x] **Privacy Disclaimer** - GDPR/NIS2-information i Beta Operator modal
+  - Expanderbar "Integritet & Datasäkerhet" sektion
+  - Air-gapped methodology, VPN-kryptering
+  - GDPR-efterlevnad (dataminimering, ingen träning, radering)
+  - NIS2 cybersäkerhets-compliance
+  - Svenska och engelska översättningar
+
+- [x] **UX Improvements**
+  - Task input expanderat till textarea (4 rader)
+  - Placeholder med exempel-prompt
+  - Ctrl+Enter för att köra
+  - "DINA PROMPTER" / "YOUR PROMPTS" i footer
+
+### Nya/Uppdaterade Filer
+
+```
+src/agentfarm/web/
+├── static/js/translations.js     # NY: i18n system
+├── static/js/app.js              # togglePrivacySection(), i18n init
+├── static/css/retro.css          # Privacy section, language toggle CSS
+├── templates/index.html          # data-i18n attrs, privacy section
+└── templates/hardware.html       # Full i18n, animated visuals
+└── server.py                     # LLM event emission for metrics
+
+.agentfarm/
+└── affiliates.json               # Amazon.se integration
+```
+
+---
 
 ## Session 2026-01-17: Eval Test Fixes
 
