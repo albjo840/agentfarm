@@ -30,22 +30,30 @@
             </div>
             <div class="status-bar">
                 <div class="status-item">
-                    <span class="label">SYSTEM</span>
-                    <span class="value online">ONLINE</span>
+                    <span class="label" data-i18n="header.system">SYSTEM</span>
+                    <span class="value online" data-i18n="header.online">ONLINE</span>
                 </div>
                 <div class="status-item">
-                    <span class="label">AGENTS</span>
+                    <span class="label" data-i18n="header.agents">AGENTER</span>
                     <span class="value" id="agent-count">6</span>
                 </div>
                 <div class="status-item tryout-display">
-                    <span class="label">STATUS</span>
-                    <span class="value" id="user-status">GÄST</span>
+                    <span class="label" data-i18n="header.status">STATUS</span>
+                    <span class="value" id="user-status" data-i18n="header.guest">GÄST</span>
                     <span class="tier-badge" id="tier-badge"></span>
                 </div>
                 <div class="status-item music-control">
                     <button id="music-toggle" class="music-btn" title="Toggle Synthwave Music">
                         <span class="music-icon">♪</span>
                         <span class="music-label">SYNTH</span>
+                    </button>
+                </div>
+                <div class="status-item language-toggle">
+                    <button class="lang-btn" data-lang="sv" title="Svenska">
+                        <span class="flag">🇸🇪</span>
+                    </button>
+                    <button class="lang-btn" data-lang="en" title="English">
+                        <span class="flag">🇬🇧</span>
                     </button>
                 </div>
             </div>
@@ -57,7 +65,7 @@
             <section class="agent-network">
                 <div class="section-header">
                     <span class="icon">◇</span>
-                    <h2>NEURAL NETWORK</h2>
+                    <h2 data-i18n="section.neural_network">NEURAL NETWORK</h2>
                 </div>
                 <div class="network-container" id="robot-arena">
                     <!-- Robot agents rendered by JS -->
@@ -68,7 +76,7 @@
             <section class="message-flow">
                 <div class="section-header">
                     <span class="icon">▷</span>
-                    <h2>DATA STREAM</h2>
+                    <h2 data-i18n="section.data_stream">DATASTRÖM</h2>
                 </div>
                 <div class="messages-container" id="messages">
                     <!-- Messages rendered by JS -->
@@ -79,21 +87,26 @@
             <section class="task-input">
                 <div class="section-header">
                     <span class="icon">⌘</span>
-                    <h2>COMMAND INTERFACE</h2>
+                    <h2 data-i18n="section.command_interface">KOMMANDOGRÄNSSNITT</h2>
                 </div>
                 <div class="input-container">
                     <div class="input-wrapper">
                         <span class="prompt">&gt;</span>
-                        <input type="text" id="task-input" placeholder="Enter task directive..." autocomplete="off">
+                        <textarea id="task-input" data-i18n-placeholder="input.placeholder" placeholder="Beskriv vad du vill skapa...
+
+T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och returnerar True/False. Lägg till enhetstester." rows="4"></textarea>
                     </div>
-                    <button id="execute-btn" class="execute-btn">
-                        <span>EXECUTE</span>
-                        <span class="btn-icon">▶</span>
-                    </button>
+                    <div class="input-actions">
+                        <span class="input-hint" data-i18n="input.hint">Ju mer detaljer, desto bättre resultat</span>
+                        <button id="execute-btn" class="execute-btn">
+                            <span data-i18n="input.execute">EXEKVERA</span>
+                            <span class="btn-icon">▶</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="multi-provider-badge">
                     <span class="badge-icon">◈</span>
-                    <span class="badge-text">MULTI-PROVIDER MODE</span>
+                    <span class="badge-text" data-i18n="input.multi_provider">MULTI-PROVIDER MODE</span>
                 </div>
             </section>
 
@@ -101,44 +114,44 @@
             <section class="workflow-status">
                 <div class="section-header">
                     <span class="icon">◎</span>
-                    <h2>WORKFLOW STATUS</h2>
+                    <h2 data-i18n="section.workflow_status">WORKFLOW STATUS</h2>
                 </div>
                 <div class="workflow-stages">
                     <div class="stage" id="stage-plan">
                         <div class="stage-icon">◇</div>
-                        <div class="stage-name">PLAN</div>
-                        <div class="stage-status">STANDBY</div>
+                        <div class="stage-name" data-i18n="stage.plan">PLAN</div>
+                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
                     </div>
                     <div class="stage-connector"></div>
                     <div class="stage" id="stage-ux_design">
                         <div class="stage-icon">♥</div>
-                        <div class="stage-name">UX</div>
-                        <div class="stage-status">STANDBY</div>
+                        <div class="stage-name" data-i18n="stage.ux">UX</div>
+                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
                     </div>
                     <div class="stage-connector"></div>
                     <div class="stage" id="stage-execute">
                         <div class="stage-icon">▷</div>
-                        <div class="stage-name">EXECUTE</div>
-                        <div class="stage-status">STANDBY</div>
+                        <div class="stage-name" data-i18n="stage.execute">EXEKVERA</div>
+                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
                     </div>
                     <div class="stage-connector"></div>
                     <div class="stage" id="stage-verify">
                         <div class="stage-icon">◈</div>
-                        <div class="stage-name">VERIFY</div>
-                        <div class="stage-status">STANDBY</div>
+                        <div class="stage-name" data-i18n="stage.verify">VERIFIERA</div>
+                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
                     </div>
                     <div class="stage-connector"></div>
                     <div class="stage" id="stage-review">
                         <div class="stage-icon">◉</div>
-                        <div class="stage-name">REVIEW</div>
-                        <div class="stage-status">STANDBY</div>
+                        <div class="stage-name" data-i18n="stage.review">GRANSKA</div>
+                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
                     </div>
                 </div>
                 <!-- Launch button - shown when workflow completes -->
                 <div id="launch-container" class="launch-container hidden">
                     <button id="launch-btn" class="launch-btn">
                         <span class="launch-icon">&#9654;</span>
-                        <span class="launch-text">LAUNCH PROJECT</span>
+                        <span class="launch-text" data-i18n="launch.button">STARTA PROJEKT</span>
                     </button>
                     <div class="launch-path" id="launch-path"></div>
                 </div>
@@ -148,21 +161,21 @@
             <section class="token-dashboard" id="token-dashboard">
                 <div class="section-header collapsible" id="token-dashboard-toggle">
                     <span class="icon">⚡</span>
-                    <h2>TOKEN METRICS</h2>
+                    <h2 data-i18n="section.token_metrics">TOKEN METRICS</h2>
                     <span class="collapse-icon">▼</span>
                 </div>
                 <div class="token-dashboard-content" id="token-dashboard-content">
                     <div class="token-overview">
                         <div class="metric-card">
-                            <span class="metric-label">TOTAL TOKENS</span>
+                            <span class="metric-label" data-i18n="metrics.total_tokens">TOTALA TOKENS</span>
                             <span class="metric-value" id="total-tokens">0</span>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">AVG TOKENS/SEC</span>
+                            <span class="metric-label" data-i18n="metrics.avg_tps">SNITT TOKENS/SEK</span>
                             <span class="metric-value" id="avg-tps">0</span>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">LATENCY (P95)</span>
+                            <span class="metric-label" data-i18n="metrics.latency">LATENS (P95)</span>
                             <span class="metric-value" id="latency-p95">0ms</span>
                         </div>
                     </div>
@@ -176,17 +189,17 @@
             <section class="file-upload-section tier-gated" id="file-upload-section">
                 <div class="section-header">
                     <span class="icon">📁</span>
-                    <h2>PROJEKTFILER</h2>
-                    <span class="section-subtitle">Filer som agenterna kan läsa</span>
+                    <h2 data-i18n="section.project_files">PROJEKTFILER</h2>
+                    <span class="section-subtitle" data-i18n="section.project_files_subtitle">Filer som agenterna kan läsa</span>
                 </div>
                 <div class="file-upload-info">
-                    <p>Ladda upp filer som agenterna ska ha tillgång till: kodfiler, dokumentation, specifikationer etc.</p>
+                    <p data-i18n="files.info">Ladda upp filer som agenterna ska ha tillgång till: kodfiler, dokumentation, specifikationer etc.</p>
                 </div>
                 <div class="file-drop-zone" id="file-drop-zone">
                     <input type="file" id="file-input-hidden" multiple hidden accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv,.pdf,.ts,.tsx,.jsx,.html,.css">
                     <span class="drop-zone-icon">📥</span>
-                    <span class="drop-zone-text">SLÄPP FILER HÄR</span>
-                    <span class="drop-zone-hint">eller klicka för att välja filer</span>
+                    <span class="drop-zone-text" data-i18n="files.drop_here">SLÄPP FILER HÄR</span>
+                    <span class="drop-zone-hint" data-i18n="files.click_hint">eller klicka för att välja filer</span>
                     <span class="drop-zone-formats">.py .js .ts .json .md .txt .yaml .csv .pdf</span>
                 </div>
                 <div class="uploaded-files-list" id="uploaded-files-list">
@@ -194,8 +207,8 @@
                 </div>
                 <!-- Beta Operator overlay for non-premium users -->
                 <div class="beta-operator-overlay" id="file-upload-overlay">
-                    <span class="overlay-text">🔒 BETA OPERATOR KRÄVS</span>
-                    <button class="beta-upgrade-btn" onclick="openModal('beta-operator-modal')">BLI BETA OPERATOR</button>
+                    <span class="overlay-text" data-i18n="files.beta_required">🔒 BETA OPERATOR KRÄVS</span>
+                    <button class="beta-upgrade-btn" onclick="openModal('beta-operator-modal')" data-i18n="files.become_beta">BLI BETA OPERATOR</button>
                 </div>
             </section>
         </main>
@@ -203,24 +216,24 @@
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-left">
-                <span class="cyber-text">NEURAL ORCHESTRATION SYSTEM</span>
+                <span class="cyber-text" data-i18n="footer.tagline">NEURAL ORCHESTRATION SYSTEM</span>
             </div>
             <div class="footer-center">
                 <button id="agent-prompts-btn" class="agent-prompts-btn tier-gated-btn" title="Anpassa agent system prompts">
                     <span class="agent-prompts-icon">⚙</span>
-                    <span class="agent-prompts-label">PROMPTS</span>
+                    <span class="agent-prompts-label" data-i18n="footer.prompts">PROMPTER</span>
                 </button>
                 <button id="beta-operator-btn" class="beta-operator-btn" title="Bli Beta Operator - få fler funktioner">
                     <span class="beta-operator-icon">⚡</span>
-                    <span class="beta-operator-label">BETA OPERATOR</span>
+                    <span class="beta-operator-label" data-i18n="footer.beta_operator">BETA OPERATOR</span>
                 </button>
                 <button id="feedback-btn" class="feedback-btn" title="Skicka feedback">
                     <span class="feedback-icon">✉</span>
-                    <span class="feedback-label">FEEDBACK</span>
+                    <span class="feedback-label" data-i18n="footer.feedback">FEEDBACK</span>
                 </button>
-                <a href="/hardware" class="hardware-btn" title="Rekommenderad hardvara">
+                <a href="/hardware" class="hardware-btn" title="Rekommenderad hårdvara">
                     <span class="hardware-icon">&#9881;</span>
-                    <span class="hardware-label">HARDWARE</span>
+                    <span class="hardware-label" data-i18n="footer.hardware">HÅRDVARA</span>
                 </a>
             </div>
             <div class="footer-right">
@@ -527,6 +540,7 @@
     </div>
 
     <script src="/static/js/robots.js"></script>
+    <script src="/static/js/translations.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

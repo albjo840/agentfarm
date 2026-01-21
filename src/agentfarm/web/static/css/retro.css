@@ -229,6 +229,46 @@ body {
     font-weight: 700;
 }
 
+/* Language Toggle */
+.language-toggle {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+}
+
+.lang-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    opacity: 0.6;
+}
+
+.lang-btn .flag {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.lang-btn:hover {
+    opacity: 1;
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 242, 0.3);
+}
+
+.lang-btn.active {
+    opacity: 1;
+    border-color: var(--cyan);
+    background: rgba(0, 255, 242, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 242, 0.4);
+}
+
 /* Main grid */
 .main-grid {
     display: grid;
@@ -465,6 +505,7 @@ section {
 
 .input-container {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
     padding: 1rem;
 }
@@ -472,31 +513,72 @@ section {
 .input-wrapper {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     background: var(--bg-dark);
     border: 1px solid var(--cyan);
-    padding: 0.5rem 1rem;
+    padding: 1rem;
+    min-height: 120px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--magenta);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.3), inset 0 0 30px rgba(255, 0, 255, 0.05);
 }
 
 .input-wrapper .prompt {
     color: var(--magenta);
     text-shadow: var(--glow-magenta);
-    margin-right: 0.5rem;
-    font-size: 1.2rem;
+    margin-right: 0.75rem;
+    font-size: 1.4rem;
+    line-height: 1.6;
 }
 
+.input-wrapper textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    line-height: 1.6;
+    outline: none;
+    resize: none;
+    min-height: 80px;
+    max-height: 200px;
+}
+
+.input-wrapper textarea::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+/* Legacy input support */
 .input-wrapper input {
     flex: 1;
     background: transparent;
     border: none;
     color: var(--text-primary);
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: 1.1rem;
     outline: none;
 }
 
 .input-wrapper input::placeholder {
     color: var(--text-dim);
+}
+
+.input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.input-hint {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    opacity: 0.7;
 }
 
 .execute-btn {

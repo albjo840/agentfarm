@@ -229,28 +229,251 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 15px;
-            background: rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(10, 20, 30, 0.8) 100%);
             border: 1px solid rgba(0, 255, 255, 0.2);
             overflow: hidden;
+            position: relative;
         }
 
-        .product-image img {
-            max-width: 100%;
-            max-height: 160px;
-            object-fit: contain;
-            filter: brightness(1.1) contrast(1.05);
-            transition: transform 0.3s ease, filter 0.3s ease;
+        /* Animated GPU visualization */
+        .product-visual {
+            position: relative;
+            width: 140px;
+            height: 100px;
         }
 
-        .product-card:hover .product-image img {
+        .product-visual.gpu .gpu-body {
+            width: 120px;
+            height: 70px;
+            background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%);
+            border: 2px solid var(--cyan);
+            border-radius: 4px;
+            position: absolute;
+            top: 15px;
+            left: 10px;
+            box-shadow: 0 0 15px rgba(0, 255, 242, 0.3);
+        }
+
+        .product-visual.gpu .gpu-fans {
+            display: flex;
+            gap: 8px;
+            position: absolute;
+            top: 28px;
+            left: 22px;
+        }
+
+        .product-visual.gpu .fan {
+            width: 28px;
+            height: 28px;
+            border: 2px solid var(--magenta);
+            border-radius: 50%;
+            position: relative;
+            animation: spin-fan 2s linear infinite;
+        }
+
+        .product-visual.gpu .fan::before,
+        .product-visual.gpu .fan::after {
+            content: '';
+            position: absolute;
+            background: var(--magenta);
+        }
+
+        .product-visual.gpu .fan::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .product-visual.gpu .fan::after {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .product-visual.gpu .gpu-vram {
+            position: absolute;
+            bottom: 22px;
+            left: 22px;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.65rem;
+            color: var(--green);
+            text-shadow: 0 0 10px var(--green);
+            animation: blink-vram 1.5s ease-in-out infinite;
+        }
+
+        .product-visual.gpu .gpu-pcie {
+            width: 100px;
+            height: 8px;
+            background: linear-gradient(90deg, #333 0%, #555 50%, #333 100%);
+            border: 1px solid #666;
+            position: absolute;
+            bottom: 0;
+            left: 20px;
+            border-radius: 2px;
+        }
+
+        @keyframes spin-fan {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes blink-vram {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Animated CPU visualization */
+        .product-visual.cpu .cpu-body {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #3a3a4a 0%, #2a2a3a 100%);
+            border: 3px solid var(--cyan);
+            position: absolute;
+            top: 10px;
+            left: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 242, 0.4);
+        }
+
+        .product-visual.cpu .cpu-die {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #1a1a2a 0%, #0a0a1a 100%);
+            border: 2px solid var(--magenta);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse-die 2s ease-in-out infinite;
+        }
+
+        .product-visual.cpu .cpu-pins {
+            position: absolute;
+            display: flex;
+            gap: 4px;
+        }
+
+        .product-visual.cpu .cpu-pins.top { top: 2px; left: 38px; }
+        .product-visual.cpu .cpu-pins.bottom { bottom: 2px; left: 38px; }
+        .product-visual.cpu .cpu-pins.left { top: 38px; left: 2px; flex-direction: column; }
+        .product-visual.cpu .cpu-pins.right { top: 38px; right: 2px; flex-direction: column; }
+
+        .product-visual.cpu .pin {
+            width: 4px;
+            height: 4px;
+            background: var(--cyan);
+            opacity: 0.7;
+        }
+
+        .product-visual.cpu .cpu-label {
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.5rem;
+            color: var(--green);
+            text-shadow: 0 0 8px var(--green);
+            white-space: nowrap;
+        }
+
+        @keyframes pulse-die {
+            0%, 100% { box-shadow: 0 0 10px var(--magenta); }
+            50% { box-shadow: 0 0 25px var(--magenta), 0 0 35px rgba(255, 0, 255, 0.5); }
+        }
+
+        /* Animated RAM visualization */
+        .product-visual.ram {
+            width: 140px;
+            height: 60px;
+        }
+
+        .product-visual.ram .ram-stick {
+            width: 130px;
+            height: 35px;
+            background: linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 100%);
+            border: 2px solid var(--green);
+            border-radius: 3px;
+            position: absolute;
+            top: 15px;
+            left: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .product-visual.ram .ram-chips {
+            display: flex;
+            gap: 6px;
+            position: absolute;
+            top: 22px;
+            left: 15px;
+        }
+
+        .product-visual.ram .chip {
+            width: 12px;
+            height: 18px;
+            background: #111;
+            border: 1px solid #444;
+            animation: flicker-chip 0.5s ease-in-out infinite;
+        }
+
+        .product-visual.ram .chip:nth-child(odd) {
+            animation-delay: 0.25s;
+        }
+
+        .product-visual.ram .ram-heatsink {
+            width: 130px;
+            height: 12px;
+            background: linear-gradient(90deg, var(--cyan) 0%, var(--magenta) 50%, var(--cyan) 100%);
+            position: absolute;
+            top: 8px;
+            left: 5px;
+            clip-path: polygon(0 100%, 5% 0, 95% 0, 100% 100%);
+            opacity: 0.8;
+        }
+
+        .product-visual.ram .ram-label {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.5rem;
+            color: var(--cyan);
+            text-shadow: 0 0 8px var(--cyan);
+        }
+
+        .product-visual.ram .ram-contacts {
+            display: flex;
+            gap: 2px;
+            position: absolute;
+            bottom: 8px;
+            left: 15px;
+        }
+
+        .product-visual.ram .contact {
+            width: 3px;
+            height: 6px;
+            background: gold;
+            opacity: 0.8;
+        }
+
+        @keyframes flicker-chip {
+            0%, 100% { box-shadow: 0 0 3px var(--green); }
+            50% { box-shadow: 0 0 8px var(--green); }
+        }
+
+        .product-card:hover .product-visual.gpu .fan {
+            animation-duration: 0.5s;
+        }
+
+        .product-card:hover .product-visual.cpu .cpu-die {
+            animation-duration: 0.8s;
+        }
+
+        .product-card:hover .product-visual {
             transform: scale(1.05);
-            filter: brightness(1.2) contrast(1.1);
-        }
-
-        .product-image .no-image {
-            color: #506070;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.8rem;
+            transition: transform 0.3s ease;
         }
 
         .product-badge {
@@ -784,21 +1007,103 @@
                     ? `<div class="product-price"><span class="price-from">från</span>${lowestPrice.toLocaleString()} kr</div>`
                     : '';
 
-                // Product image
-                const imageHtml = product.image_url
-                    ? `<div class="product-image"><img src="${product.image_url}" alt="${product.name}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'no-image\\'>BILD SAKNAS</span>'"></div>`
-                    : `<div class="product-image"><span class="no-image">BILD SAKNAS</span></div>`;
+                // Animated product visual based on category
+                const visualHtml = this.renderProductVisual(product);
 
                 return `
                     <div class="product-card">
                         ${badgeHtml}
-                        ${imageHtml}
+                        ${visualHtml}
                         <h3 class="product-name">${product.name}</h3>
                         ${priceHtml}
                         <p class="product-description">${product.description}</p>
                         ${specsHtml}
                         <div class="product-links">
                             ${linksHtml}
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderProductVisual(product) {
+                const category = product.category;
+
+                if (category === 'gpu') {
+                    // Extract VRAM from description
+                    const vramMatch = product.description.match(/(\d+)\s*GB/i);
+                    const vram = vramMatch ? vramMatch[1] + 'GB' : '';
+
+                    return `
+                        <div class="product-image">
+                            <div class="product-visual gpu">
+                                <div class="gpu-body"></div>
+                                <div class="gpu-fans">
+                                    <div class="fan"></div>
+                                    <div class="fan"></div>
+                                    <div class="fan"></div>
+                                </div>
+                                <div class="gpu-vram">${vram} VRAM</div>
+                                <div class="gpu-pcie"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (category === 'cpu') {
+                    // Extract cores from description
+                    const coreMatch = product.description.match(/(\d+)\s*kärn/i);
+                    const cores = coreMatch ? coreMatch[1] + ' CORES' : 'AMD';
+
+                    return `
+                        <div class="product-image">
+                            <div class="product-visual cpu">
+                                <div class="cpu-body">
+                                    <div class="cpu-die"></div>
+                                    <div class="cpu-pins top"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                                    <div class="cpu-pins bottom"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                                    <div class="cpu-pins left"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                                    <div class="cpu-pins right"><div class="pin"></div><div class="pin"></div><div class="pin"></div></div>
+                                </div>
+                                <div class="cpu-label">${cores}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (category === 'ram') {
+                    // Extract capacity from description
+                    const ramMatch = product.description.match(/(\d+)\s*GB/i);
+                    const capacity = ramMatch ? ramMatch[1] + 'GB' : 'DDR5';
+
+                    return `
+                        <div class="product-image">
+                            <div class="product-visual ram">
+                                <div class="ram-heatsink"></div>
+                                <div class="ram-stick"></div>
+                                <div class="ram-chips">
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                    <div class="chip"></div>
+                                </div>
+                                <div class="ram-contacts">
+                                    ${Array(20).fill('<div class="contact"></div>').join('')}
+                                </div>
+                                <div class="ram-label">${capacity}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Default/SBC
+                return `
+                    <div class="product-image">
+                        <div class="product-visual">
+                            <span style="color: var(--cyan); font-family: 'Orbitron', monospace; font-size: 2rem;">◈</span>
                         </div>
                     </div>
                 `;

@@ -672,8 +672,10 @@ function setupEventListeners() {
         }
     });
 
-    taskInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+    taskInput.addEventListener('keydown', (e) => {
+        // Ctrl+Enter or Cmd+Enter to submit (textarea needs modifier key)
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
             executeBtn.click();
         }
     });
@@ -1215,6 +1217,11 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
     musicController.init();
     initFileUpload();
+
+    // Initialize language toggle (i18n)
+    if (window.i18n && window.i18n.initLanguageToggle) {
+        window.i18n.initLanguageToggle();
+    }
 
     // Wire up launch button
     const launchBtn = document.getElementById('launch-btn');
