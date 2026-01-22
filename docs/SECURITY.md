@@ -368,7 +368,32 @@ def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
 1. **VPN-only** - Betalande kunder via WireGuard
 2. **No egress** - LLM-containern har ingen internet-access
 3. **Rate limiting** - nginx rate limits
-4. **TLS everywhere** - Certbot/Let's Encrypt
+4. **TLS everywhere** - Certbot/Let's Encrypt (se [SSL_SETUP.md](./SSL_SETUP.md))
+
+### SSL/TLS Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         TLS TERMINATION                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  External Traffic:                                                      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐             │
+│  │   Internet   │───►│    nginx     │───►│  AgentFarm   │             │
+│  │   (HTTPS)    │    │  SSL Term    │    │  :8080       │             │
+│  └──────────────┘    └──────────────┘    └──────────────┘             │
+│                                                                         │
+│  Domains:                                                               │
+│  • agentfarm.se (Loopia DNS → 31.208.228.229)                         │
+│  • taborsen.duckdns.org (DuckDNS → 31.208.228.229)                    │
+│                                                                         │
+│  Certificates:                                                          │
+│  • Let's Encrypt via Certbot (snap)                                    │
+│  • Auto-renewal via systemd timer                                       │
+│  • 90 days validity, renewed at 30 days                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Code Execution
 
@@ -381,4 +406,4 @@ def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
 
 *Status: SecureVault, ContextInjector, TierManager implementerade. Se [CURRENT_STATE.md](./CURRENT_STATE.md) för aktuellt läge.*
 
-*Senast uppdaterad: 2026-01-16*
+*Senast uppdaterad: 2026-01-22*
