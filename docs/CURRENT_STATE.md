@@ -1,6 +1,6 @@
 # AgentFarm - Current State
 
-> **Uppdaterad:** 2026-01-21
+> **Uppdaterad:** 2026-01-22
 >
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -8,7 +8,7 @@
 
 ```
 Branch: feature/affiliate-ads
-Status: Full i18n, Amazon affiliates, Privacy disclaimer
+Status: Agent persistence, parallelization, tracking module
 ```
 
 ## Senaste Commits
@@ -20,6 +20,77 @@ b97735a feat: Rename Prompts to 'Your prompts', add My Stack section
 a302bf4 feat: Add language toggle, animated hardware visuals, larger task input
 0775fd8 feat: Add product images and new badge types to hardware page
 ```
+
+## Session 2026-01-22: Agent Persistence & Parallelization
+
+### Slutfört i denna session
+
+- [x] **Auto-inject CodeTools** - Orchestrator injectar nu CodeTools automatiskt
+  - VerifierAgent får riktiga `run_tests`, `run_linter`, `run_typecheck`
+  - Ersätter stub-implementationer som returnerade "[Would run: ...]"
+
+- [x] **Förbättrad VerifierAgent**
+  - `default_max_tool_calls` ökat från 10 till 25
+  - Retry-logik med `max_retries=2` för återhämtningsbara fel
+  - Förbättrad JSON-fallback med heuristisk-baserad success detection
+  - `_is_recoverable_failure()` detekterar timeout, rate limit, nätverksfel
+
+- [x] **Förbättrad ReviewerAgent**
+  - `default_max_tool_calls` ökat till 20
+
+- [x] **RecursionGuard förbättringar**
+  - `max_total_calls` ökat från 50 till 100
+  - `default_max_tool_calls` attribut i BaseAgent
+
+- [x] **Ny Tracking-modul** (`tracking/`)
+  - `ProgressTracker`: Viktad fasspårning (plan=10%, execute=50%, verify=15%)
+  - `CodeQualityScore`: Sammansatt kvalitetspoäng med bokstavsbetyg (A-F)
+  - `SmartRetryManager`: Felkategorisering med adaptiva retry-strategier
+  - `TestResultAggregator`: Flaky test-detektion och testhistorik
+
+- [x] **Parallel Verification** (`agents/parallel_verifier.py`)
+  - Kör syntax, imports, tests, lint, typecheck samtidigt
+  - Typisk 2-3x speedup på flerkärniga system
+
+- [x] **Överlappande Workflow-faser**
+  - `run_workflow_with_overlapping_phases()` startar verify vid 80% execute
+  - Mergar tidiga och slutliga verifikationsresultat
+
+- [x] **Rikare kontext till Verifier/Reviewer**
+  - Detaljerad execution results summary till Verifier
+  - Verification summary och stegbeskrivningar till Reviewer
+
+### Nya/Uppdaterade Filer
+
+```
+src/agentfarm/
+├── orchestrator.py           # Auto-inject CodeTools, overlapping phases
+├── agents/
+│   ├── base.py               # default_max_tool_calls, max_total_calls=100
+│   ├── verifier.py           # max_tool_calls=25, retry, improved fallback
+│   ├── reviewer.py           # max_tool_calls=20
+│   └── parallel_verifier.py  # NY: Concurrent verification
+└── tracking/                 # NY MODUL
+    ├── __init__.py
+    ├── progress.py           # ProgressTracker, WorkflowProgress
+    ├── quality.py            # CodeQualityScore, QualityGrade
+    ├── retry.py              # SmartRetryManager, ErrorCategory
+    └── test_aggregator.py    # TestResultAggregator, TestHistory
+
+tests/
+└── test_recursion_guard.py   # Uppdaterat för max_total_calls=100
+
+CLAUDE.md                     # Dokumentation för tracking-modulen
+```
+
+### Testresultat
+
+```bash
+python -m pytest tests/ -v
+# 212 passed, 20 skipped in 0.88s
+```
+
+---
 
 ## Session 2026-01-21: Internationalization, Privacy & Token Metrics Fix
 

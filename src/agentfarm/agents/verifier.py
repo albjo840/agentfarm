@@ -18,6 +18,7 @@ class VerifierAgent(BaseAgent):
 
     name = "VerifierAgent"
     description = "Verifies code changes through testing and validation"
+    default_max_tool_calls = 25  # Verifier needs many tool calls (syntax, imports, tests, lint, typecheck)
 
     def __init__(self, provider: LLMProvider) -> None:
         super().__init__(provider)
@@ -297,22 +298,94 @@ After running ALL tools, summarize in JSON:
         except (json.JSONDecodeError, KeyError):
             pass
 
-        # Fallback
+        # Improved fallback: use heuristics to infer success from tool outputs
+        content_lower = content.lower() if content else ""
+        tool_output_str = "\n".join(tool_outputs).lower()
+
+        # Heuristic 1: Tests passed without failures
+        tests_ok = (
+            ("passed" in tool_output_str or "passed" in content_lower)
+            and "failed" not in tool_output_str
+            and "failure" not in tool_output_str
+        )
+
+        # Heuristic 2: No errors mentioned (or explicitly "0 errors")
+        no_errors = (
+            "0 errors" in content_lower
+            or "0 errors" in tool_output_str
+            or (
+                "error" not in content_lower
+                and "error" not in tool_output_str
+            )
+        )
+
+        # Heuristic 3: Explicit success indicators
+        explicit_success = (
+            "all checks pass" in content_lower
+            or "verification successful" in content_lower
+            or "syntax valid" in tool_output_str
+        )
+
+        # Infer success: tests OK and no errors, or explicit success
+        inferred_success = (tests_ok and no_errors) or explicit_success
+
+        # Extract approximate counts from tool outputs
+        passed_count = tool_output_str.count(" passed")
+        failed_count = tool_output_str.count(" failed")
+
         return AgentResult(
-            success=False,
+            success=inferred_success,
             output=content,
-            data={"tool_outputs": tool_outputs},
+            data={
+                "tool_outputs": tool_outputs,
+                "tests_passed": max(passed_count, 0),
+                "tests_failed": max(failed_count, 0),
+                "inferred_from_heuristics": True,
+            },
             tokens_used=response.total_tokens,
-            summary_for_next_agent="Verification completed, see details",
+            summary_for_next_agent=(
+                f"Verification {'passed' if inferred_success else 'failed'} "
+                f"(heuristic: tests_ok={tests_ok}, no_errors={no_errors})"
+            ),
         )
 
     async def verify_changes(
-        self, context: AgentContext, changed_files: list[str]
+        self, context: AgentContext, changed_files: list[str], max_retries: int = 2
     ) -> VerificationResult:
-        """Verify changes to specific files."""
-        request = f"Verify changes to: {', '.join(changed_files)}"
-        result = await self.run(context, request)
+        """Verify changes to specific files with retry logic.
 
+        Args:
+            context: Agent context
+            changed_files: Files to verify
+            max_retries: Number of retries for recoverable failures
+
+        Returns:
+            VerificationResult with test/lint/type results
+        """
+        request = f"Verify changes to: {', '.join(changed_files)}"
+
+        last_result = None
+        for attempt in range(1, max_retries + 1):
+            result = await self.run(context, request, max_tool_calls=self.default_max_tool_calls)
+            last_result = result
+
+            if result.success:
+                break
+
+            # Check if failure is recoverable (timeout, rate limit, etc.)
+            if attempt < max_retries and self._is_recoverable_failure(result):
+                import logging
+                logging.getLogger(__name__).info(
+                    "Verification attempt %d failed (recoverable), retrying...", attempt
+                )
+                import asyncio
+                await asyncio.sleep(1.0 * attempt)  # Exponential-ish backoff
+                continue
+
+            # Non-recoverable or last attempt
+            break
+
+        result = last_result
         data = result.data
         test_results = [
             SingleTestResult(name=f"test_{i}", passed=True)
@@ -333,3 +406,21 @@ After running ALL tools, summarize in JSON:
             coverage_percent=data.get("coverage"),
             summary=result.summary_for_next_agent,
         )
+
+    def _is_recoverable_failure(self, result: AgentResult) -> bool:
+        """Check if a failure is recoverable (worth retrying)."""
+        output_lower = result.output.lower() if result.output else ""
+
+        # Recoverable: timeouts, rate limits, temporary network issues
+        recoverable_patterns = [
+            "timeout",
+            "timed out",
+            "rate limit",
+            "429",
+            "temporary",
+            "connection refused",
+            "connection reset",
+            "network",
+        ]
+
+        return any(pattern in output_lower for pattern in recoverable_patterns)

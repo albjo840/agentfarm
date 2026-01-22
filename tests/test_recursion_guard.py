@@ -12,7 +12,7 @@ class TestRecursionGuard:
         """Test creating a guard with default settings."""
         guard = RecursionGuard()
         assert guard.max_depth == 5
-        assert guard.max_total_calls == 50
+        assert guard.max_total_calls == 100  # Increased from 50 for complex workflows
         assert guard.allow_self_calls is False
         assert guard.current_depth == 0
         assert guard.total_calls == 0

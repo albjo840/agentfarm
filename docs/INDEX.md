@@ -74,12 +74,19 @@ src/agentfarm/
 ├── monitoring/              # Hårdvaruövervakning
 │   ├── gpu_monitor.py       # AMD ROCm / NVIDIA stats
 │   └── performance.py       # Tokens/sek tracking
+├── tracking/                # Progress, kvalitet, retry
+│   ├── progress.py          # ProgressTracker (viktade faser)
+│   ├── quality.py           # CodeQualityScore (A-F betyg)
+│   ├── retry.py             # SmartRetryManager
+│   └── test_aggregator.py   # Flaky test-detektion
 ├── providers/               # Se PROVIDERS.md
 │   ├── base.py              # LLMProvider ABC
 │   ├── router.py            # Multi-model routing
 │   └── ollama.py            # Lokal inference
 ├── agents/                  # Se AGENTS.md
 │   ├── base.py              # BaseAgent + RecursionGuard
+│   ├── verifier.py          # VerifierAgent (max_tool_calls=25, retry)
+│   ├── parallel_verifier.py # Parallell verifiering (2-3x speedup)
 │   └── collaboration.py     # ProactiveCollaborator
 └── web/                     # Se WEB.md
     └── server.py            # aiohttp + WebSocket
@@ -97,4 +104,4 @@ Se [CURRENT_STATE.md](./CURRENT_STATE.md) för:
 
 ---
 
-*Uppdaterad: 2026-01-16*
+*Uppdaterad: 2026-01-22*

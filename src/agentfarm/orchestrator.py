@@ -28,6 +28,7 @@ from agentfarm.models.schemas import (
 )
 from agentfarm.providers.base import LLMProvider
 from agentfarm.tools.file_tools import FileTools
+from agentfarm.tools.code_tools import CodeTools
 
 
 class Orchestrator:
@@ -103,9 +104,9 @@ class Orchestrator:
         # Set up collaboration system
         self._setup_collaboration()
 
-        # Auto-inject FileTools if enabled
+        # Auto-inject FileTools and CodeTools if enabled
         if auto_inject_tools:
-            self._auto_inject_file_tools()
+            self._auto_inject_tools()
 
     def _init_multi_provider_agents(self) -> None:
         """Initialize agents with different providers based on config."""
@@ -187,8 +188,9 @@ class Orchestrator:
         if self._event_callback:
             await self._event_callback(event, data)
 
-    def _auto_inject_file_tools(self) -> None:
-        """Automatically inject FileTools into agents that need them."""
+    def _auto_inject_tools(self) -> None:
+        """Automatically inject FileTools and CodeTools into agents that need them."""
+        # Inject FileTools
         file_tools = FileTools(self.working_dir)
         self._file_tools = file_tools
 
@@ -202,6 +204,15 @@ class Orchestrator:
 
         # Reviewer needs file tools for reading
         self.reviewer._tool_handlers["read_file"] = file_tools.read_file
+
+        # Inject CodeTools for Verifier (CRITICAL - enables real test/lint/typecheck)
+        code_tools = CodeTools(self.working_dir)
+        self._code_tools = code_tools
+
+        # Verifier needs code tools for actual verification
+        self.verifier._tool_handlers["run_tests"] = code_tools.run_tests
+        self.verifier._tool_handlers["run_linter"] = code_tools.run_linter
+        self.verifier._tool_handlers["run_typecheck"] = code_tools.run_typecheck
 
     def inject_tools(
         self,
@@ -378,7 +389,7 @@ class Orchestrator:
         await self._emit("stage_change", {"stage": "verify", "status": "active"})
         changed_files = self._collect_changed_files(execution_results)
         await self._emit("agent_message", {"agent": "verifier", "content": f"Verifying {len(changed_files)} changed files..."})
-        verification = await self._run_verify_phase(context, plan, changed_files)
+        verification = await self._run_verify_phase(context, plan, changed_files, execution_results)
         await self._emit("tokens_update", {"tokens": self.get_total_tokens_used()})
         if verification.success:
             await self._emit("agent_message", {"agent": "verifier", "content": f"✓ {verification.tests_passed} tests passed"})
@@ -390,7 +401,7 @@ class Orchestrator:
         # PHASE 4: REVIEW
         await self._emit("stage_change", {"stage": "review", "status": "active"})
         await self._emit("agent_message", {"agent": "reviewer", "content": "Reviewing code changes..."})
-        review = await self._run_review_phase(context, plan, changed_files, verification)
+        review = await self._run_review_phase(context, plan, changed_files, verification, execution_results)
         await self._emit("tokens_update", {"tokens": self.get_total_tokens_used()})
         if review.approved:
             await self._emit("agent_message", {"agent": "reviewer", "content": "✓ Code review approved"})
@@ -518,10 +529,32 @@ class Orchestrator:
         context: AgentContext,
         plan: TaskPlan,
         changed_files: list[str],
+        execution_results: list[ExecutionResult] | None = None,
     ) -> VerificationResult:
-        """Run the verification phase."""
-        # Update context for verifier
-        context.previous_step_output = f"Executed {len(plan.steps)} steps"
+        """Run the verification phase with rich context.
+
+        Args:
+            context: Base agent context
+            plan: The task plan
+            changed_files: Files that were modified
+            execution_results: Results from execution phase (for rich context)
+
+        Returns:
+            VerificationResult with test/lint/type results
+        """
+        # Build rich context for verifier
+        changes_summary = []
+        if execution_results:
+            for result in execution_results:
+                if result.files_changed:
+                    for fc in result.files_changed:
+                        changes_summary.append(f"- {fc.path}: {fc.action}")
+
+        context.previous_step_output = (
+            f"Executed {len(plan.steps)} steps.\n"
+            f"Changes made:\n" + "\n".join(changes_summary[:20]) +  # Limit for token efficiency
+            f"\nFiles: {', '.join(changed_files[:10])}"  # Limit file list
+        )
         context.relevant_files = changed_files
 
         return await self.verifier.verify_changes(context, changed_files)
@@ -532,10 +565,39 @@ class Orchestrator:
         plan: TaskPlan,
         changed_files: list[str],
         verification: VerificationResult,
+        execution_results: list[ExecutionResult] | None = None,
     ) -> ReviewResult:
-        """Run the review phase."""
-        # Update context for reviewer
-        context.previous_step_output = verification.summary
+        """Run the review phase with rich context.
+
+        Args:
+            context: Base agent context
+            plan: The task plan
+            changed_files: Files that were modified
+            verification: Results from verification phase
+            execution_results: Results from execution phase (for rich context)
+
+        Returns:
+            ReviewResult with approval status and comments
+        """
+        # Build rich context for reviewer
+        verification_summary = (
+            f"Verification: {verification.tests_passed} tests passed, "
+            f"{verification.tests_failed} failed. "
+            f"Lint issues: {len(verification.lint_issues)}. "
+            f"Type errors: {len(verification.type_errors)}."
+        )
+
+        changes_summary = []
+        if execution_results:
+            for result in execution_results:
+                if result.summary:
+                    changes_summary.append(f"- Step: {result.summary[:100]}")
+
+        context.previous_step_output = (
+            f"{verification_summary}\n"
+            f"Task: {plan.summary}\n"
+            f"Steps executed:\n" + "\n".join(changes_summary[:10])
+        )
         context.relevant_files = changed_files
 
         return await self.reviewer.review_changes(context, changed_files)
@@ -728,6 +790,149 @@ class Orchestrator:
             for fc in result.files_changed:
                 files.add(fc.path)
         return sorted(files)
+
+    async def run_workflow_with_overlapping_phases(
+        self,
+        task: str,
+        context_files: list[str] | None = None,
+        constraints: list[str] | None = None,
+        early_verify_threshold: float = 0.8,
+    ) -> WorkflowResult:
+        """Run workflow with overlapping execution and verification phases.
+
+        This experimental mode starts verification when execution is 80% complete,
+        potentially saving time on long workflows.
+
+        Args:
+            task: Description of the task
+            context_files: Files relevant to the task
+            constraints: Any constraints to follow
+            early_verify_threshold: Start verify when this % of execute is done (0-1)
+
+        Returns:
+            WorkflowResult with full details
+        """
+        import asyncio
+
+        await self._emit("workflow_start", {"task": task, "mode": "overlapping"})
+
+        context = AgentContext(
+            task_summary=task,
+            relevant_files=context_files or [],
+            constraints=constraints or [],
+        )
+
+        # PHASE 1: PLAN (same as normal)
+        await self._emit("stage_change", {"stage": "plan", "status": "active"})
+        plan = await self._run_plan_phase(context, task)
+        if not plan:
+            await self._emit("workflow_complete", {"success": False})
+            return WorkflowResult(
+                success=False,
+                task_description=task,
+                plan=None,
+                pr_summary="Planning failed",
+            )
+        await self._emit("stage_change", {"stage": "plan", "status": "complete"})
+
+        # Skip UX phase for overlapping mode (simplicity)
+        await self._emit("stage_change", {"stage": "ux_design", "status": "skipped"})
+
+        # PHASE 2+3: EXECUTE with early VERIFY
+        await self._emit("stage_change", {"stage": "execute", "status": "active"})
+
+        executor_steps = [s for s in plan.steps if s.agent == "ExecutorAgent"]
+        total_steps = len(executor_steps)
+        threshold_step = int(total_steps * early_verify_threshold)
+
+        execution_results: list[ExecutionResult] = []
+        early_verify_task: asyncio.Task | None = None
+        early_verify_result: VerificationResult | None = None
+
+        # Execute steps one by one, start verify when threshold reached
+        for i, step in enumerate(executor_steps):
+            step_context = AgentContext(
+                task_summary=context.task_summary,
+                relevant_files=context.relevant_files,
+                constraints=context.constraints,
+            )
+            result = await self.executor.execute_step(step_context, step.description, step.id)
+            execution_results.append(result)
+
+            await self._emit("step_complete", {
+                "step_id": step.id,
+                "success": result.success,
+                "progress": (i + 1) / total_steps,
+            })
+
+            # Start early verification when threshold reached
+            if i + 1 >= threshold_step and early_verify_task is None:
+                completed_files = self._collect_changed_files(execution_results)
+                if completed_files:
+                    await self._emit("agent_message", {
+                        "agent": "verifier",
+                        "content": f"Starting early verification ({len(completed_files)} files)..."
+                    })
+                    early_verify_task = asyncio.create_task(
+                        self.verifier.verify_changes(context, completed_files)
+                    )
+
+        await self._emit("stage_change", {"stage": "execute", "status": "complete"})
+
+        # Wait for early verify to complete (if started)
+        changed_files = self._collect_changed_files(execution_results)
+        if early_verify_task:
+            await self._emit("stage_change", {"stage": "verify", "status": "active"})
+            early_verify_result = await early_verify_task
+            # Run full verify only on new files if early verify passed
+            new_files = [f for f in changed_files if f not in set(self._collect_changed_files(execution_results[:threshold_step]))]
+            if new_files and early_verify_result.success:
+                await self._emit("agent_message", {
+                    "agent": "verifier",
+                    "content": f"Verifying {len(new_files)} additional files..."
+                })
+                final_verify = await self.verifier.verify_changes(context, new_files)
+                # Merge results
+                verification = VerificationResult(
+                    success=early_verify_result.success and final_verify.success,
+                    tests_passed=early_verify_result.tests_passed + final_verify.tests_passed,
+                    tests_failed=early_verify_result.tests_failed + final_verify.tests_failed,
+                    tests_skipped=early_verify_result.tests_skipped + final_verify.tests_skipped,
+                    test_results=early_verify_result.test_results + final_verify.test_results,
+                    lint_issues=early_verify_result.lint_issues + final_verify.lint_issues,
+                    type_errors=early_verify_result.type_errors + final_verify.type_errors,
+                    coverage_percent=final_verify.coverage_percent,
+                    summary=f"Combined: {early_verify_result.summary} + {final_verify.summary}",
+                )
+            else:
+                verification = early_verify_result
+        else:
+            # Normal verification
+            await self._emit("stage_change", {"stage": "verify", "status": "active"})
+            verification = await self._run_verify_phase(context, plan, changed_files, execution_results)
+
+        await self._emit("stage_change", {"stage": "verify", "status": "complete" if verification.success else "error"})
+
+        # PHASE 4: REVIEW (same as normal)
+        await self._emit("stage_change", {"stage": "review", "status": "active"})
+        review = await self._run_review_phase(context, plan, changed_files, verification, execution_results)
+        await self._emit("stage_change", {"stage": "review", "status": "complete" if review.approved else "error"})
+
+        # PHASE 5: SUMMARY
+        pr_summary = self._generate_pr_summary(task, plan, execution_results, verification, review)
+        success = verification.success and review.approved
+        await self._emit("workflow_complete", {"success": success})
+
+        return WorkflowResult(
+            success=success,
+            task_description=task,
+            plan=plan,
+            execution_results=execution_results,
+            verification=verification,
+            review=review,
+            pr_summary=pr_summary,
+            total_tokens_used=self.get_total_tokens_used(),
+        )
 
     def _generate_pr_summary(
         self,

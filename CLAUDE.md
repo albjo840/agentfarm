@@ -53,9 +53,10 @@ agentfarm/
 │   │   ├── orchestrator_agent.py  # OrchestratorAgent - LLM-driven coordinator
 │   │   ├── planner.py         # PlannerAgent - task breakdown
 │   │   ├── executor.py        # ExecutorAgent - code changes + collaboration tools
-│   │   ├── verifier.py        # VerifierAgent - testing/validation
+│   │   ├── verifier.py        # VerifierAgent - testing/validation + retry logic
 │   │   ├── reviewer.py        # ReviewerAgent - code review
-│   │   └── ux_designer.py     # UXDesignerAgent - UI/UX design
+│   │   ├── ux_designer.py     # UXDesignerAgent - UI/UX design
+│   │   └── parallel_verifier.py  # ParallelVerifier - concurrent verification checks
 │   ├── execution/             # Parallel execution system
 │   │   ├── __init__.py
 │   │   └── parallel.py        # DependencyAnalyzer + ParallelExecutor
@@ -63,6 +64,12 @@ agentfarm/
 │   │   ├── base.py            # MemoryManager and base classes
 │   │   ├── short_term.py      # In-memory LRU cache
 │   │   └── long_term.py       # Persistent JSON storage
+│   ├── tracking/              # Progress, quality, and retry tracking
+│   │   ├── __init__.py        # Module exports
+│   │   ├── progress.py        # ProgressTracker, WorkflowProgress
+│   │   ├── quality.py         # CodeQualityScore, QualityGrade
+│   │   ├── retry.py           # SmartRetryManager, ErrorCategory
+│   │   └── test_aggregator.py # TestResultAggregator, flaky test detection
 │   ├── prompts/               # System prompts per agent
 │   │   ├── orchestrator_prompt.py
 │   │   ├── planner_prompt.py
@@ -440,8 +447,14 @@ provider = get_provider()  # Finds first available API key
 | `agents/base.py` | BaseAgent class with token optimization, memory, and proactive collaboration |
 | `agents/collaboration.py` | AgentCollaborator + ProactiveCollaborator for agent-to-agent communication |
 | `agents/executor.py` | ExecutorAgent with request_review, consult_planner, sanity_check tools |
+| `agents/verifier.py` | VerifierAgent with retry logic and improved JSON fallback |
+| `agents/parallel_verifier.py` | ParallelVerifier for concurrent syntax/test/lint/typecheck |
 | `execution/parallel.py` | DependencyAnalyzer and ParallelExecutor for concurrent step execution |
 | `memory/base.py` | MemoryManager for short/long-term memory |
+| `tracking/progress.py` | ProgressTracker with weighted phases for workflow progress |
+| `tracking/quality.py` | CodeQualityScore with letter grades (A-F) |
+| `tracking/retry.py` | SmartRetryManager with error categorization |
+| `tracking/test_aggregator.py` | TestResultAggregator for flaky test detection |
 | `prompts/*.py` | Dedicated system prompts for each agent |
 | `providers/base.py` | LLMProvider ABC for provider abstraction |
 | `models/schemas.py` | All Pydantic models (TaskPlan, ExecutionResult, etc.) |
@@ -705,7 +718,211 @@ TestCase(
 )
 ```
 
+### Tracking System
+
+The `tracking/` module provides progress tracking, quality metrics, and retry logic:
+
+#### ProgressTracker
+
+```python
+from agentfarm.tracking import ProgressTracker, WorkflowPhase
+
+tracker = ProgressTracker(event_callback=my_callback)
+
+# Track workflow progress
+await tracker.start_workflow("Add feature X")
+await tracker.start_phase(WorkflowPhase.PLAN, total_steps=1)
+await tracker.complete_phase(WorkflowPhase.PLAN)
+
+await tracker.start_phase(WorkflowPhase.EXECUTE, total_steps=5)
+for i in range(5):
+    await tracker.update_step(WorkflowPhase.EXECUTE, i + 1)
+await tracker.complete_phase(WorkflowPhase.EXECUTE)
+
+print(f"Progress: {tracker.progress.total_percent}%")  # Weighted by phase
+```
+
+**Phase weights (default):** plan=10%, ux_design=5%, execute=50%, verify=15%, review=15%, summary=5%
+
+#### CodeQualityScore
+
+```python
+from agentfarm.tracking import CodeQualityScore
+
+quality = CodeQualityScore()
+
+# Add metrics from verification
+quality.add_test_results(passed=19, failed=1, skipped=2)
+quality.add_lint_results(issues=["file.py:10: unused import"])
+quality.add_type_results(errors=[])
+quality.add_coverage(85.5)
+
+print(f"Quality: {quality.grade.value} ({quality.total_score:.1f})")  # B (82.5)
+print(quality.get_issues())  # Lists metrics below 70
+```
+
+**Grades:** A (90+), B (80+), C (70+), D (60+), F (<60)
+
+#### SmartRetryManager
+
+```python
+from agentfarm.tracking import SmartRetryManager, ErrorCategory
+
+retry_manager = SmartRetryManager()
+
+async def flaky_operation():
+    # ... operation that might fail
+    pass
+
+result = await retry_manager.execute_with_retry(
+    operation=flaky_operation,
+    categorize_error=lambda e: (
+        ErrorCategory.TRANSIENT if "timeout" in str(e)
+        else ErrorCategory.PERMANENT
+    ),
+)
+
+if result.success:
+    print(f"Succeeded after {result.attempts} attempts")
+```
+
+**Error categories:**
+- `TRANSIENT`: Timeout, rate limit, network - 3 retries, exponential backoff
+- `FLAKY`: Intermittent failures - 2 retries with jitter
+- `FIXABLE`: Can be fixed by adjusting approach - 1 retry
+- `PERMANENT`: Logic error, invalid input - no retry
+
+#### TestResultAggregator
+
+```python
+from agentfarm.tracking import TestResultAggregator
+
+aggregator = TestResultAggregator(storage_path=".agentfarm/test_history.json")
+
+# Record test runs
+aggregator.start_run()
+aggregator.record_run("test_login", passed=True)
+aggregator.record_run("test_checkout", passed=False, error="Timeout")
+aggregator.end_run()
+
+# Analyze patterns
+flaky_tests = aggregator.get_flaky_tests()  # 20-80% pass rate
+failing_tests = aggregator.get_consistently_failing_tests()
+
+print(aggregator.get_report())
+```
+
+### Parallel Verification
+
+`ParallelVerifier` runs verification checks concurrently for faster results:
+
+```python
+from agentfarm.agents.parallel_verifier import ParallelVerifier
+from agentfarm.tools.code_tools import CodeTools
+
+verifier = ParallelVerifier(code_tools=CodeTools("."))
+
+result = await verifier.verify_files(
+    files=["main.py", "utils.py"],
+    run_tests=True,
+    run_lint=True,
+    run_typecheck=True,
+)
+
+print(f"Success: {result.success}")
+print(f"Speedup: {result.parallel_speedup:.1f}x")
+print(f"Failed checks: {[c.check_type for c in result.failed_checks]}")
+```
+
+**Parallel execution model:**
+```
+Sequential: |--syntax--|--imports--|--tests--|--lint--|--typecheck--|
+Parallel:   |--syntax--| + |--tests--| + |--lint--| + |--typecheck--|
+            |--imports--|
+```
+
+Typical speedup: 2-3x on multi-core systems.
+
+### Overlapping Workflow Phases
+
+The orchestrator supports overlapping execution and verification:
+
+```python
+from agentfarm import Orchestrator
+
+orchestrator = Orchestrator(working_dir="./my_project")
+
+# Standard workflow (sequential)
+result = await orchestrator.run_workflow("Add feature X")
+
+# Overlapping workflow (starts verify when 80% of execute is done)
+result = await orchestrator.run_workflow_with_overlapping_phases(
+    task="Add feature X",
+    early_verify_threshold=0.8,  # Start verify at 80% execute
+)
+```
+
 ## Changelog
+
+### 2026-01-22: Agent Persistence & Parallelization
+
+#### New Features
+- **Tracking Module** (`tracking/`): New module for progress, quality, and retry tracking
+  - `ProgressTracker`: Weighted phase tracking (plan=10%, execute=50%, verify=15%, etc.)
+  - `CodeQualityScore`: Composite quality score with letter grades (A-F)
+  - `SmartRetryManager`: Error categorization with adaptive retry strategies
+  - `TestResultAggregator`: Flaky test detection and test history tracking
+
+- **Parallel Verification** (`agents/parallel_verifier.py`):
+  - Runs syntax, imports, tests, lint, typecheck concurrently
+  - Typical 2-3x speedup on multi-core systems
+  - `verify_files()` returns detailed results with speedup metrics
+
+- **Overlapping Workflow Phases** (`orchestrator.py`):
+  - New `run_workflow_with_overlapping_phases()` method
+  - Starts verification when 80% of execution is complete
+  - Merges early and final verification results
+
+- **Auto-inject CodeTools** (`orchestrator.py`):
+  - Orchestrator now auto-injects `CodeTools` into VerifierAgent
+  - Enables real test/lint/typecheck execution instead of stubs
+
+#### Improvements
+- **VerifierAgent Persistence** (`agents/verifier.py`):
+  - Increased `default_max_tool_calls` from 10 to 25
+  - Added retry logic with `max_retries=2` for recoverable failures
+  - Improved JSON fallback with heuristic-based success detection
+
+- **ReviewerAgent** (`agents/reviewer.py`):
+  - Increased `default_max_tool_calls` to 20
+
+- **RecursionGuard** (`agents/base.py`):
+  - Increased `max_total_calls` from 50 to 100 for complex workflows
+  - Added `default_max_tool_calls` class attribute to BaseAgent
+
+- **Rich Context Passing** (`orchestrator.py`):
+  - Verifier receives detailed execution results summary
+  - Reviewer receives verification summary and step descriptions
+
+#### Files Modified
+| File | Changes |
+|------|---------|
+| `orchestrator.py` | Auto-inject CodeTools, overlapping phases, rich context |
+| `agents/verifier.py` | max_tool_calls=25, retry logic, improved fallback |
+| `agents/reviewer.py` | max_tool_calls=20 |
+| `agents/base.py` | default_max_tool_calls, max_total_calls=100 |
+
+#### New Files
+| File | Contents |
+|------|----------|
+| `tracking/__init__.py` | Module exports |
+| `tracking/progress.py` | ProgressTracker, WorkflowProgress, PhaseProgress |
+| `tracking/quality.py` | CodeQualityScore, QualityGrade |
+| `tracking/retry.py` | SmartRetryManager, ErrorCategory, RetryConfig |
+| `tracking/test_aggregator.py` | TestResultAggregator, TestHistory |
+| `agents/parallel_verifier.py` | ParallelVerifier, CheckResult |
+
+---
 
 ### 2026-01-12: UX Designer Integration & Bug Fixes
 

@@ -52,7 +52,7 @@ class RecursionGuard:
     """
 
     max_depth: int = 5
-    max_total_calls: int = 50
+    max_total_calls: int = 100  # Increased from 50 for complex workflows
     allow_self_calls: bool = False
 
     # Mutable state (use field with default_factory)
@@ -203,6 +203,7 @@ class BaseAgent(ABC):
 
     name: str = "BaseAgent"
     description: str = "Base agent"
+    default_max_tool_calls: int = 10  # Subclasses can override (e.g., VerifierAgent: 25)
 
     def __init__(
         self,
@@ -664,7 +665,7 @@ class BaseAgent(ABC):
         self,
         context: AgentContext,
         request: str,
-        max_tool_calls: int = 10,
+        max_tool_calls: int | None = None,
         temperature: float = 0.7,
         recursion_guard: RecursionGuard | None = None,
     ) -> AgentResult:
@@ -675,10 +676,14 @@ class BaseAgent(ABC):
         Args:
             context: Minimal context for the agent
             request: The user's request
-            max_tool_calls: Maximum number of tool call rounds to prevent infinite loops
+            max_tool_calls: Maximum tool call rounds (defaults to class's default_max_tool_calls)
             temperature: LLM temperature (lower = more deterministic)
             recursion_guard: Optional guard to prevent infinite recursion (passed from parent)
         """
+        # Use provided value or class default
+        if max_tool_calls is None:
+            max_tool_calls = self.default_max_tool_calls
+
         # Use provided guard, instance guard, or create a new one
         guard = recursion_guard or self.recursion_guard or RecursionGuard()
 

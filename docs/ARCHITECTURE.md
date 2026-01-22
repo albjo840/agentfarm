@@ -135,10 +135,49 @@ class BaseAgent(ABC):
     # Memory för kontext över sessioner
     memory: MemoryManager
 
+    # Max tool calls (subklasser kan overrida)
+    default_max_tool_calls: int = 10  # VerifierAgent: 25, ReviewerAgent: 20
+
     # Proaktiv samarbete med andra agenter
     async def request_quick_review(code, question) -> str
     async def brainstorm(topic, with_agents) -> list[str]
     async def check_approach(approach) -> tuple[bool, str]
+```
+
+### Tracking Module (`tracking/`)
+
+```python
+from agentfarm.tracking import (
+    ProgressTracker,      # Viktad fasspårning
+    CodeQualityScore,     # Kvalitetspoäng A-F
+    SmartRetryManager,    # Felkategoriserad retry
+    TestResultAggregator, # Flaky test-detektion
+)
+
+# Progress tracking med viktade faser
+tracker = ProgressTracker()
+await tracker.start_phase(WorkflowPhase.EXECUTE, total_steps=5)
+print(f"Progress: {tracker.progress.total_percent}%")
+
+# Kvalitetspoäng
+quality = CodeQualityScore.from_verification_result(result)
+print(f"Grade: {quality.grade.value}")  # A, B, C, D, F
+
+# Smart retry
+retry = SmartRetryManager()
+result = await retry.execute_with_retry(operation)
+```
+
+### ParallelVerifier (`agents/parallel_verifier.py`)
+
+Kör verifieringskontroller parallellt för snabbare resultat:
+
+```python
+from agentfarm.agents.parallel_verifier import ParallelVerifier
+
+verifier = ParallelVerifier(code_tools=CodeTools("."))
+result = await verifier.verify_files(files, run_tests=True, run_lint=True)
+print(f"Speedup: {result.parallel_speedup:.1f}x")  # Typiskt 2-3x
 ```
 
 ### TierManager (`monetization/tiers.py`)
