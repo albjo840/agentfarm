@@ -10,14 +10,14 @@
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    transition: transform 0.3s ease, left 0.3s ease, top 0.3s ease;
+    transition: transform 0.15s ease, left 0.15s ease, top 0.15s ease;
     z-index: 10;
     /* Center the robot on its position point */
     transform: translate(-50%, -50%);
 }
 
 .robot-agent:hover {
-    transform: translate(-50%, -50%) scale(1.1);
+    transform: translate(-50%, -50%) scale(1.05);
 }
 
 .robot-agent.active {
@@ -30,23 +30,24 @@
     height: 64px;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    animation: float 3s ease-in-out infinite;
-    filter: drop-shadow(0 0 10px var(--robot-glow, #00fff2));
+    animation: power-hum 2s ease-in-out infinite;
+    filter: drop-shadow(3px 3px 0 #000);
 }
 
 .robot-agent.active .robot-sprite {
-    animation: float 1.5s ease-in-out infinite, pulse-glow 0.5s ease-in-out infinite;
+    animation: power-hum 1s ease-in-out infinite;
 }
 
-/* Float animation */
+/* Power hum animation (replaces float) */
+@keyframes power-hum {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+/* Legacy float for compatibility */
 @keyframes float {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-}
-
-@keyframes pulse-glow {
-    0%, 100% { filter: drop-shadow(0 0 10px var(--robot-glow)); }
-    50% { filter: drop-shadow(0 0 20px var(--robot-glow)) brightness(1.2); }
+    50% { transform: translateY(-2px); }
 }
 
 /* Walk animation - leg movement */
@@ -114,7 +115,7 @@
     color: var(--robot-color, #00fff2);
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 5px var(--robot-glow);
+    text-shadow: 2px 2px 0 #000;
     white-space: nowrap;
 }
 
@@ -133,9 +134,9 @@
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 10, 20, 0.95);
-    border: 2px solid var(--robot-color, #00fff2);
-    border-radius: 8px;
+    background: #000;
+    border: 4px solid var(--robot-color, #00fff2);
+    border-radius: 0;
     padding: 8px 12px;
     max-width: 200px;
     font-family: 'Share Tech Mono', monospace;
@@ -143,9 +144,9 @@
     color: #fff;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.1s ease;
     z-index: 100;
-    box-shadow: 0 0 15px var(--robot-glow);
+    box-shadow: 5px 5px 0 #000;
 }
 
 .speech-bubble::after {
@@ -161,13 +162,13 @@
 .robot-agent.speaking .speech-bubble {
     opacity: 1;
     visibility: visible;
-    animation: bubble-appear 0.3s ease-out;
+    animation: bubble-appear 0.15s ease-out;
 }
 
 @keyframes bubble-appear {
     0% {
         opacity: 0;
-        transform: translateX(-50%) translateY(10px);
+        transform: translateX(-50%) translateY(5px);
     }
     100% {
         opacity: 1;

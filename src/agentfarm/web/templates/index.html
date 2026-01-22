@@ -120,34 +120,59 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                     <h2 data-i18n="section.workflow_status">WORKFLOW STATUS</h2>
                 </div>
                 <div class="workflow-stages">
-                    <div class="stage" id="stage-plan">
-                        <div class="stage-icon">◇</div>
-                        <div class="stage-name" data-i18n="stage.plan">PLAN</div>
-                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                    <div class="stage" id="stage-plan" data-stage="plan" onclick="toggleStageDetails('plan')">
+                        <div class="stage-header">
+                            <div class="stage-icon">◇</div>
+                            <div class="stage-name" data-i18n="stage.plan">PLAN</div>
+                            <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                        </div>
+                        <div class="stage-expand-icon">▼</div>
                     </div>
                     <div class="stage-connector"></div>
-                    <div class="stage" id="stage-ux_design">
-                        <div class="stage-icon">♥</div>
-                        <div class="stage-name" data-i18n="stage.ux">UX</div>
-                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                    <div class="stage" id="stage-ux_design" data-stage="ux_design" onclick="toggleStageDetails('ux_design')">
+                        <div class="stage-header">
+                            <div class="stage-icon">♥</div>
+                            <div class="stage-name" data-i18n="stage.ux">UX</div>
+                            <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                        </div>
+                        <div class="stage-expand-icon">▼</div>
                     </div>
                     <div class="stage-connector"></div>
-                    <div class="stage" id="stage-execute">
-                        <div class="stage-icon">▷</div>
-                        <div class="stage-name" data-i18n="stage.execute">EXEKVERA</div>
-                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                    <div class="stage" id="stage-execute" data-stage="execute" onclick="toggleStageDetails('execute')">
+                        <div class="stage-header">
+                            <div class="stage-icon">▷</div>
+                            <div class="stage-name" data-i18n="stage.execute">EXEKVERA</div>
+                            <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                        </div>
+                        <div class="stage-expand-icon">▼</div>
                     </div>
                     <div class="stage-connector"></div>
-                    <div class="stage" id="stage-verify">
-                        <div class="stage-icon">◈</div>
-                        <div class="stage-name" data-i18n="stage.verify">VERIFIERA</div>
-                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                    <div class="stage" id="stage-verify" data-stage="verify" onclick="toggleStageDetails('verify')">
+                        <div class="stage-header">
+                            <div class="stage-icon">◈</div>
+                            <div class="stage-name" data-i18n="stage.verify">VERIFIERA</div>
+                            <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                        </div>
+                        <div class="stage-expand-icon">▼</div>
                     </div>
                     <div class="stage-connector"></div>
-                    <div class="stage" id="stage-review">
-                        <div class="stage-icon">◉</div>
-                        <div class="stage-name" data-i18n="stage.review">GRANSKA</div>
-                        <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                    <div class="stage" id="stage-review" data-stage="review" onclick="toggleStageDetails('review')">
+                        <div class="stage-header">
+                            <div class="stage-icon">◉</div>
+                            <div class="stage-name" data-i18n="stage.review">GRANSKA</div>
+                            <div class="stage-status" data-i18n="stage.standby">STANDBY</div>
+                        </div>
+                        <div class="stage-expand-icon">▼</div>
+                    </div>
+                </div>
+                <!-- Stage details panel - shows when a stage is clicked -->
+                <div class="stage-details-panel" id="stage-details-panel">
+                    <div class="stage-details-header">
+                        <span class="stage-details-title" id="stage-details-title">PLAN</span>
+                        <button class="stage-details-close" onclick="closeStageDetails()">✕</button>
+                    </div>
+                    <div class="stage-details-content" id="stage-details-content">
+                        <!-- Messages for this stage -->
                     </div>
                 </div>
                 <!-- Launch button - shown when workflow completes -->
@@ -188,32 +213,7 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                 </div>
             </section>
 
-            <!-- File Upload Section (SecureVault) -->
-            <section class="file-upload-section tier-gated" id="file-upload-section">
-                <div class="section-header">
-                    <span class="icon">📁</span>
-                    <h2 data-i18n="section.project_files">PROJEKTFILER</h2>
-                    <span class="section-subtitle" data-i18n="section.project_files_subtitle">Filer som agenterna kan läsa</span>
-                </div>
-                <div class="file-upload-info">
-                    <p data-i18n="files.info">Ladda upp filer som agenterna ska ha tillgång till: kodfiler, dokumentation, specifikationer etc.</p>
-                </div>
-                <div class="file-drop-zone" id="file-drop-zone">
-                    <input type="file" id="file-input-hidden" multiple hidden accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv,.pdf,.ts,.tsx,.jsx,.html,.css">
-                    <span class="drop-zone-icon">📥</span>
-                    <span class="drop-zone-text" data-i18n="files.drop_here">SLÄPP FILER HÄR</span>
-                    <span class="drop-zone-hint" data-i18n="files.click_hint">eller klicka för att välja filer</span>
-                    <span class="drop-zone-formats">.py .js .ts .json .md .txt .yaml .csv .pdf</span>
-                </div>
-                <div class="uploaded-files-list" id="uploaded-files-list">
-                    <!-- Populated by JavaScript -->
-                </div>
-                <!-- Beta Operator overlay for non-premium users -->
-                <div class="beta-operator-overlay" id="file-upload-overlay">
-                    <span class="overlay-text" data-i18n="files.beta_required">🔒 BETA OPERATOR KRÄVS</span>
-                    <button class="beta-upgrade-btn" onclick="openModal('beta-operator-modal')" data-i18n="files.become_beta">BLI BETA OPERATOR</button>
-                </div>
-            </section>
+            <!-- File Upload Section removed - files are now per-agent -->
         </main>
 
         <!-- Footer -->
@@ -485,6 +485,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <textarea class="agent-custom-prompt" data-agent="orchestrator" rows="3" placeholder="T.ex: Prioritera snabbhet över precision..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="orchestrator">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
+                        </div>
                     </div>
 
                     <!-- PLANNER -->
@@ -502,6 +510,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <label>DITT TILLÄGG:</label>
                             <textarea class="agent-custom-prompt" data-agent="planner" rows="3" placeholder="T.ex: Använd alltid microservices-arkitektur..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="planner">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
                         </div>
                     </div>
 
@@ -521,6 +537,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <textarea class="agent-custom-prompt" data-agent="ux_designer" rows="3" placeholder="T.ex: Använd vårt designsystem med blå primärfärg..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="ux_designer">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
+                        </div>
                     </div>
 
                     <!-- EXECUTOR -->
@@ -538,6 +562,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <label>DITT TILLÄGG:</label>
                             <textarea class="agent-custom-prompt" data-agent="executor" rows="3" placeholder="T.ex: Använd TypeScript och skriv JSDoc-kommentarer..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="executor">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
                         </div>
                     </div>
 
@@ -557,6 +589,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <textarea class="agent-custom-prompt" data-agent="verifier" rows="3" placeholder="T.ex: Kräv 80% code coverage..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="verifier">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
+                        </div>
                     </div>
 
                     <!-- REVIEWER -->
@@ -574,6 +614,14 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <label>DITT TILLÄGG:</label>
                             <textarea class="agent-custom-prompt" data-agent="reviewer" rows="3" placeholder="T.ex: Kontrollera att inga API-nycklar finns i koden..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
+                        </div>
+                        <div class="agent-card-files">
+                            <label>KONTEXTFILER:</label>
+                            <div class="agent-file-drop" data-agent="reviewer">
+                                <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
+                                <span class="drop-text">📁 Släpp filer här</span>
+                            </div>
+                            <div class="agent-file-list"></div>
                         </div>
                     </div>
                 </div>

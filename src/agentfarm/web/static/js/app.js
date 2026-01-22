@@ -34,6 +34,7 @@ let workingDir = '.';
 let availableProviders = [];
 let robotVisualizer = null;
 let currentProjectPath = null;
+let workflowBusyOverlay = null; // Privacy overlay when another user is working
 
 // Streaming message tracking
 let streamingMessages = {}; // request_id -> {agent, content, messageId}
@@ -51,6 +52,17 @@ let agentStates = {
     reviewer: 'idle',
     ux: 'idle'
 };
+
+// Per-stage message tracking
+let stageMessages = {
+    plan: [],
+    ux_design: [],
+    execute: [],
+    verify: [],
+    review: []
+};
+let currentStage = null;  // Currently active stage
+let selectedStage = null; // Stage with expanded details
 
 // DOM Elements
 const messagesContainer = document.getElementById('messages');
@@ -116,6 +128,11 @@ function handleServerMessage(data) {
             }
             break;
 
+        case 'workflow_busy':
+            // Another user is running a workflow - show busy indicator
+            showWorkflowBusy(true);
+            break;
+
         case 'project_created':
             currentProjectPath = data.path;
             addMessage('orchestrator', `📁 Projekt skapat: ${data.path}`);
@@ -128,6 +145,7 @@ function handleServerMessage(data) {
             executeBtn.disabled = true;
             executeBtn.querySelector('span').textContent = 'RUNNING...';
             ['plan', 'ux_design', 'execute', 'verify', 'review'].forEach(s => setStageStatus(s, null));
+            clearStageMessages();  // Clear previous workflow messages
             addMessage('orchestrator', `Initiating workflow: "${data.task}" via ${data.provider.toUpperCase()}`);
             // Start idle behavior for visual life
             if (robotVisualizer) {
@@ -152,6 +170,8 @@ function handleServerMessage(data) {
 
         case 'agent_message':
             addMessage(data.agent, data.content);
+            // Track message for current stage
+            addStageMessage(`[${data.agent}] ${data.content}`);
             // Animate robot communication
             if (robotVisualizer) {
                 // Determine who is talking to whom
@@ -194,6 +214,8 @@ function handleServerMessage(data) {
             executeBtn.disabled = false;
             executeBtn.querySelector('span').textContent = 'EXECUTE';
             setActiveAgent('orchestrator');
+            // Hide busy overlay (privacy mode)
+            showWorkflowBusy(false);
             // Reset all agent states to idle
             Object.keys(agentStates).forEach(id => setAgentState(id, 'idle'));
             // Stop idle behavior when workflow ends
@@ -231,6 +253,8 @@ function handleServerMessage(data) {
             executeBtn.disabled = false;
             executeBtn.querySelector('span').textContent = 'EXECUTE';
             setActiveAgent('orchestrator');
+            // Hide busy overlay (privacy mode)
+            showWorkflowBusy(false);
             // Reset all agent states to idle
             Object.keys(agentStates).forEach(id => setAgentState(id, 'idle'));
             // Stop idle behavior when workflow ends
@@ -592,6 +616,7 @@ function setStageStatus(stageId, status) {
     switch (status) {
         case 'active':
             statusEl.textContent = 'PROCESSING';
+            currentStage = stageId;  // Track current active stage
             break;
         case 'complete':
             statusEl.textContent = 'COMPLETE';
@@ -604,6 +629,139 @@ function setStageStatus(stageId, status) {
             break;
         default:
             statusEl.textContent = 'STANDBY';
+    }
+
+    // Update details panel if this stage is selected
+    if (selectedStage === stageId) {
+        renderStageDetails(stageId);
+    }
+}
+
+// Toggle stage details panel
+function toggleStageDetails(stageId) {
+    const panel = document.getElementById('stage-details-panel');
+    const allStages = document.querySelectorAll('.stage');
+
+    // If clicking the same stage, close it
+    if (selectedStage === stageId) {
+        closeStageDetails();
+        return;
+    }
+
+    // Remove selected from all stages
+    allStages.forEach(s => s.classList.remove('selected'));
+
+    // Select this stage
+    const stage = document.getElementById(`stage-${stageId}`);
+    if (stage) {
+        stage.classList.add('selected');
+    }
+
+    selectedStage = stageId;
+    renderStageDetails(stageId);
+    panel.classList.add('visible');
+}
+
+// Close stage details panel
+function closeStageDetails() {
+    const panel = document.getElementById('stage-details-panel');
+    const allStages = document.querySelectorAll('.stage');
+
+    allStages.forEach(s => s.classList.remove('selected'));
+    panel.classList.remove('visible');
+    selectedStage = null;
+}
+
+// Render stage details
+function renderStageDetails(stageId) {
+    const titleEl = document.getElementById('stage-details-title');
+    const contentEl = document.getElementById('stage-details-content');
+
+    const stageNames = {
+        plan: 'PLAN',
+        ux_design: 'UX DESIGN',
+        execute: 'EXEKVERA',
+        verify: 'VERIFIERA',
+        review: 'GRANSKA'
+    };
+
+    titleEl.textContent = stageNames[stageId] || stageId.toUpperCase();
+
+    const messages = stageMessages[stageId] || [];
+
+    if (messages.length === 0) {
+        contentEl.innerHTML = '<div class="stage-message-empty">Inga meddelanden ännu</div>';
+        return;
+    }
+
+    contentEl.innerHTML = messages.map(msg => `
+        <div class="stage-message">
+            <div class="stage-message-time">${msg.time}</div>
+            <div class="stage-message-text">${escapeHtml(msg.content)}</div>
+        </div>
+    `).join('');
+
+    // Scroll to bottom
+    contentEl.scrollTop = contentEl.scrollHeight;
+}
+
+// Add message to current stage
+function addStageMessage(content) {
+    if (!currentStage) return;
+
+    const msg = {
+        time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        content: content
+    };
+
+    if (!stageMessages[currentStage]) {
+        stageMessages[currentStage] = [];
+    }
+    stageMessages[currentStage].push(msg);
+
+    // Update details panel if this stage is visible
+    if (selectedStage === currentStage) {
+        renderStageDetails(currentStage);
+    }
+}
+
+// Clear all stage messages (called at workflow start)
+function clearStageMessages() {
+    stageMessages = {
+        plan: [],
+        ux_design: [],
+        execute: [],
+        verify: [],
+        review: []
+    };
+    currentStage = null;
+    closeStageDetails();
+}
+
+// Make functions globally available
+window.toggleStageDetails = toggleStageDetails;
+window.closeStageDetails = closeStageDetails;
+
+// Show/hide workflow busy overlay (privacy mode)
+function showWorkflowBusy(show) {
+    if (show) {
+        if (!workflowBusyOverlay) {
+            workflowBusyOverlay = document.createElement('div');
+            workflowBusyOverlay.className = 'workflow-busy-overlay';
+            workflowBusyOverlay.innerHTML = `
+                <div class="workflow-busy-content">
+                    <div class="busy-icon">⚡</div>
+                    <h3>WORKFLOW PÅGÅR</h3>
+                    <p>En annan användare kör ett workflow.</p>
+                    <p class="busy-hint">Du kan se resultatet när det är klart.</p>
+                    <div class="busy-spinner"></div>
+                </div>
+            `;
+            document.body.appendChild(workflowBusyOverlay);
+        }
+        workflowBusyOverlay.classList.add('visible');
+    } else if (workflowBusyOverlay) {
+        workflowBusyOverlay.classList.remove('visible');
     }
 }
 
@@ -654,6 +812,7 @@ function executeTask(task) {
         type: 'create_project',
         name: projectName,
         prompt: task,
+        agent_files: getAgentFilesForWorkflow(),  // Per-agent files
     }));
 }
 
@@ -1642,8 +1801,8 @@ function renderDatastreamMessages() {
     const container = document.getElementById('datastream-messages');
     if (!container) return;
 
-    // Get all messages from messageHistory
-    const html = messageHistory.map(msg => {
+    // Get all messages
+    const html = messages.map(msg => {
         const agentId = msg.agent?.id || 'orchestrator';
         const agentName = msg.agent?.name || 'SYSTEM';
         const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('sv-SE') : '';
@@ -1829,198 +1988,130 @@ async function saveCompanyContext() {
 }
 
 // =============================================================================
-// FILE UPLOAD (SecureVault)
+// PER-AGENT FILE UPLOAD
 // =============================================================================
 
-const ALLOWED_FILE_TYPES = ['.txt', '.md', '.py', '.js', '.json', '.yaml', '.yml', '.csv', '.pdf'];
+const ALLOWED_FILE_TYPES = ['.txt', '.md', '.py', '.js', '.json', '.yaml', '.yml', '.csv'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-let uploadedVaultFiles = [];
+
+// Per-agent file storage: { agent_name: [{name, size, content}] }
+const agentFiles = {
+    orchestrator: [],
+    planner: [],
+    ux_designer: [],
+    executor: [],
+    verifier: [],
+    reviewer: []
+};
 
 function initFileUpload() {
-    const dropZone = document.getElementById('file-drop-zone');
-    const fileInput = document.getElementById('file-input-hidden');
-    const uploadSection = document.getElementById('file-upload-section');
-
-    if (!dropZone || !fileInput) return;
-
-    // Click to open file picker
-    dropZone.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    // File input change
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            uploadFiles(e.target.files);
-        }
-    });
-
-    // Drag and drop handlers
-    dropZone.addEventListener('dragenter', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('drag-active');
-    });
-
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('drag-active');
-    });
-
-    dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('drag-active');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('drag-active');
-
-        if (e.dataTransfer.files.length > 0) {
-            uploadFiles(e.dataTransfer.files);
-        }
-    });
-
-    // Load existing vault files
-    loadVaultFiles();
-
-    // Check tier and update UI
-    checkFileUploadTier();
+    // Initialize per-agent file drops
+    initAgentFileDrops();
 }
 
-async function checkFileUploadTier() {
-    const uploadSection = document.getElementById('file-upload-section');
-    if (!uploadSection) return;
+function initAgentFileDrops() {
+    document.querySelectorAll('.agent-file-drop').forEach(dropZone => {
+        const agent = dropZone.dataset.agent;
+        const fileInput = dropZone.querySelector('.agent-file-input');
+        const fileList = dropZone.closest('.agent-card-files').querySelector('.agent-file-list');
 
-    try {
-        const response = await fetch('/api/user');
-        if (response.ok) {
-            const user = await response.json();
-            const canUpload = user.tier === 'early_access';
-
-            if (canUpload) {
-                uploadSection.classList.remove('locked');
-                uploadSection.classList.add('unlocked');
-            } else {
-                uploadSection.classList.add('locked');
-                uploadSection.classList.remove('unlocked');
-            }
-        }
-    } catch (e) {
-        console.error('Failed to check tier for file upload:', e);
-    }
-}
-
-async function uploadFiles(files) {
-    const uploadSection = document.getElementById('file-upload-section');
-
-    // Check if locked (free tier)
-    if (uploadSection && uploadSection.classList.contains('locked')) {
-        addMessage('orchestrator', '⚠️ Filuppladdning kräver Early Access. Klicka på UPGRADE för att låsa upp.');
-        return;
-    }
-
-    for (const file of files) {
-        // Validate file type
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!ALLOWED_FILE_TYPES.includes(ext)) {
-            addMessage('orchestrator', `✗ Ogiltig filtyp: ${file.name}. Tillåtna: ${ALLOWED_FILE_TYPES.join(', ')}`);
-            continue;
-        }
-
-        // Validate file size
-        if (file.size > MAX_FILE_SIZE) {
-            addMessage('orchestrator', `✗ Filen är för stor: ${file.name}. Max ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-            continue;
-        }
-
-        // Upload file
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch('/api/files/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                addMessage('orchestrator', `✓ Fil uppladdad: ${file.name}`);
-                loadVaultFiles(); // Refresh list
-            } else {
-                addMessage('orchestrator', `✗ Uppladdning misslyckades: ${result.error || 'Okänt fel'}`);
-            }
-        } catch (err) {
-            console.error('Upload error:', err);
-            addMessage('orchestrator', `✗ Uppladdning misslyckades: ${err.message}`);
-        }
-    }
-}
-
-async function loadVaultFiles() {
-    const listContainer = document.getElementById('uploaded-files-list');
-    if (!listContainer) return;
-
-    try {
-        const response = await fetch('/api/files/vault');
-        if (response.ok) {
-            const data = await response.json();
-            uploadedVaultFiles = data.files || [];
-            renderUploadedFiles();
-        }
-    } catch (e) {
-        console.error('Failed to load vault files:', e);
-    }
-}
-
-function renderUploadedFiles() {
-    const listContainer = document.getElementById('uploaded-files-list');
-    if (!listContainer) return;
-
-    if (uploadedVaultFiles.length === 0) {
-        listContainer.innerHTML = '<div class="vault-empty">Inga filer uppladdade</div>';
-        return;
-    }
-
-    listContainer.innerHTML = uploadedVaultFiles.map(file => {
-        const ext = file.name.split('.').pop().toLowerCase();
-        const icon = getFileIcon(file.name);
-        const size = formatFileSize(file.size);
-
-        return `
-            <div class="vault-file-item" data-filename="${escapeAttr(file.name)}">
-                <span class="vault-file-icon">${icon}</span>
-                <span class="vault-file-name">${escapeHtml(file.name)}</span>
-                <span class="vault-file-size">${size}</span>
-                <button class="vault-file-delete" onclick="deleteVaultFile('${escapeAttr(file.name)}')" title="Ta bort">
-                    <span>✕</span>
-                </button>
-            </div>
-        `;
-    }).join('');
-}
-
-async function deleteVaultFile(filename) {
-    try {
-        const response = await fetch(`/api/files/vault/${encodeURIComponent(filename)}`, {
-            method: 'DELETE',
+        // Click to upload
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== fileInput) fileInput.click();
         });
 
-        if (response.ok) {
-            addMessage('orchestrator', `✓ Fil borttagen: ${filename}`);
-            loadVaultFiles();
-        } else {
-            const result = await response.json();
-            addMessage('orchestrator', `✗ Kunde inte ta bort: ${result.error || 'Okänt fel'}`);
+        // File selected
+        fileInput.addEventListener('change', (e) => {
+            handleAgentFiles(agent, e.target.files, fileList);
+            fileInput.value = '';
+        });
+
+        // Drag & drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleAgentFiles(agent, e.dataTransfer.files, fileList);
+        });
+    });
+}
+
+async function handleAgentFiles(agent, files, fileListEl) {
+    for (const file of files) {
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!ALLOWED_FILE_TYPES.includes(ext)) {
+            showNotification(`Filtyp ${ext} stöds ej`, 'error');
+            continue;
         }
-    } catch (err) {
-        console.error('Delete error:', err);
+        if (file.size > MAX_FILE_SIZE) {
+            showNotification(`${file.name} är för stor (max 10MB)`, 'error');
+            continue;
+        }
+
+        // Read file content as base64
+        const content = await readFileAsBase64(file);
+        agentFiles[agent].push({
+            name: file.name,
+            size: file.size,
+            content: content
+        });
     }
+
+    renderAgentFiles(agent, fileListEl);
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderAgentFiles(agent, fileListEl) {
+    fileListEl.innerHTML = agentFiles[agent].map((file, idx) => `
+        <div class="agent-file-item">
+            <span class="file-name" title="${escapeAttr(file.name)}">${escapeHtml(file.name)}</span>
+            <span class="file-remove" onclick="removeAgentFile('${agent}', ${idx})">✕</span>
+        </div>
+    `).join('');
+}
+
+function removeAgentFile(agent, index) {
+    agentFiles[agent].splice(index, 1);
+    const dropZone = document.querySelector(`.agent-file-drop[data-agent="${agent}"]`);
+    if (dropZone) {
+        const fileList = dropZone.closest('.agent-card-files').querySelector('.agent-file-list');
+        renderAgentFiles(agent, fileList);
+    }
+}
+
+// Make removeAgentFile available globally
+window.removeAgentFile = removeAgentFile;
+
+function showNotification(message, type = 'info') {
+    // Use existing addMessage for notifications
+    addMessage('orchestrator', type === 'error' ? `✗ ${message}` : message);
+}
+
+// Helper to get agent files for workflow
+function getAgentFilesForWorkflow() {
+    // Filter out agents with no files
+    const filesForWorkflow = {};
+    for (const [agent, files] of Object.entries(agentFiles)) {
+        if (files.length > 0) {
+            filesForWorkflow[agent] = files;
+        }
+    }
+    return filesForWorkflow;
 }
 
 // Check for payment result in URL

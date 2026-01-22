@@ -76,37 +76,72 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 
 
 class WebSocketClients:
-    """Manage WebSocket client connections."""
+    """Manage WebSocket client connections with privacy support."""
+
+    # Event types that contain sensitive workflow data
+    PRIVATE_EVENT_TYPES = {
+        'workflow_start', 'workflow_complete', 'workflow_error',
+        'agent_message', 'agent_thinking', 'agent_tool_call',
+        'stage_change', 'step_start', 'step_complete',
+        'code_generated', 'code_modified',
+        'agent_collaboration', 'parallel_execution_start',
+    }
 
     def __init__(self):
         self.clients: set[web.WebSocketResponse] = set()
+        self.client_devices: dict[web.WebSocketResponse, str] = {}  # ws -> device_id
+        self.workflow_owner: str | None = None  # device_id of current workflow owner
+
+    def set_workflow_owner(self, device_id: str | None) -> None:
+        """Set the device_id that owns the current workflow."""
+        self.workflow_owner = device_id
+        logger.info("Workflow owner set to: %s", device_id or "None")
 
     async def broadcast(self, message: dict[str, Any]) -> None:
-        """Broadcast message to all connected clients."""
+        """Broadcast message to all connected clients with privacy filtering."""
         if not self.clients:
             logger.debug("No WebSocket clients connected, skipping broadcast")
             return
 
-        data = json.dumps(message)
-        dead_clients = set()
+        event_type = message.get('type', 'unknown')
+        is_private = event_type in self.PRIVATE_EVENT_TYPES
 
-        logger.info("Broadcasting to %d clients: %s", len(self.clients), message.get('type', 'unknown'))
+        dead_clients = set()
+        logger.info("Broadcasting to %d clients: %s (private=%s)", len(self.clients), event_type, is_private)
 
         for ws in self.clients:
             try:
-                await ws.send_str(data)
+                client_device = self.client_devices.get(ws, "")
+
+                # If private event and this client is NOT the owner, send busy message instead
+                if is_private and self.workflow_owner and client_device != self.workflow_owner:
+                    busy_message = {
+                        "type": "workflow_busy",
+                        "message": "Ett workflow pågår...",
+                        "owner": False,
+                    }
+                    await ws.send_str(json.dumps(busy_message))
+                else:
+                    # Send full message to owner or for non-private events
+                    if is_private and client_device == self.workflow_owner:
+                        message["owner"] = True
+                    await ws.send_str(json.dumps(message))
             except Exception as e:
                 logger.warning("Failed to send to client: %s", e)
                 dead_clients.add(ws)
 
         self.clients -= dead_clients
+        for ws in dead_clients:
+            self.client_devices.pop(ws, None)
 
-    def add(self, ws: web.WebSocketResponse) -> None:
+    def add(self, ws: web.WebSocketResponse, device_id: str = "") -> None:
         self.clients.add(ws)
-        logger.info("WebSocket client connected. Total clients: %d", len(self.clients))
+        self.client_devices[ws] = device_id
+        logger.info("WebSocket client connected (device=%s). Total clients: %d", device_id, len(self.clients))
 
     def remove(self, ws: web.WebSocketResponse) -> None:
         self.clients.discard(ws)
+        self.client_devices.pop(ws, None)
 
 
 # Global state
@@ -511,7 +546,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     # Get device_id from cookie
     device_id = _get_device_id(request)
 
-    ws_clients.add(ws)
+    ws_clients.add(ws, device_id)
 
     # Send welcome message with available providers
     await ws.send_json({
@@ -551,8 +586,9 @@ async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any], dev
         # Create a new project and start workflow (multi-provider mode)
         name = data.get('name', 'nytt-projekt')
         prompt = data.get('prompt', '')
+        agent_files = data.get('agent_files', {})  # Per-agent files
         # Run in background - multi-provider mode is automatic
-        asyncio.create_task(create_and_run_project(name, prompt, device_id))
+        asyncio.create_task(create_and_run_project(name, prompt, device_id, agent_files))
 
     elif msg_type == 'ping':
         await ws.send_json({'type': 'pong'})
@@ -562,9 +598,10 @@ async def handle_ws_message(ws: web.WebSocketResponse, data: dict[str, Any], dev
         await ws.send_json({'type': 'workdir_set', 'workdir': current_working_dir})
 
 
-async def create_and_run_project(name: str, prompt: str, device_id: str) -> None:
+async def create_and_run_project(name: str, prompt: str, device_id: str, agent_files: dict | None = None) -> None:
     """Create a new project directory and run workflow in multi-provider mode."""
     import re
+    import base64
 
     logger.info("Creating project: %s with prompt: %s (user: %s)", name, prompt[:100], device_id[:8])
 
@@ -613,6 +650,22 @@ async def create_and_run_project(name: str, prompt: str, device_id: str) -> None
     # Create project directory
     project_path.mkdir(parents=True)
     logger.info("Created project directory: %s", project_path)
+
+    # Save per-agent context files
+    if agent_files:
+        for agent, files in agent_files.items():
+            if not files:
+                continue
+            agent_dir = project_path / ".context" / agent
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            for file_data in files:
+                try:
+                    file_path = agent_dir / file_data['name']
+                    content = base64.b64decode(file_data['content'])
+                    file_path.write_bytes(content)
+                    logger.info("Saved context file for %s: %s", agent, file_data['name'])
+                except Exception as e:
+                    logger.error("Failed to save context file %s for %s: %s", file_data.get('name'), agent, e)
 
     await ws_clients.broadcast({
         'type': 'project_created',
@@ -804,6 +857,9 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
     import uuid
+
+    # Set workflow owner for privacy filtering
+    ws_clients.set_workflow_owner(device_id if device_id else None)
 
     # Check and consume workflow credit
     if device_id and user_manager:
@@ -1018,6 +1074,9 @@ async def run_real_workflow(task: str, provider_type: str, working_dir: str, dev
             priority=PriorityLevel.HIGH,
             correlation_id=correlation_id,
         ))
+    finally:
+        # Clear workflow owner to allow other users to see future events
+        ws_clients.set_workflow_owner(None)
 
 
 async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
