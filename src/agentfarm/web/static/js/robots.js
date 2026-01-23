@@ -372,9 +372,13 @@ class RobotVisualizer {
         this.isProcessingQueue = true;
 
         while (this.messageQueue.length > 0) {
-            const { fromId, toId, message } = this.messageQueue.shift();
-            await this.walkAndSpeak(fromId, toId, message);
-            await this.delay(500); // Small pause between communications
+            // Process up to 2 messages in parallel
+            const batch = this.messageQueue.splice(0, 2);
+            const promises = batch.map(({ fromId, toId, message }) =>
+                this.walkAndSpeak(fromId, toId, message)
+            );
+            await Promise.all(promises);
+            await this.delay(300); // Small pause between batches
         }
 
         this.isProcessingQueue = false;
@@ -447,6 +451,69 @@ class RobotVisualizer {
                 robot.element.style.transition = '';
                 resolve();
             }, duration);
+        });
+    }
+
+    // Check if a position is occupied by another robot
+    isPositionOccupied(x, y, excludeId, minDistance = 15) {
+        for (const [id, robot] of this.robots) {
+            if (id === excludeId) continue;
+            const dx = Math.abs(robot.data.x - x);
+            const dy = Math.abs(robot.data.y - y);
+            if (dx < minDistance && dy < minDistance) return true;
+        }
+        return false;
+    }
+
+    // Find a safe position near target that doesn't overlap with other robots
+    findSafePosition(targetX, targetY, excludeId) {
+        if (!this.isPositionOccupied(targetX, targetY, excludeId)) {
+            return { x: targetX, y: targetY };
+        }
+        const offsets = [[8,0],[-8,0],[0,8],[0,-8],[6,6],[-6,6],[6,-6],[-6,-6]];
+        for (const [ox, oy] of offsets) {
+            const nx = Math.max(5, Math.min(95, targetX + ox));
+            const ny = Math.max(5, Math.min(95, targetY + oy));
+            if (!this.isPositionOccupied(nx, ny, excludeId)) {
+                return { x: nx, y: ny };
+            }
+        }
+        return { x: targetX, y: targetY };
+    }
+
+    // Hop animation - bouncy movement to a position
+    async hopToPosition(robot, targetX, targetY, duration) {
+        return new Promise(resolve => {
+            const startX = parseFloat(robot.element.style.left) || robot.data.x;
+            const startY = parseFloat(robot.element.style.top) || robot.data.y;
+            const startTime = performance.now();
+
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease-out bounce
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+                // Calculate position
+                const currentX = startX + (targetX - startX) * easeProgress;
+                const currentY = startY + (targetY - startY) * easeProgress;
+
+                // Add vertical bounce
+                const bounceHeight = Math.sin(progress * Math.PI) * 3;
+
+                robot.element.style.left = `${currentX}%`;
+                robot.element.style.top = `${currentY - bounceHeight}%`;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    robot.element.style.top = `${targetY}%`;
+                    resolve();
+                }
+            };
+
+            requestAnimationFrame(animate);
         });
     }
 
@@ -561,7 +628,7 @@ class RobotVisualizer {
         const robot = this.robots.get(agentId);
         if (!robot || robot.isWalking) return;
 
-        const actions = ['wander', 'think', 'scan', 'look'];
+        const actions = ['wander', 'think', 'scan', 'look', 'wave', 'jump', 'spin'];
         const action = actions[Math.floor(Math.random() * actions.length)];
 
         switch (action) {
@@ -577,7 +644,19 @@ class RobotVisualizer {
             case 'look':
                 this.showLookingAnimation(agentId);
                 break;
+            case 'wave':
+                this.showWaveAnimation(agentId);
+                break;
+            case 'jump':
+                this.showJumpAnimation(agentId);
+                break;
+            case 'spin':
+                this.showSpinAnimation(agentId);
+                break;
         }
+
+        // 10% chance for idle chat with another idle robot
+        await this.maybeIdleChat(agentId);
     }
 
     async idleWander(agentId) {
@@ -660,6 +739,70 @@ class RobotVisualizer {
         setTimeout(() => {
             robot.element.classList.remove('looking', 'facing-right');
         }, 1200);
+    }
+
+    showWaveAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        robot.element.classList.add('waving');
+
+        setTimeout(() => {
+            robot.element.classList.remove('waving');
+        }, 1500);
+    }
+
+    showJumpAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        robot.element.classList.add('jumping');
+
+        setTimeout(() => {
+            robot.element.classList.remove('jumping');
+        }, 400);
+    }
+
+    showSpinAnimation(agentId) {
+        const robot = this.robots.get(agentId);
+        if (!robot) return;
+
+        robot.element.classList.add('spin-360');
+
+        setTimeout(() => {
+            robot.element.classList.remove('spin-360');
+        }, 600);
+    }
+
+    // Random idle chat between two idle robots
+    async maybeIdleChat(initiatorId) {
+        if (Math.random() > 0.1) return; // 10% chance
+
+        const idleRobots = Array.from(this.robots.entries())
+            .filter(([id, r]) => !r.isWalking && !this.workingRobots.has(id) && id !== initiatorId);
+
+        if (idleRobots.length === 0) return;
+
+        // Pick a random idle robot to chat with
+        const [targetId, targetRobot] = idleRobots[Math.floor(Math.random() * idleRobots.length)];
+
+        const chatMessages = [
+            '👋',
+            '...',
+            '💭',
+            '✨',
+            '🤔',
+            '⚡',
+        ];
+        const message = chatMessages[Math.floor(Math.random() * chatMessages.length)];
+
+        // Brief greeting exchange
+        const initiator = this.robots.get(initiatorId);
+        if (initiator && !initiator.isWalking) {
+            this.speak(initiatorId, message);
+            await this.delay(800);
+            this.speak(targetId, message);
+        }
     }
 
     // Set robot to "working" state (busy animation)

@@ -400,8 +400,8 @@
         /* Animated GPU visualization */
         .product-visual {
             position: relative;
-            width: 140px;
-            height: 100px;
+            width: 160px;
+            height: 120px;
         }
 
         .product-visual.gpu .gpu-body {
@@ -430,7 +430,7 @@
             border: 2px solid var(--magenta);
             border-radius: 50%;
             position: relative;
-            animation: spin-fan 2s linear infinite;
+            animation: spin-fan 4s linear infinite;
         }
 
         .product-visual.gpu .fan::before,
@@ -459,10 +459,10 @@
             bottom: 22px;
             left: 22px;
             font-family: 'Orbitron', monospace;
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             color: var(--green);
             text-shadow: 0 0 10px var(--green);
-            animation: blink-vram 1.5s ease-in-out infinite;
+            animation: blink-vram 3s ease-in-out infinite;
         }
 
         .product-visual.gpu .gpu-pcie {
@@ -507,7 +507,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            animation: pulse-die 2s ease-in-out infinite;
+            animation: pulse-die 3s ease-in-out infinite;
         }
 
         .product-visual.cpu .cpu-pins {
@@ -522,10 +522,10 @@
         .product-visual.cpu .cpu-pins.right { top: 38px; right: 2px; flex-direction: column; }
 
         .product-visual.cpu .pin {
-            width: 4px;
-            height: 4px;
+            width: 5px;
+            height: 5px;
             background: var(--cyan);
-            opacity: 0.7;
+            opacity: 0.85;
         }
 
         .product-visual.cpu .cpu-label {
@@ -534,7 +534,7 @@
             left: 50%;
             transform: translateX(-50%);
             font-family: 'Orbitron', monospace;
-            font-size: 0.5rem;
+            font-size: 0.65rem;
             color: var(--green);
             text-shadow: 0 0 8px var(--green);
             white-space: nowrap;
@@ -576,7 +576,7 @@
             height: 18px;
             background: #111;
             border: 1px solid #444;
-            animation: flicker-chip 0.5s ease-in-out infinite;
+            animation: flicker-chip 2s ease-in-out infinite;
         }
 
         .product-visual.ram .chip:nth-child(odd) {
@@ -625,12 +625,9 @@
             50% { box-shadow: 0 0 8px var(--green); }
         }
 
-        .product-card:hover .product-visual.gpu .fan {
-            animation-duration: 0.5s;
-        }
-
-        .product-card:hover .product-visual.cpu .cpu-die {
-            animation-duration: 0.8s;
+        /* Pause animations on hover for a calmer effect */
+        .product-card:hover .product-visual * {
+            animation-play-state: paused;
         }
 
         .product-card:hover .product-visual {
@@ -1108,7 +1105,7 @@
                     <div class="stack-info">
                         <h3>AMD Radeon RX 7800 XT</h3>
                         <p>16GB GDDR6 · ROCm 6.x · Ollama inference</p>
-                        <a href="https://www.amazon.se/s?k=AMD+Radeon+RX+7800+XT&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=AMD+Radeon+RX+7800+XT+16GB+Graphics+Card&tag=agentfarm-21" target="_blank" rel="nofollow sponsored noopener" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
                 <div class="stack-item">
@@ -1125,7 +1122,7 @@
                     <div class="stack-info">
                         <h3>AMD Ryzen 9 7950X</h3>
                         <p>16 kärnor · 32 trådar · 5.7GHz boost</p>
-                        <a href="https://www.amazon.se/s?k=AMD+Ryzen+9+7950X&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=AMD+Ryzen+9+7950X+AM5+Processor&tag=agentfarm-21" target="_blank" rel="nofollow sponsored noopener" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
                 <div class="stack-item">
@@ -1141,7 +1138,7 @@
                     <div class="stack-info">
                         <h3>Corsair Vengeance DDR5 64GB</h3>
                         <p>2x32GB · DDR5-5600 · CL36</p>
-                        <a href="https://www.amazon.se/s?k=Corsair+Vengeance+DDR5+64GB+5600&tag=agentfarm-21" target="_blank" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
+                        <a href="https://www.amazon.se/s?k=Corsair+Vengeance+DDR5+5600MHz+64GB+2x32GB&tag=agentfarm-21" target="_blank" rel="nofollow sponsored noopener" class="stack-link" data-i18n="hw.buy_amazon">Köp på Amazon.se →</a>
                     </div>
                 </div>
             </div>
