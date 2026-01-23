@@ -11,8 +11,7 @@ const TRANSLATIONS = {
         "header.status": "STATUS",
         "header.guest": "GÄST",
         "header.synth": "SYNTH",
-        "header.vision": "VISION",
-        "header.hardware": "HÅRDVARA",
+        "header.vision_tagline": "VISION",
 
         // Section headers
         "section.neural_network": "NEURAL NETWORK",
@@ -236,8 +235,7 @@ const TRANSLATIONS = {
         "header.status": "STATUS",
         "header.guest": "GUEST",
         "header.synth": "SYNTH",
-        "header.vision": "VISION",
-        "header.hardware": "HARDWARE",
+        "header.vision_tagline": "VISION",
 
         // Section headers
         "section.neural_network": "NEURAL NETWORK",
