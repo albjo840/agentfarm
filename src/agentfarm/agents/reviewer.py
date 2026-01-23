@@ -406,6 +406,16 @@ class ReviewerAgent(BaseAgent):
             request += f"\n\nDiff:\n{diff}"
 
         result = await self.run(context, request)
+
+        # Handle None result (LLM failure, timeout, etc.)
+        if result is None:
+            return ReviewResult(
+                approved=False,
+                comments=[],
+                summary="Review failed: No response from agent",
+                suggestions=[],
+            )
+
         data = result.data
 
         comments = [ReviewComment(**c) for c in data.get("comments", [])]

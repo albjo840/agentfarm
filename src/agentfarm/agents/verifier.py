@@ -367,6 +367,15 @@ After running ALL tools, summarize in JSON:
         last_result = None
         for attempt in range(1, max_retries + 1):
             result = await self.run(context, request, max_tool_calls=self.default_max_tool_calls)
+
+            # Handle None result (LLM failure, timeout, etc.)
+            if result is None:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Verification attempt %d returned None, retrying...", attempt
+                )
+                continue
+
             last_result = result
 
             if result.success:
@@ -384,6 +393,20 @@ After running ALL tools, summarize in JSON:
 
             # Non-recoverable or last attempt
             break
+
+        # Handle case where all attempts returned None
+        if last_result is None:
+            return VerificationResult(
+                success=False,
+                tests_passed=0,
+                tests_failed=0,
+                tests_skipped=0,
+                test_results=[],
+                lint_issues=[],
+                type_errors=[],
+                coverage_percent=None,
+                summary="Verification failed: No response from agent after retries",
+            )
 
         result = last_result
         data = result.data
