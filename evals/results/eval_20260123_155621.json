@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-01-23T15:56:21.522724",
+  "total_tests": 2,
+  "passed": 0,
+  "failed": 2,
+  "total_score": 14.047619047619047,
+  "max_score": 40,
+  "percentage": 35.11904761904761,
+  "duration": 449.75967717170715,
+  "by_category": {
+    "refactor": {
+      "total": 2,
+      "passed": 0,
+      "avg_score": 0.5238095238095238
+    }
+  },
+  "results": [
+    {
+      "test_id": "refactor-001",
+      "passed": false,
+      "score": 0.3333333333333333,
+      "duration": 193.9914255142212,
+      "errors": [
+        "Function calculate_subtotal not found in messy.py",
+        "Function apply_discount not found in messy.py",
+        "Function calculate_tax not found in messy.py",
+        "Function format_receipt not found in messy.py"
+      ]
+    },
+    {
+      "test_id": "refactor-002",
+      "passed": false,
+      "score": 0.7142857142857143,
+      "duration": 255.76817917823792,
+      "errors": [
+        "Syntax error: Sorry: IndentationError: unexpected unindent (shapes.py, line 6)",
+        "Class Triangle not found in shapes.py"
+      ]
+    }
+  ]
+}

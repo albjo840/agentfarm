@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-01-23T15:54:17.635795",
+  "total_tests": 2,
+  "passed": 1,
+  "failed": 1,
+  "total_score": 19.125,
+  "max_score": 65,
+  "percentage": 29.423076923076923,
+  "duration": 322.79537987709045,
+  "by_category": {
+    "multistep": {
+      "total": 2,
+      "passed": 1,
+      "avg_score": 0.7375
+    }
+  },
+  "results": [
+    {
+      "test_id": "multistep-001",
+      "passed": false,
+      "score": 0.6,
+      "duration": 125.39621663093567,
+      "errors": [
+        "File storage.py not found",
+        "Syntax error:   File \"/tmp/eval_multistep-001_614nntmx/todo.py\", line 33\n    delete_todo(args.id)}\n                        ^\nSyntaxError: unmatched '}'\n",
+        "File storage.py not found",
+        "File storage.py not found"
+      ]
+    },
+    {
+      "test_id": "multistep-002",
+      "passed": true,
+      "score": 0.875,
+      "duration": 197.39910006523132,
+      "errors": [
+        "Pattern 'requests|httpx|aiohttp' not found in scraper.py"
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@ När användaren säger "fortsätt" eller "get context", läs dessa filer i ordn
 | [SECURITY.md](./SECURITY.md) | Säkerhetsarkitektur (Vault, VPN, isolation) |
 | [WEB.md](./WEB.md) | Web interface och API endpoints |
 | [CURRENT_STATE.md](./CURRENT_STATE.md) | Pågående arbete och nästa steg |
+| [MCP_TESTING.md](./MCP_TESTING.md) | MCP-baserad testning och evalueringsverktyg |
 | [ROCM_SETUP.md](./ROCM_SETUP.md) | ROCm 6.4.3 + Ollama installation (testad config) |
 | [WIREGUARD_SETUP.md](./WIREGUARD_SETUP.md) | WireGuard VPN + DuckDNS (testad config) |
 | [SSL_SETUP.md](./SSL_SETUP.md) | Certbot SSL/TLS för agentfarm.se och DuckDNS |
@@ -105,4 +106,4 @@ Se [CURRENT_STATE.md](./CURRENT_STATE.md) för:
 
 ---
 
-*Uppdaterad: 2026-01-22*
+*Uppdaterad: 2026-01-23*

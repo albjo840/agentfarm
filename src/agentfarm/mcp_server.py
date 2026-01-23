@@ -19,6 +19,7 @@ from mcp.types import (
 )
 
 from agentfarm.agents.base import AgentContext
+from agentfarm.mcp import get_eval_tool_handler, get_prompt_tool_handler, get_testing_tool_handler
 from agentfarm.models.schemas import TaskPlan, WorkflowResult
 from agentfarm.orchestrator import Orchestrator
 from agentfarm.providers.ollama import OllamaProvider
@@ -63,6 +64,38 @@ EXCLUDE_DIRS = {
     ".mypy_cache",
     ".ruff_cache",
 }
+
+# Handler instances
+_eval_handler = None
+_prompt_handler = None
+_testing_handler = None
+
+
+def get_eval_handler():
+    """Get or create the eval tool handler instance."""
+    global _eval_handler
+    if _eval_handler is None:
+        EvalToolHandler = get_eval_tool_handler()
+        _eval_handler = EvalToolHandler(_working_dir)
+    return _eval_handler
+
+
+def get_prompt_handler():
+    """Get or create the prompt tool handler instance."""
+    global _prompt_handler
+    if _prompt_handler is None:
+        PromptToolHandler = get_prompt_tool_handler()
+        _prompt_handler = PromptToolHandler(_working_dir)
+    return _prompt_handler
+
+
+def get_testing_handler():
+    """Get or create the testing tool handler instance."""
+    global _testing_handler
+    if _testing_handler is None:
+        TestingToolHandler = get_testing_tool_handler()
+        _testing_handler = TestingToolHandler(_working_dir)
+    return _testing_handler
 
 
 def get_orchestrator() -> Orchestrator:
@@ -331,6 +364,149 @@ async def list_tools() -> list[Tool]:
                 "required": ["path"],
             },
         ),
+        # Evaluation Tools
+        Tool(
+            name="run_eval",
+            description="Run evaluation suite with optional category filter",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Category to run: codegen, bugfix, refactor, multistep",
+                        "enum": ["codegen", "bugfix", "refactor", "multistep"],
+                    },
+                    "quick": {
+                        "type": "boolean",
+                        "description": "Run quick mode (fewer tests)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="list_evals",
+            description="List all available evaluation tests",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="run_single_eval",
+            description="Run a specific evaluation test by ID",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "test_id": {
+                        "type": "string",
+                        "description": "Test ID (e.g., 'codegen-001')",
+                    },
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Show verbose output",
+                        "default": False,
+                    },
+                },
+                "required": ["test_id"],
+            },
+        ),
+        Tool(
+            name="get_eval_results",
+            description="Get recent evaluation results",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of results to return",
+                        "default": 10,
+                    },
+                },
+            },
+        ),
+        # Prompt Introspection Tools
+        Tool(
+            name="get_prompt",
+            description="Get the system prompt for an agent",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name: planner, executor, verifier, reviewer, ux_designer, orchestrator",
+                    },
+                },
+                "required": ["agent"],
+            },
+        ),
+        Tool(
+            name="list_prompts",
+            description="List all agent prompts with metadata",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="test_prompt",
+            description="Test a prompt with sample input",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name to test",
+                    },
+                    "test_input": {
+                        "type": "string",
+                        "description": "Sample input to test with",
+                    },
+                    "custom_suffix": {
+                        "type": "string",
+                        "description": "Optional custom prompt suffix",
+                    },
+                },
+                "required": ["agent", "test_input"],
+            },
+        ),
+        # Workflow Testing Tools
+        Tool(
+            name="test_agent",
+            description="Test a single agent with specific input",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent to test: planner, executor, verifier, reviewer",
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "Task description for the agent",
+                    },
+                    "context_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Context files for the task",
+                    },
+                },
+                "required": ["agent", "task"],
+            },
+        ),
+        Tool(
+            name="run_quick_test",
+            description="Run quick sanity tests",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "component": {
+                        "type": "string",
+                        "description": "Component to test: imports, agents, tools, memory",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -356,6 +532,39 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = _handle_list_project_files(arguments)
         elif name == "read_file":
             result = _handle_read_file(arguments)
+        # Evaluation Tools
+        elif name == "run_eval":
+            result = await get_eval_handler().run_eval(
+                arguments.get("category"), arguments.get("quick", False)
+            )
+        elif name == "list_evals":
+            result = get_eval_handler().list_evals()
+        elif name == "run_single_eval":
+            result = await get_eval_handler().run_single_eval(
+                arguments["test_id"], arguments.get("verbose", False)
+            )
+        elif name == "get_eval_results":
+            result = get_eval_handler().get_eval_results(arguments.get("limit", 10))
+        # Prompt Introspection Tools
+        elif name == "get_prompt":
+            result = get_prompt_handler().get_prompt(arguments["agent"])
+        elif name == "list_prompts":
+            result = get_prompt_handler().list_prompts()
+        elif name == "test_prompt":
+            result = await get_prompt_handler().test_prompt(
+                arguments["agent"],
+                arguments["test_input"],
+                arguments.get("custom_suffix"),
+            )
+        # Workflow Testing Tools
+        elif name == "test_agent":
+            result = await get_testing_handler().test_agent(
+                arguments["agent"],
+                arguments["task"],
+                arguments.get("context_files"),
+            )
+        elif name == "run_quick_test":
+            result = get_testing_handler().run_quick_test(arguments.get("component"))
         else:
             result = f"Unknown tool: {name}"
 

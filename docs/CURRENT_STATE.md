@@ -1,25 +1,94 @@
 # AgentFarm - Current State
 
-> **Uppdaterad:** 2026-01-22
+> **Uppdaterad:** 2026-01-23
 >
-> Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)
+> Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md) | [MCP_TESTING.md](./MCP_TESTING.md)
 
 ## Aktiv Branch
 
 ```
-Branch: feature/affiliate-ads
-Status: Agent persistence, parallelization, tracking module
+Branch: master
+Status: MCP-based testing tools, evaluation results
 ```
 
 ## Senaste Commits
 
 ```
-d7751fd feat: Add privacy disclaimer to Beta Operator modal
-09f75bf feat: Add hardware page i18n and fix token metrics tracking
-b97735a feat: Rename Prompts to 'Your prompts', add My Stack section
-a302bf4 feat: Add language toggle, animated hardware visuals, larger task input
-0775fd8 feat: Add product images and new badge types to hardware page
+7a18c3b docs: Update Stripe setup guide for live mode
+ed00373 feat: Update web interface and remove PHP proxy
+4f72802 docs: Add SSL/TLS setup documentation
+fd931f4 fix: Clean up hardware page and fix language toggle flags
+7260be0 feat: Add tracking module, parallel verification, and agent persistence
 ```
+
+## Session 2026-01-23: MCP Testing Tools & Evaluation
+
+### Slutfört i denna session
+
+- [x] **Ny MCP-modul** (`mcp/`) - 10 nya testverktyg för Claude Desktop
+  - `run_eval`, `list_evals`, `run_single_eval`, `get_eval_results`
+  - `get_prompt`, `list_prompts`, `test_prompt`
+  - `test_agent`, `run_quick_test`
+
+- [x] **Pydantic Schemas** (`mcp/schemas.py`)
+  - `EvalRunResult` - Evalueringsresultat
+  - `PromptInfo` - Agent-prompt metadata
+  - `AgentTestResult` - Testresultat per agent
+
+- [x] **Handler-klasser**
+  - `EvalToolHandler` - Kör och hantera evalueringar
+  - `PromptToolHandler` - Introspection av agent-prompter
+  - `TestingToolHandler` - Snabbtester och agenttestning
+
+- [x] **MCP Server Integration** (`mcp_server.py`)
+  - 10 nya Tool-definitioner
+  - Handler-routing i call_tool()
+  - Lazy imports för cirkulära beroenden
+
+- [x] **Tester** (`tests/test_mcp_tools.py`)
+  - 15 tester för nya MCP-verktyg
+  - Schema-validering
+  - Handler-funktionalitet
+
+- [x] **Evalueringssvit körning** - Parallell körning med 4 subagenter
+  - Resultat: 6/11 tester passerade (52.9%)
+  - Identifierade förbättringsområden dokumenterade
+
+### Nya Filer
+
+```
+src/agentfarm/mcp/
+├── __init__.py          # Module exports med lazy imports
+├── schemas.py           # Pydantic response-schemas
+├── eval_tools.py        # EvalToolHandler
+├── prompt_tools.py      # PromptToolHandler
+└── testing_tools.py     # TestingToolHandler
+
+tests/
+└── test_mcp_tools.py    # 15 tester för MCP-verktyg
+
+docs/
+└── MCP_TESTING.md       # Dokumentation för MCP-testning
+```
+
+### Evalueringsresultat (Baseline)
+
+| Kategori | Pass | Poäng |
+|----------|------|-------|
+| codegen | 3/4 | 66% |
+| bugfix | 2/3 | 88% |
+| refactor | 0/2 | 35% |
+| multistep | 1/2 | 29% |
+| **TOTALT** | **6/11** | **53%** |
+
+### Identifierade Problem
+
+1. `edit_file` - "Content to replace not found"
+2. Tool call limits - Agenter når max-gränser
+3. `run_tests` API - `keywords`-argument ej stött
+4. ProactiveCollaborator - Ej konfigurerad
+
+---
 
 ## Session 2026-01-22: Agent Persistence & Parallelization
 

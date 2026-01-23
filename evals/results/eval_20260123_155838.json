@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-01-23T15:58:38.092275",
+  "total_tests": 3,
+  "passed": 2,
+  "failed": 1,
+  "total_score": 35.0,
+  "max_score": 40,
+  "percentage": 87.5,
+  "duration": 586.3427119255066,
+  "by_category": {
+    "bugfix": {
+      "total": 3,
+      "passed": 2,
+      "avg_score": 0.6666666666666666
+    }
+  },
+  "results": [
+    {
+      "test_id": "bugfix-001",
+      "passed": false,
+      "score": 0.0,
+      "duration": 300.3754839897156,
+      "errors": [
+        "Test timed out after 300s"
+      ]
+    },
+    {
+      "test_id": "bugfix-002",
+      "passed": true,
+      "score": 1.0,
+      "duration": 167.43863439559937,
+      "errors": []
+    },
+    {
+      "test_id": "bugfix-003",
+      "passed": true,
+      "score": 1.0,
+      "duration": 118.52850222587585,
+      "errors": []
+    }
+  ]
+}

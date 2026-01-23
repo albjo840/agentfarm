@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-01-23T15:59:44.657914",
+  "total_tests": 4,
+  "passed": 3,
+  "failed": 1,
+  "total_score": 43.0,
+  "max_score": 65,
+  "percentage": 66.15384615384615,
+  "duration": 652.8967936038971,
+  "by_category": {
+    "codegen": {
+      "total": 4,
+      "passed": 3,
+      "avg_score": 0.7
+    }
+  },
+  "results": [
+    {
+      "test_id": "codegen-001",
+      "passed": true,
+      "score": 0.8,
+      "duration": 223.3851819038391,
+      "errors": [
+        "Pattern '\"\"\".*\"\"\"' not found in prime.py"
+      ]
+    },
+    {
+      "test_id": "codegen-002",
+      "passed": true,
+      "score": 1.0,
+      "duration": 226.58512353897095,
+      "errors": []
+    },
+    {
+      "test_id": "codegen-003",
+      "passed": true,
+      "score": 1.0,
+      "duration": 124.80464339256287,
+      "errors": []
+    },
+    {
+      "test_id": "codegen-004",
+      "passed": false,
+      "score": 0.0,
+      "duration": 78.12172842025757,
+      "errors": [
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found",
+        "File pipeline.py not found"
+      ]
+    }
+  ]
+}
