@@ -290,27 +290,80 @@ def get_available_providers() -> list[dict[str, Any]]:
 
 
 async def index_handler(request: web.Request) -> web.Response:
-    """Serve the main dashboard."""
+    """Serve the main dashboard with device_id cookie."""
     index_path = TEMPLATES_DIR / "index.html"
-    return web.FileResponse(index_path)
+
+    # Read file content
+    with open(index_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    response = web.Response(text=content, content_type='text/html')
+
+    # Set device_id cookie if not present
+    device_id = request.cookies.get("device_id")
+    if not device_id:
+        import uuid
+        device_id = str(uuid.uuid4())
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
+
+    return response
 
 
 async def mobile_handler(request: web.Request) -> web.Response:
-    """Serve the mobile interface."""
+    """Serve the mobile interface with device_id cookie."""
     mobile_path = TEMPLATES_DIR / "mobile.html"
-    return web.FileResponse(mobile_path)
+
+    with open(mobile_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    response = web.Response(text=content, content_type='text/html')
+
+    # Set device_id cookie if not present
+    device_id = request.cookies.get("device_id")
+    if not device_id:
+        import uuid
+        device_id = str(uuid.uuid4())
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
+
+    return response
 
 
 async def hardware_handler(request: web.Request) -> web.Response:
-    """Serve the hardware terminal page."""
+    """Serve the hardware terminal page with device_id cookie."""
     hardware_path = TEMPLATES_DIR / "hardware.html"
-    return web.FileResponse(hardware_path)
+
+    with open(hardware_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    response = web.Response(text=content, content_type='text/html')
+
+    # Set device_id cookie if not present
+    device_id = request.cookies.get("device_id")
+    if not device_id:
+        import uuid
+        device_id = str(uuid.uuid4())
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
+
+    return response
 
 
 async def vision_handler(request: web.Request) -> web.Response:
-    """Serve the vision/mission page."""
+    """Serve the vision/mission page with device_id cookie."""
     vision_path = TEMPLATES_DIR / "vision.html"
-    return web.FileResponse(vision_path)
+
+    with open(vision_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    response = web.Response(text=content, content_type='text/html')
+
+    # Set device_id cookie if not present
+    device_id = request.cookies.get("device_id")
+    if not device_id:
+        import uuid
+        device_id = str(uuid.uuid4())
+    response.set_cookie("device_id", device_id, max_age=365*24*60*60, httponly=True, samesite="Lax")
+
+    return response
 
 
 async def api_hardware_stats_handler(request: web.Request) -> web.Response:
