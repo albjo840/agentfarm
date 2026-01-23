@@ -590,8 +590,8 @@ class Orchestrator:
         changes_summary = []
         if execution_results:
             for result in execution_results:
-                if result.summary:
-                    changes_summary.append(f"- Step: {result.summary[:100]}")
+                if result.output:
+                    changes_summary.append(f"- Step {result.step_id}: {result.output[:100]}")
 
         context.previous_step_output = (
             f"{verification_summary}\n"
