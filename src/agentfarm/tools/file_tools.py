@@ -68,7 +68,18 @@ class FileTools:
             content = await f.read()
 
         if old_content not in content:
-            raise ValueError(f"Content to replace not found in {path}")
+            # Try fuzzy match: normalize whitespace
+            match_result = self._fuzzy_find(content, old_content)
+            if match_result:
+                actual_old, start, end = match_result
+                new_file_content = content[:start] + new_content + content[end:]
+                async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+                    await f.write(new_file_content)
+                return f"Edited {path} (fuzzy match)"
+            raise ValueError(
+                f"Content to replace not found in {path}. "
+                f"First 50 chars of search: {old_content[:50]!r}..."
+            )
 
         new_file_content = content.replace(old_content, new_content, 1)
 
@@ -125,6 +136,24 @@ class FileTools:
             return f"No matches found for '{pattern}'"
 
         return "\n".join(results[:100])
+
+    def _fuzzy_find(self, content: str, search: str) -> tuple[str, int, int] | None:
+        """Find content with fuzzy whitespace matching.
+
+        Args:
+            content: The file content to search in
+            search: The pattern to search for
+
+        Returns:
+            Tuple of (matched_text, start_index, end_index) or None if not found
+        """
+        import re
+        # Normalize whitespace in search pattern
+        search_normalized = re.sub(r'\s+', r'\\s+', re.escape(search.strip()))
+        match = re.search(search_normalized, content, re.DOTALL)
+        if match:
+            return match.group(0), match.start(), match.end()
+        return None
 
     async def file_exists(self, path: str) -> bool:
         """Check if a file exists."""

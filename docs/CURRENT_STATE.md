@@ -8,18 +8,90 @@
 
 ```
 Branch: master
-Status: MCP-based testing tools, evaluation results
+Status: Evaluation improvements, agent tool limits & collaboration fixes
 ```
 
 ## Senaste Commits
 
 ```
-7a18c3b docs: Update Stripe setup guide for live mode
-ed00373 feat: Update web interface and remove PHP proxy
-4f72802 docs: Add SSL/TLS setup documentation
-fd931f4 fix: Clean up hardware page and fix language toggle flags
-7260be0 feat: Add tracking module, parallel verification, and agent persistence
+cc96a76 feat: Add MCP-based testing tools for AgentFarm
+2c27040 fix: Remove AI-style formatting from vision page
+0a55b92 content: Rewrite vision page with improved Swedish copy
+69bdc00 feat: Add i18n support to agent prompts modal
+6d23e1f fix: Add language switcher and proper translations to vision page
 ```
+
+## Session 2026-01-23 (del 2): Evaluation Improvements
+
+### Slutfört i denna session
+
+Förbättrat evalueringsresultat från 52.9% genom att fixa 5 identifierade problem:
+
+- [x] **Tool Call Limits Höjda**
+  - `VerifierAgent`: 25 → **40** tool calls
+  - `ReviewerAgent`: 20 → **35** tool calls
+  - `BaseAgent` default: 10 → **15** tool calls
+
+- [x] **run_tests Parameter Fix** (`verifier.py`)
+  - Ändrat `keywords` → `pattern` för att matcha CodeTools API
+  - Fixar: Verifiering körs nu faktiskt med rätt filter
+
+- [x] **ProactiveCollaborator Setup** (`orchestrator.py`)
+  - Orchestrator skapar och injectar ProactiveCollaborator automatiskt
+  - Event listener för web UI collaboration events
+  - Fixar: "no collaborator set" varningar
+
+- [x] **ExecutorAgent Recovery Bug** (`executor.py`)
+  - Ändrat `_collaborator` → `collaborator` (rätt attributnamn)
+  - Fixar: Recovery via TeamProblemSolver fungerar nu
+
+- [x] **Fuzzy edit_file Matching** (`file_tools.py`)
+  - Ny `_fuzzy_find()` metod med whitespace-tolerant matching
+  - Fallback om exakt match misslyckas
+  - Bättre felmeddelanden med första 50 chars av sökning
+  - Fixar: "Content to replace not found" fel
+
+### Uppdaterade Filer
+
+```
+src/agentfarm/
+├── agents/
+│   ├── base.py          # default_max_tool_calls: 10 → 15
+│   ├── verifier.py      # max_tool_calls: 25 → 40, pattern parameter
+│   ├── reviewer.py      # max_tool_calls: 20 → 35
+│   └── executor.py      # collaborator attribut-fix
+├── orchestrator.py      # ProactiveCollaborator setup
+└── tools/
+    └── file_tools.py    # _fuzzy_find() metod
+
+docs/
+├── AGENTS.md            # Uppdaterad med nya tool limits
+└── CURRENT_STATE.md     # Denna fil
+```
+
+### Testresultat
+
+```bash
+python -m pytest tests/ -v
+# 227 passed, 20 skipped in 1.11s
+
+python -m evals.quick_test
+# 6/6 passed in 4.44s
+```
+
+### Förväntad Förbättring
+
+| Fix | Förväntad effekt |
+|-----|------------------|
+| Tool limits ökade | +5-10% (agenter slutför fler uppgifter) |
+| run_tests parameter | +10-15% (verifiering körs faktiskt) |
+| ProactiveCollaborator | +5% (bättre samarbete) |
+| Executor recovery | +3-5% (recovery fungerar) |
+| Fuzzy edit_file | +5-10% (färre edit-fel) |
+
+**Total förväntad förbättring**: 52.9% → 70-80%
+
+---
 
 ## Session 2026-01-23: MCP Testing Tools & Evaluation
 

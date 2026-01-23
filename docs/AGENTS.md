@@ -34,6 +34,7 @@ class BaseAgent(ABC):
     provider: LLMProvider
     memory: MemoryManager | None
     recursion_guard: RecursionGuard
+    default_max_tool_calls: int = 15  # Subklasser kan överskriva
 
     @property
     @abstractmethod
@@ -157,10 +158,15 @@ result = await executor.run(context)
 
 **Syfte:** Kör tester och validerar kod
 
+**Config:** `default_max_tool_calls = 40`
+
 **Tools:**
-- `run_pytest` - Kör pytest
+- `check_syntax` - Validera Python syntax
+- `check_imports` - Verifiera imports
+- `run_tests` - Kör pytest (parameter: `pattern` för -k filter)
 - `run_linter` - Kör ruff
 - `run_typecheck` - Kör type checking
+- `read_file` - Läs fil för inspektion
 
 ```python
 verifier = VerifierAgent(provider)
@@ -184,6 +190,8 @@ result = await verifier.run(context)
 ### 5. ReviewerAgent (`agents/reviewer.py`)
 
 **Syfte:** Kodgranskning
+
+**Config:** `default_max_tool_calls = 35`
 
 ```python
 reviewer = ReviewerAgent(provider)
@@ -209,7 +217,7 @@ Förhindrar oändliga loopar:
 ```python
 class RecursionGuard:
     max_depth: int = 10           # Max nesting depth
-    max_total_calls: int = 50     # Max totala anrop
+    max_total_calls: int = 100    # Max totala anrop
     identical_task_threshold: int = 5  # Max identiska tasks
 
     def enter(self, agent_name: str, task_summary: str) -> None:
@@ -225,12 +233,15 @@ class RecursionGuard:
 
 ### ProactiveCollaborator
 
-Agenter kan samarbeta direkt utan orchestrator:
+Agenter kan samarbeta direkt utan orchestrator. **Orchestrator konfigurerar automatiskt ProactiveCollaborator** för alla agenter vid uppstart:
 
 ```python
 from agentfarm.agents.collaboration import ProactiveCollaborator
 
-collaborator = ProactiveCollaborator(agents)
+# Orchestrator skapar och injectar automatiskt:
+collaborator = ProactiveCollaborator(base_collaborator)
+for agent in agents:
+    agent.set_proactive_collaborator(collaborator)
 
 # Peer review under kodgenerering
 feedback = await collaborator.request_peer_review(

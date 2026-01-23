@@ -18,7 +18,7 @@ class ReviewerAgent(BaseAgent):
 
     name = "ReviewerAgent"
     description = "Reviews code for quality and correctness"
-    default_max_tool_calls = 20  # Reviewer needs many tool calls for thorough review
+    default_max_tool_calls = 35  # Reviewer needs many tool calls for thorough review
 
     def __init__(self, provider: LLMProvider, working_dir: str = ".") -> None:
         super().__init__(provider)

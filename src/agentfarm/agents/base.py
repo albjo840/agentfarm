@@ -203,7 +203,7 @@ class BaseAgent(ABC):
 
     name: str = "BaseAgent"
     description: str = "Base agent"
-    default_max_tool_calls: int = 10  # Subclasses can override (e.g., VerifierAgent: 25)
+    default_max_tool_calls: int = 15  # Subclasses can override (e.g., VerifierAgent: 40)
 
     def __init__(
         self,

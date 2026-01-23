@@ -18,7 +18,7 @@ class VerifierAgent(BaseAgent):
 
     name = "VerifierAgent"
     description = "Verifies code changes through testing and validation"
-    default_max_tool_calls = 25  # Verifier needs many tool calls (syntax, imports, tests, lint, typecheck)
+    default_max_tool_calls = 40  # Verifier needs many tool calls (syntax, imports, tests, lint, typecheck)
 
     def __init__(self, provider: LLMProvider) -> None:
         super().__init__(provider)
@@ -103,7 +103,7 @@ After running ALL tools, summarize in JSON:
                 "properties": {
                     "path": {"type": "string", "description": "Test path or pattern (default: .)"},
                     "verbose": {"type": "boolean", "description": "Verbose output"},
-                    "keywords": {"type": "string", "description": "Filter tests by keyword (-k)"},
+                    "pattern": {"type": "string", "description": "Filter tests by keyword pattern (-k)"},
                 },
                 "required": [],
             },
@@ -216,9 +216,9 @@ After running ALL tools, summarize in JSON:
         except Exception as e:
             return f"ERROR checking imports in {path}: {e}"
 
-    async def _run_tests(self, path: str = ".", verbose: bool = False, keywords: str = "") -> str:
+    async def _run_tests(self, path: str = ".", verbose: bool = False, pattern: str = "") -> str:
         """Run pytest tests."""
-        return f"[Would run: pytest {path} {'-v' if verbose else ''} {f'-k {keywords}' if keywords else ''}]"
+        return f"[Would run: pytest {path} {'-v' if verbose else ''} {f'-k {pattern}' if pattern else ''}]"
 
     async def _run_linter(self, path: str = ".", fix: bool = False) -> str:
         """Run ruff linter."""

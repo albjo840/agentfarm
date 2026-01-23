@@ -314,11 +314,11 @@ Guidelines:
         )
 
         # Only try collaboration if we have a collaborator set up
-        if not hasattr(self, '_collaborator') or self._collaborator is None:
+        if not hasattr(self, 'collaborator') or self.collaborator is None:
             return None
 
         try:
-            problem_solver = TeamProblemSolver(self._collaborator)
+            problem_solver = TeamProblemSolver(self.collaborator)
 
             failure = FailureContext(
                 agent="executor",

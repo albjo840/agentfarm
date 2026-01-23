@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Event callback type
 EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
-from agentfarm.agents.collaboration import AgentCollaborator
+from agentfarm.agents.collaboration import AgentCollaborator, ProactiveCollaborator
 from agentfarm.agents.executor import ExecutorAgent
 from agentfarm.agents.planner import PlannerAgent
 from agentfarm.agents.reviewer import ReviewerAgent
@@ -170,6 +170,25 @@ class Orchestrator:
         # Set collaborator on all agents
         for agent in self._agents.values():
             agent.set_collaborator(self._collaborator)
+
+        # Create ProactiveCollaborator wrapper
+        self._proactive_collaborator = ProactiveCollaborator(self._collaborator)
+
+        # Add event listener for web UI
+        async def on_collaboration(collab) -> None:
+            if self._event_callback:
+                await self._emit("agent_collaboration", {
+                    "initiator": collab.initiator,
+                    "participants": collab.participants,
+                    "type": collab.collaboration_type.value,
+                    "topic": collab.topic,
+                })
+
+        self._proactive_collaborator.add_listener(on_collaboration)
+
+        # Inject ProactiveCollaborator into all agents
+        for agent in self._agents.values():
+            agent.set_proactive_collaborator(self._proactive_collaborator)
 
     def get_collaboration_summary(self) -> str:
         """Get a summary of agent collaboration during the workflow."""
