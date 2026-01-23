@@ -274,6 +274,116 @@
             margin-right: 0.5rem;
         }
 
+        /* Vision list styling */
+        .vision-list {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0;
+        }
+
+        .vision-list li {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+            padding: 0.75rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .vision-list li:last-child {
+            border-bottom: none;
+        }
+
+        .vision-list li::before {
+            content: '›';
+            position: absolute;
+            left: 0;
+            color: var(--cyan);
+            font-weight: bold;
+        }
+
+        .vision-list li strong {
+            color: var(--cyan);
+        }
+
+        /* Upgrade comparison table */
+        .upgrade-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .upgrade-table th,
+        .upgrade-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .upgrade-table thead th {
+            background: rgba(0, 255, 242, 0.15);
+            color: var(--cyan);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .upgrade-table thead th:first-child {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .upgrade-table thead th:nth-child(2) {
+            background: rgba(255, 200, 0, 0.15);
+            color: var(--yellow);
+        }
+
+        .upgrade-table thead th:nth-child(3) {
+            background: rgba(255, 0, 255, 0.15);
+            color: var(--magenta);
+        }
+
+        .upgrade-table tbody td {
+            color: var(--text-primary);
+        }
+
+        .upgrade-table tbody td:first-child {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .upgrade-table tbody td:nth-child(2) {
+            color: var(--yellow);
+        }
+
+        .upgrade-table tbody td:nth-child(3) {
+            color: var(--magenta);
+        }
+
+        .upgrade-table tbody tr:nth-child(even) {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .upgrade-table tbody tr:hover {
+            background: rgba(0, 255, 242, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            .upgrade-table {
+                font-size: 0.75rem;
+            }
+            .upgrade-table th,
+            .upgrade-table td {
+                padding: 0.5rem;
+            }
+        }
+
         .cta-section {
             text-align: center;
             padding: 2rem;
@@ -396,135 +506,142 @@
 
     <div class="vision-container">
         <div class="vision-hero">
-            <h1 data-i18n="vision.title">PIONJÄRANDAN</h1>
+            <h1 data-i18n="vision.title">PIONJÄRER</h1>
             <p class="tagline" data-i18n="vision.tagline">
                 Välkommen till frontlinjen av lokal AI. Tillsammans bygger vi framtidens
-                integritetsskyddade agentplattform - en GPU-cykel i taget.
+                integritetsskyddade agentplattform, en GPU-cykel i taget.
             </p>
         </div>
 
-        <!-- Section 1: The Vision -->
+        <!-- Section 1: Why Local -->
         <section class="vision-section">
             <div class="vision-section-header">
-                <span class="icon">&#9733;</span>
+                <span class="icon">★</span>
                 <h2 data-i18n="vision.why_local_title">VARFÖR LOKALT?</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.why_local_p1">
                     Att köra AI-agenter lokalt är ett aktivt val för integritet och oberoende.
-                    Din kod, dina dokument och dina idéer lämnar aldrig min "hemma-farm" -
-                    till skillnad från molntjänster där din data potentiellt kan användas
-                    för att träna framtida modeller.
+                    Din kod, dina dokument och dina idéer lämnar aldrig min "hemdator", till
+                    skillnad från i molntjänster, där din data potentiellt kan användas för
+                    att träna framtida modeller eller riskerar att läcka ut på annat sätt.
                 </p>
                 <p data-i18n="vision.why_local_p2">
-                    Men ärlighet kräver: lokala modeller är inte molnjättar. De har sina
-                    begränsningar, och det är viktigt att du förstår dem innan du börjar.
+                    Men: lokala modeller är inte molnjättar. De har sina begränsningar, och
+                    det är viktigt att du förstår dem innan du börjar.
                 </p>
             </div>
         </section>
 
-        <!-- Section 2: Honest Limitations -->
+        <!-- Section 2: What to Expect -->
         <section class="vision-section">
             <div class="vision-section-header">
-                <span class="icon">&#9888;</span>
+                <span class="icon">⚠</span>
                 <h2 data-i18n="vision.limitations_title">VAD DU KAN FÖRVÄNTA DIG</h2>
             </div>
             <div class="vision-section-content">
-                <div class="highlight-box warning">
-                    <p data-i18n="vision.limitations_intro">
-                        <strong>Ödmjuk transparens:</strong> Just nu kör vi optimerade, kvantiserade
-                        modeller (4-bit) på en AMD Radeon 7800 XT med 16GB VRAM. Det innebär:
-                    </p>
-                </div>
-                <p data-i18n="vision.limitations_queue">
-                    <strong>&#8227; Köer kan uppstå</strong> - En GPU, många användare. Ibland får du vänta.
+                <p data-i18n="vision.limitations_intro">
+                    Just nu kör vi optimerade modeller på en AMD Radeon 7800 XT med 16GB VRAM. Det innebär:
                 </p>
-                <p data-i18n="vision.limitations_precision">
-                    <strong>&#8227; Mindre precision</strong> - Agenterna kan vara lite mer "distraherade"
-                    än Claude i molnet. De behöver tydligare instruktioner.
-                </p>
-                <p data-i18n="vision.limitations_context">
-                    <strong>&#8227; Kortare minne</strong> - Kontextfönstret är begränsat. Långa dokument
-                    kan bli avkortade.
-                </p>
-                <p data-i18n="vision.limitations_failures">
-                    <strong>&#8227; Processer kan faila</strong> - Ibland går det inte som planerat.
-                    Det är en del av resan.
-                </p>
-                <p data-i18n="vision.limitations_prompts">
-                    <strong>&#8227; Prompt-känslighet</strong> - Dina anpassningar i systemprompter
-                    får inte lika starkt genomslag som hos större modeller.
-                </p>
+                <ul class="vision-list">
+                    <li data-i18n="vision.limitations_queue">
+                        <strong>Köer kan uppstå</strong> – En GPU, många användare. Ibland får du vänta på din tur.
+                    </li>
+                    <li data-i18n="vision.limitations_precision">
+                        <strong>Mindre precision</strong> – Agenterna kan vara lite mer "distraherade" än jättarna i molnet. De behöver tydligare instruktioner.
+                    </li>
+                    <li data-i18n="vision.limitations_context">
+                        <strong>Begränsat arbetsminne</strong> – För att hålla systemet snabbt begränsar vi kontextfönstret (hur mycket agenten minns av samtalet samtidigt). Bifoga inga enorma dokument.
+                    </li>
+                    <li data-i18n="vision.limitations_failures">
+                        <strong>Processer kan faila</strong> – Ibland går det inte som planerat. Det är en del av resan i ett experimentellt skede.
+                    </li>
+                    <li data-i18n="vision.limitations_prompts">
+                        <strong>Prompt-känslighet</strong> – Dina instruktioner får inte alltid lika exakt genomslag som hos modeller med hundratals miljarder parametrar.
+                    </li>
+                </ul>
             </div>
         </section>
 
-        <!-- Section 3: What Works Well -->
+        <!-- Section 3: But Still -->
         <section class="vision-section">
             <div class="vision-section-header">
-                <span class="icon">&#10003;</span>
-                <h2 data-i18n="vision.strengths_title">DÄR VI LYSER</h2>
+                <span class="icon">✓</span>
+                <h2 data-i18n="vision.strengths_title">MEN IGEN</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.strengths_intro">
                     Lokala modeller är fantastiska på specifika uppgifter:
                 </p>
-                <p data-i18n="vision.strengths_structured">
-                    <strong>&#10004; Strukturerad data</strong> - Extrahera information, formatera JSON,
-                    sortera filer. När uppgiften är väldefinierad levererar agenterna.
-                </p>
-                <p data-i18n="vision.strengths_privacy">
-                    <strong>&#10004; Privacy-first</strong> - Känslig företagsdata, intern kod,
-                    dokument du aldrig skulle skicka till OpenAI eller Anthropic.
-                </p>
-                <p data-i18n="vision.strengths_iterative">
-                    <strong>&#10004; Iterativa kedjor</strong> - När agent A gör en liten sak och
-                    agent B kontrollerar den. Många små steg = bra resultat.
-                </p>
+                <ul class="vision-list">
+                    <li data-i18n="vision.strengths_structured">
+                        <strong>Strukturerad data</strong> – Extrahera information, formatera JSON, sortera filer. När uppgiften är väldefinierad levererar agenterna.
+                    </li>
+                    <li data-i18n="vision.strengths_privacy">
+                        <strong>Privacy-first</strong> – Känslig företagsdata, intern kod och dokument du aldrig skulle skicka till en molntjänst är säkra och anonyma.
+                    </li>
+                    <li data-i18n="vision.strengths_iterative">
+                        <strong>Iterativa kedjor</strong> – När agent A gör en liten sak och agent B kontrollerar den. Många små steg = bra resultat.
+                    </li>
+                </ul>
             </div>
         </section>
 
         <!-- Section 4: The Upgrade Path -->
         <section class="vision-section">
             <div class="vision-section-header">
-                <span class="icon">&#9889;</span>
-                <h2 data-i18n="vision.upgrade_title">TILLSAMMANS UPPÅT</h2>
+                <span class="icon">⚡</span>
+                <h2 data-i18n="vision.upgrade_title">UP, UP and AWAY!</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.upgrade_intro">
-                    Ditt bidrag som Beta Operator går direkt till att uppgradera farmens "hjärna".
-                    Vi bygger detta tillsammans - från en entusiastdriven lokal setup till
-                    något betydligt kraftfullare.
+                    Ditt bidrag som Beta Operator går direkt till att utvärdera och uppgradera
+                    farmens "hjärna". Vi bygger detta tillsammans – från en entusiastdriven
+                    lokal setup till något betydligt kraftfullare.
                 </p>
 
-                <div class="upgrade-comparison">
-                    <div class="upgrade-card current">
-                        <h3 data-i18n="vision.upgrade_now">NU: 16GB VRAM</h3>
-                        <ul>
-                            <li data-i18n="vision.upgrade_now_1">7B-14B modeller (kvantiserade)</li>
-                            <li data-i18n="vision.upgrade_now_2">~2048 tokens kontext</li>
-                            <li data-i18n="vision.upgrade_now_3">En agent åt gången</li>
-                            <li data-i18n="vision.upgrade_now_4">4-bit precision</li>
-                            <li data-i18n="vision.upgrade_now_5">Köer vid hög belastning</li>
-                        </ul>
-                    </div>
-                    <div class="upgrade-card future">
-                        <h3 data-i18n="vision.upgrade_goal">MÅL: 24GB VRAM</h3>
-                        <ul>
-                            <li data-i18n="vision.upgrade_goal_1">30B-70B modeller möjliga</li>
-                            <li data-i18n="vision.upgrade_goal_2">8192+ tokens kontext</li>
-                            <li data-i18n="vision.upgrade_goal_3">Två agenter parallellt</li>
-                            <li data-i18n="vision.upgrade_goal_4">8-bit precision (stabilare)</li>
-                            <li data-i18n="vision.upgrade_goal_5">Minimal kötid</li>
-                        </ul>
-                    </div>
-                </div>
+                <table class="upgrade-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="vision.table_feature">Funktion</th>
+                            <th data-i18n="vision.table_now">NU: 16GB VRAM</th>
+                            <th data-i18n="vision.table_goal">MÅL: 24GB VRAM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td data-i18n="vision.table_model_size">Modellstorlek</td>
+                            <td data-i18n="vision.table_model_now">7B–14B parametrar</td>
+                            <td data-i18n="vision.table_model_goal">30B–34B (Expert-nivå)</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="vision.table_memory">Arbetsminne</td>
+                            <td data-i18n="vision.table_memory_now">~2048 tokens (snabba svar)</td>
+                            <td data-i18n="vision.table_memory_goal">8192+ tokens (långt minne)</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="vision.table_parallel">Parallellism</td>
+                            <td data-i18n="vision.table_parallel_now">En agent åt gången</td>
+                            <td data-i18n="vision.table_parallel_goal">Flera agenter samtidigt</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="vision.table_precision">Logisk skärpa</td>
+                            <td data-i18n="vision.table_precision_now">4-bit precision (effektivt)</td>
+                            <td data-i18n="vision.table_precision_goal">8-bit precision (högre intelligens)</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="vision.table_availability">Tillgänglighet</td>
+                            <td data-i18n="vision.table_availability_now">Köer vid belastning</td>
+                            <td data-i18n="vision.table_availability_goal">Minimal kötid / Mer kapacitet</td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <div class="highlight-box upgrade">
                     <p data-i18n="vision.upgrade_difference">
                         <strong>Skillnaden är enorm:</strong> Att gå från 7B till 30B+ parametrar
-                        är där agenten slutar "gissa" och börjar "förstå" kontext. Med mer VRAM
-                        kan agenterna läsa hela dokument och komma ihåg vad som sades i början
-                        av konversationen.
+                        är där agenten slutar "gissa" och börjar "förstå" komplexa instruktioner.
+                        Med mer VRAM kan agenterna läsa hela dokument och behålla tråden i långa resonemang.
                     </p>
                 </div>
             </div>
@@ -533,18 +650,18 @@
         <!-- Section 5: The Journey -->
         <section class="vision-section">
             <div class="vision-section-header">
-                <span class="icon">&#9829;</span>
+                <span class="icon">♥</span>
                 <h2 data-i18n="vision.journey_title">EN GEMENSAM RESA</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.journey_p1">
-                    Att vara Beta Operator handlar inte bara om att få tillgång till funktioner -
+                    Att vara Beta Operator handlar inte bara om att få tillgång till funktioner,
                     det handlar om att vara med på en resa. Din feedback formar produkten.
                     Ditt tålamod med köer och omstarter är det som gör att vi kan slipa bort kanterna.
                 </p>
                 <p data-i18n="vision.journey_p2">
-                    Avgiften (29 kr) är symbolisk - den gör att du känner att du har rätt
-                    att ställa krav, ge feedback och påverka riktningen. Vi är i detta tillsammans.
+                    Avgiften (29 kr) är symbolisk – men den gör att du har rätt att ställa krav,
+                    ge feedback och påverka riktningen. Vi är i detta tillsammans.
                 </p>
                 <p data-i18n="vision.journey_p3">
                     Tack för att du tror på visionen om integritetsskyddad, lokal AI.
@@ -560,11 +677,11 @@
             </p>
             <div class="cta-buttons">
                 <a href="/" class="cta-btn primary">
-                    <span class="emoji-icon">&#9889;</span>
+                    <span class="emoji-icon">⚡</span>
                     <span data-i18n="vision.cta_dashboard">TILL DASHBOARD</span>
                 </a>
                 <a href="/hardware" class="cta-btn secondary">
-                    <span class="emoji-icon">&#9881;</span>
+                    <span class="emoji-icon">⚙</span>
                     <span data-i18n="vision.cta_hardware">SE HÅRDVARAN</span>
                 </a>
             </div>
