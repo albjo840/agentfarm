@@ -469,11 +469,11 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
     <div id="agent-prompts-modal" class="modal hidden">
         <div class="modal-content agent-panel-content">
             <div class="modal-header">
-                <h3>⚙️ AGENT KONFIGURATION</h3>
+                <h3 data-i18n="prompts.title">⚙️ AGENT KONFIGURATION</h3>
                 <button class="modal-close" data-modal="agent-prompts-modal">&times;</button>
             </div>
             <div class="modal-body agent-panel-body">
-                <p class="agent-panel-info">Anpassa varje agents beteende. Dina tillägg läggs till efter bas-prompten.</p>
+                <p class="agent-panel-info" data-i18n="prompts.info">Anpassa varje agents beteende. Dina tillägg läggs till efter bas-prompten.</p>
 
                 <div class="agent-cards-grid">
                     <!-- ORCHESTRATOR -->
@@ -484,19 +484,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-orchestrator">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">Hjärnan i AgentFarm. Styr flödet mellan agenter, hanterar loop-detektering och kvalitetsspärr.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.orchestrator_desc">Hjärnan i AgentFarm. Styr flödet mellan agenter, hanterar loop-detektering och kvalitetsspärr.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="orchestrator" rows="3" placeholder="T.ex: Prioritera snabbhet över precision..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="orchestrator" rows="3" data-i18n-placeholder="prompts.orchestrator_placeholder" placeholder="T.ex: Prioritera snabbhet över precision..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="orchestrator">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -510,19 +510,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-planner">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">Chefsarkitekt. Bryter ner problem till exekverbar roadmap med sekventiell JSON-plan.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.planner_desc">Chefsarkitekt. Bryter ner problem till exekverbar roadmap med sekventiell JSON-plan.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="planner" rows="3" placeholder="T.ex: Använd alltid microservices-arkitektur..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="planner" rows="3" data-i18n-placeholder="prompts.planner_placeholder" placeholder="T.ex: Använd alltid microservices-arkitektur..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="planner">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -536,19 +536,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-ux_designer">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">Ansvarar för gränssnitt, API-kontrakt och användarflöden. Följer 80-tals Sci-Fi estetik som default.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.ux_desc">Ansvarar för gränssnitt, API-kontrakt och användarflöden. Följer 80-tals Sci-Fi estetik som default.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="ux_designer" rows="3" placeholder="T.ex: Använd vårt designsystem med blå primärfärg..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="ux_designer" rows="3" data-i18n-placeholder="prompts.ux_placeholder" placeholder="T.ex: Använd vårt designsystem med blå primärfärg..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="ux_designer">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -562,19 +562,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-executor">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">Seniordeveloper. Skriver ren, säker kod i isolerad sandbox. Följer kodstilar från kontext.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.executor_desc">Seniordeveloper. Skriver ren, säker kod i isolerad sandbox. Följer kodstilar från kontext.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="executor" rows="3" placeholder="T.ex: Använd TypeScript och skriv JSDoc-kommentarer..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="executor" rows="3" data-i18n-placeholder="prompts.executor_placeholder" placeholder="T.ex: Använd TypeScript och skriv JSDoc-kommentarer..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="executor">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -588,19 +588,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-verifier">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">QA-ingenjör. Hittar buggar, kör tester i sandbox, godkänner endast om alla tester passerar.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.verifier_desc">QA-ingenjör. Hittar buggar, kör tester i sandbox, godkänner endast om alla tester passerar.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="verifier" rows="3" placeholder="T.ex: Kräv 80% code coverage..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="verifier" rows="3" data-i18n-placeholder="prompts.verifier_placeholder" placeholder="T.ex: Kräv 80% code coverage..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="verifier">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -614,19 +614,19 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                             <span class="agent-status" id="status-reviewer">●</span>
                         </div>
                         <div class="agent-card-base">
-                            <div class="base-prompt-label">BAS-PROMPT:</div>
-                            <div class="base-prompt-text">Slutgiltig granskning. Verifierar att resultatet matchar krav och att ZIP-exporten är säker.</div>
+                            <div class="base-prompt-label" data-i18n="prompts.base_prompt">BAS-PROMPT:</div>
+                            <div class="base-prompt-text" data-i18n="prompts.reviewer_desc">Slutgiltig granskning. Verifierar att resultatet matchar krav och att ZIP-exporten är säker.</div>
                         </div>
                         <div class="agent-card-custom">
-                            <label>DITT TILLÄGG:</label>
-                            <textarea class="agent-custom-prompt" data-agent="reviewer" rows="3" placeholder="T.ex: Kontrollera att inga API-nycklar finns i koden..."></textarea>
+                            <label data-i18n="prompts.your_addition">DITT TILLÄGG:</label>
+                            <textarea class="agent-custom-prompt" data-agent="reviewer" rows="3" data-i18n-placeholder="prompts.reviewer_placeholder" placeholder="T.ex: Kontrollera att inga API-nycklar finns i koden..."></textarea>
                             <div class="char-count"><span class="count">0</span>/500</div>
                         </div>
                         <div class="agent-card-files">
-                            <label>KONTEXTFILER:</label>
+                            <label data-i18n="prompts.context_files">KONTEXTFILER:</label>
                             <div class="agent-file-drop" data-agent="reviewer">
                                 <input type="file" class="agent-file-input" multiple accept=".txt,.md,.py,.js,.json,.yaml,.yml,.csv">
-                                <span class="drop-text">📁 Släpp filer här</span>
+                                <span class="drop-text" data-i18n="prompts.drop_files">📁 Släpp filer här</span>
                             </div>
                             <div class="agent-file-list"></div>
                         </div>
@@ -634,8 +634,8 @@ T.ex: Skapa en Python-funktion som validerar e-postadresser med regex och return
                 </div>
             </div>
             <div class="modal-footer agent-panel-footer">
-                <button id="save-all-prompts" class="submit-btn">💾 SPARA ALLA</button>
-                <button id="clear-all-prompts" class="clear-btn">🗑️ RENSA ALLA</button>
+                <button id="save-all-prompts" class="submit-btn" data-i18n="prompts.save_all">💾 SPARA ALLA</button>
+                <button id="clear-all-prompts" class="clear-btn" data-i18n="prompts.clear_all">🗑️ RENSA ALLA</button>
             </div>
         </div>
     </div>
