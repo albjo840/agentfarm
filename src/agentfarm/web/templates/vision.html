@@ -78,6 +78,46 @@
             color: #000;
         }
 
+        .vision-nav .lang-switcher {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: 0.5rem;
+        }
+
+        .vision-nav .lang-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.4rem;
+            height: 2.4rem;
+            padding: 0;
+            background: rgba(0, 255, 242, 0.08);
+            border: 2px solid rgba(0, 255, 242, 0.5);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.85;
+        }
+
+        .vision-nav .lang-btn:hover {
+            opacity: 1;
+            border-color: var(--cyan);
+            background: rgba(0, 255, 242, 0.15);
+        }
+
+        .vision-nav .lang-btn.active {
+            border-color: var(--cyan);
+            background: rgba(0, 255, 242, 0.2);
+            opacity: 1;
+        }
+
+        .vision-nav .lang-btn .flag {
+            font-size: 0.85rem;
+            color: var(--cyan);
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+        }
+
         /* Vision page specific styles */
         .vision-container {
             max-width: 900px;
@@ -343,14 +383,22 @@
         <nav class="vision-nav">
             <a href="/" class="nav-link" data-i18n="vision.nav_dashboard">DASHBOARD</a>
             <a href="/hardware" class="nav-link" data-i18n="vision.nav_hardware">HÅRDVARA</a>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="sv" title="Svenska">
+                    <span class="flag">SV</span>
+                </button>
+                <button class="lang-btn" data-lang="en" title="English">
+                    <span class="flag">EN</span>
+                </button>
+            </div>
         </nav>
     </header>
 
     <div class="vision-container">
         <div class="vision-hero">
-            <h1 data-i18n="vision.title">PIONJARANDAN</h1>
+            <h1 data-i18n="vision.title">PIONJÄRANDAN</h1>
             <p class="tagline" data-i18n="vision.tagline">
-                Valommen till frontlinjen av lokal AI. Tillsammans bygger vi framtidens
+                Välkommen till frontlinjen av lokal AI. Tillsammans bygger vi framtidens
                 integritetsskyddade agentplattform - en GPU-cykel i taget.
             </p>
         </div>
@@ -359,18 +407,18 @@
         <section class="vision-section">
             <div class="vision-section-header">
                 <span class="icon">&#9733;</span>
-                <h2 data-i18n="vision.why_local_title">VARFOR LOKALT?</h2>
+                <h2 data-i18n="vision.why_local_title">VARFÖR LOKALT?</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.why_local_p1">
-                    Att kora AI-agenter lokalt ar ett aktivt val for integritet och oberoende.
-                    Din kod, dina dokument och dina ideer lamnar aldrig min "hemma-farm" -
-                    till skillnad fran molntjanster dar din data potentiellt kan anvandas
-                    for att trana framtida modeller.
+                    Att köra AI-agenter lokalt är ett aktivt val för integritet och oberoende.
+                    Din kod, dina dokument och dina idéer lämnar aldrig min "hemma-farm" -
+                    till skillnad från molntjänster där din data potentiellt kan användas
+                    för att träna framtida modeller.
                 </p>
                 <p data-i18n="vision.why_local_p2">
-                    Men arlignet kraver: lokala modeller ar inte molnjattar. De har sina
-                    begransningar, och det ar viktigt att du forstar dem innan du borjar.
+                    Men ärlighet kräver: lokala modeller är inte molnjättar. De har sina
+                    begränsningar, och det är viktigt att du förstår dem innan du börjar.
                 </p>
             </div>
         </section>
@@ -379,33 +427,33 @@
         <section class="vision-section">
             <div class="vision-section-header">
                 <span class="icon">&#9888;</span>
-                <h2 data-i18n="vision.limitations_title">VAD DU KAN FORVANTA DIG</h2>
+                <h2 data-i18n="vision.limitations_title">VAD DU KAN FÖRVÄNTA DIG</h2>
             </div>
             <div class="vision-section-content">
                 <div class="highlight-box warning">
                     <p data-i18n="vision.limitations_intro">
-                        <strong>Odmjuk transparens:</strong> Just nu kor vi optimerade, kvantiserade
-                        modeller (4-bit) pa en AMD Radeon 7800 XT med 16GB VRAM. Det innebar:
+                        <strong>Ödmjuk transparens:</strong> Just nu kör vi optimerade, kvantiserade
+                        modeller (4-bit) på en AMD Radeon 7800 XT med 16GB VRAM. Det innebär:
                     </p>
                 </div>
                 <p data-i18n="vision.limitations_queue">
-                    <strong>&#8227; Koer kan uppsta</strong> - En GPU, manga anvandare. Ibland far du vanta.
+                    <strong>&#8227; Köer kan uppstå</strong> - En GPU, många användare. Ibland får du vänta.
                 </p>
                 <p data-i18n="vision.limitations_precision">
                     <strong>&#8227; Mindre precision</strong> - Agenterna kan vara lite mer "distraherade"
-                    an Claude i molnet. De behover tydligare instruktioner.
+                    än Claude i molnet. De behöver tydligare instruktioner.
                 </p>
                 <p data-i18n="vision.limitations_context">
-                    <strong>&#8227; Kortare minne</strong> - Kontextfonstret ar begransat. Langa dokument
+                    <strong>&#8227; Kortare minne</strong> - Kontextfönstret är begränsat. Långa dokument
                     kan bli avkortade.
                 </p>
                 <p data-i18n="vision.limitations_failures">
-                    <strong>&#8227; Processer kan faila</strong> - Ibland gar det inte som planerat.
-                    Det ar en del av resan.
+                    <strong>&#8227; Processer kan faila</strong> - Ibland går det inte som planerat.
+                    Det är en del av resan.
                 </p>
                 <p data-i18n="vision.limitations_prompts">
-                    <strong>&#8227; Prompt-kanslighet</strong> - Dina anpassningar i systemprompter
-                    far inte lika starkt genomslag som hos storre modeller.
+                    <strong>&#8227; Prompt-känslighet</strong> - Dina anpassningar i systemprompter
+                    får inte lika starkt genomslag som hos större modeller.
                 </p>
             </div>
         </section>
@@ -414,23 +462,23 @@
         <section class="vision-section">
             <div class="vision-section-header">
                 <span class="icon">&#10003;</span>
-                <h2 data-i18n="vision.strengths_title">DAR VI LYSER</h2>
+                <h2 data-i18n="vision.strengths_title">DÄR VI LYSER</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.strengths_intro">
-                    Lokala modeller ar fantastiska pa specifika uppgifter:
+                    Lokala modeller är fantastiska på specifika uppgifter:
                 </p>
                 <p data-i18n="vision.strengths_structured">
                     <strong>&#10004; Strukturerad data</strong> - Extrahera information, formatera JSON,
-                    sortera filer. Nar uppgiften ar valdefinerad levererar agenterna.
+                    sortera filer. När uppgiften är väldefinierad levererar agenterna.
                 </p>
                 <p data-i18n="vision.strengths_privacy">
-                    <strong>&#10004; Privacy-first</strong> - Kanslg foretagsdata, intern kod,
+                    <strong>&#10004; Privacy-first</strong> - Känslig företagsdata, intern kod,
                     dokument du aldrig skulle skicka till OpenAI eller Anthropic.
                 </p>
                 <p data-i18n="vision.strengths_iterative">
-                    <strong>&#10004; Iterativa kedjor</strong> - Nar agent A gor en liten sak och
-                    agent B kontrollerar den. Manga sma steg = bra resultat.
+                    <strong>&#10004; Iterativa kedjor</strong> - När agent A gör en liten sak och
+                    agent B kontrollerar den. Många små steg = bra resultat.
                 </p>
             </div>
         </section>
@@ -439,43 +487,43 @@
         <section class="vision-section">
             <div class="vision-section-header">
                 <span class="icon">&#9889;</span>
-                <h2 data-i18n="vision.upgrade_title">TILLSAMMANS UPPAT</h2>
+                <h2 data-i18n="vision.upgrade_title">TILLSAMMANS UPPÅT</h2>
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.upgrade_intro">
-                    Ditt bidrag som Beta Operator gar direkt till att uppgradera farmens "hjarna".
-                    Vi bygger detta tillsammans - fran en entusiastdriven lokal setup till
-                    nagot betydligt kraftfullare.
+                    Ditt bidrag som Beta Operator går direkt till att uppgradera farmens "hjärna".
+                    Vi bygger detta tillsammans - från en entusiastdriven lokal setup till
+                    något betydligt kraftfullare.
                 </p>
 
                 <div class="upgrade-comparison">
                     <div class="upgrade-card current">
-                        <h3>NU: 16GB VRAM</h3>
+                        <h3 data-i18n="vision.upgrade_now">NU: 16GB VRAM</h3>
                         <ul>
-                            <li>7B-14B modeller (kvantiserade)</li>
-                            <li>~2048 tokens kontext</li>
-                            <li>En agent at gangen</li>
-                            <li>4-bit precision</li>
-                            <li>Koer vid hog belastning</li>
+                            <li data-i18n="vision.upgrade_now_1">7B-14B modeller (kvantiserade)</li>
+                            <li data-i18n="vision.upgrade_now_2">~2048 tokens kontext</li>
+                            <li data-i18n="vision.upgrade_now_3">En agent åt gången</li>
+                            <li data-i18n="vision.upgrade_now_4">4-bit precision</li>
+                            <li data-i18n="vision.upgrade_now_5">Köer vid hög belastning</li>
                         </ul>
                     </div>
                     <div class="upgrade-card future">
-                        <h3>MAL: 24GB VRAM</h3>
+                        <h3 data-i18n="vision.upgrade_goal">MÅL: 24GB VRAM</h3>
                         <ul>
-                            <li>30B-70B modeller mojliga</li>
-                            <li>8192+ tokens kontext</li>
-                            <li>Tva agenter parallellt</li>
-                            <li>8-bit precision (stabilare)</li>
-                            <li>Minimal kotid</li>
+                            <li data-i18n="vision.upgrade_goal_1">30B-70B modeller möjliga</li>
+                            <li data-i18n="vision.upgrade_goal_2">8192+ tokens kontext</li>
+                            <li data-i18n="vision.upgrade_goal_3">Två agenter parallellt</li>
+                            <li data-i18n="vision.upgrade_goal_4">8-bit precision (stabilare)</li>
+                            <li data-i18n="vision.upgrade_goal_5">Minimal kötid</li>
                         </ul>
                     </div>
                 </div>
 
                 <div class="highlight-box upgrade">
                     <p data-i18n="vision.upgrade_difference">
-                        <strong>Skillnaden ar enorm:</strong> Att ga fran 7B till 30B+ parametrar
-                        ar dar agenten slutar "gissa" och borjar "forsta" kontext. Med mer VRAM
-                        kan agenterna lasa hela dokument och komma ihag vad som sades i borjan
+                        <strong>Skillnaden är enorm:</strong> Att gå från 7B till 30B+ parametrar
+                        är där agenten slutar "gissa" och börjar "förstå" kontext. Med mer VRAM
+                        kan agenterna läsa hela dokument och komma ihåg vad som sades i början
                         av konversationen.
                     </p>
                 </div>
@@ -490,25 +538,25 @@
             </div>
             <div class="vision-section-content">
                 <p data-i18n="vision.journey_p1">
-                    Att vara Beta Operator handlar inte bara om att fa tillgang till funktioner -
-                    det handlar om att vara med pa en resa. Din feedback formar produkten.
-                    Ditt talamod med koer och omstarter ar det som gor att vi kan slipa bort kanterna.
+                    Att vara Beta Operator handlar inte bara om att få tillgång till funktioner -
+                    det handlar om att vara med på en resa. Din feedback formar produkten.
+                    Ditt tålamod med köer och omstarter är det som gör att vi kan slipa bort kanterna.
                 </p>
                 <p data-i18n="vision.journey_p2">
-                    Avgiften (29 kr) ar symbolisk - den gor att du kanner att du har ratt
-                    att stalla krav, ge feedback och paverka riktningen. Vi ar i detta tillsammans.
+                    Avgiften (29 kr) är symbolisk - den gör att du känner att du har rätt
+                    att ställa krav, ge feedback och påverka riktningen. Vi är i detta tillsammans.
                 </p>
                 <p data-i18n="vision.journey_p3">
-                    Tack for att du tror pa visionen om integritetsskyddad, lokal AI.
+                    Tack för att du tror på visionen om integritetsskyddad, lokal AI.
                 </p>
             </div>
         </section>
 
         <!-- CTA -->
         <div class="cta-section">
-            <h3 data-i18n="vision.cta_title">REDO ATT BORJA?</h3>
+            <h3 data-i18n="vision.cta_title">REDO ATT BÖRJA?</h3>
             <p data-i18n="vision.cta_text">
-                Bli en del av pionjarerna som bygger framtidens lokala AI-plattform.
+                Bli en del av pionjärerna som bygger framtidens lokala AI-plattform.
             </p>
             <div class="cta-buttons">
                 <a href="/" class="cta-btn primary">
@@ -517,7 +565,7 @@
                 </a>
                 <a href="/hardware" class="cta-btn secondary">
                     <span class="emoji-icon">&#9881;</span>
-                    <span data-i18n="vision.cta_hardware">SE HARDVARAN</span>
+                    <span data-i18n="vision.cta_hardware">SE HÅRDVARAN</span>
                 </a>
             </div>
         </div>
@@ -525,12 +573,36 @@
 
     <script src="/static/js/translations.js"></script>
     <script>
-        // Initialize language from localStorage
+        // Initialize language from localStorage and set up switcher
         document.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('agentfarm_lang') || 'sv';
+
+            // Apply translations
             if (window.i18n) {
-                const savedLang = localStorage.getItem('agentfarm_lang') || 'sv';
                 window.i18n.setLanguage(savedLang);
             }
+
+            // Mark active language button
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if (btn.dataset.lang === savedLang) {
+                    btn.classList.add('active');
+                }
+
+                // Handle click
+                btn.addEventListener('click', () => {
+                    const lang = btn.dataset.lang;
+                    localStorage.setItem('agentfarm_lang', lang);
+
+                    // Update active state
+                    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // Apply translations
+                    if (window.i18n) {
+                        window.i18n.setLanguage(lang);
+                    }
+                });
+            });
         });
     </script>
 </body>
