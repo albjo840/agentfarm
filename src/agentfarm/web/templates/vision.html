@@ -7,6 +7,77 @@
     <link rel="stylesheet" href="/static/css/retro.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
+        /* Vision header */
+        .vision-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 3rem;
+            padding: 1.5rem 2rem;
+            background: var(--bg-panel);
+            border-bottom: 4px solid #000;
+            margin-bottom: 2rem;
+        }
+
+        .vision-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .vision-logo .logo-icon {
+            font-size: 2rem;
+            color: var(--cyan);
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .vision-logo h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: 0.3em;
+            color: var(--text-primary);
+            text-shadow: 3px 3px 0 #000;
+            margin: 0;
+        }
+
+        .vision-logo .version {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border: 3px solid #000;
+            background: var(--magenta);
+            color: #000;
+            font-weight: 700;
+            box-shadow: 3px 3px 0 #000;
+        }
+
+        .vision-nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .vision-nav .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--cyan);
+            text-decoration: none;
+            border: 2px solid var(--cyan);
+            background: transparent;
+            transition: all 0.15s ease;
+        }
+
+        .vision-nav .nav-link:hover {
+            background: var(--cyan);
+            color: #000;
+        }
+
         /* Vision page specific styles */
         .vision-container {
             max-width: 900px;
@@ -262,12 +333,20 @@
     <div class="scanlines"></div>
     <div class="crt-effect"></div>
 
-    <div class="vision-container">
-        <a href="/" class="back-link">
-            <span>&larr;</span>
-            <span data-i18n="vision.back">Tillbaka till Dashboard</span>
+    <!-- Header -->
+    <header class="vision-header">
+        <a href="/" class="vision-logo">
+            <span class="logo-icon">◈</span>
+            <h1>AGENTFARM</h1>
+            <span class="version">v2.0</span>
         </a>
+        <nav class="vision-nav">
+            <a href="/" class="nav-link" data-i18n="vision.nav_dashboard">DASHBOARD</a>
+            <a href="/hardware" class="nav-link" data-i18n="vision.nav_hardware">HÅRDVARA</a>
+        </nav>
+    </header>
 
+    <div class="vision-container">
         <div class="vision-hero">
             <h1 data-i18n="vision.title">PIONJARANDAN</h1>
             <p class="tagline" data-i18n="vision.tagline">

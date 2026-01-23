@@ -11,6 +11,8 @@ const TRANSLATIONS = {
         "header.status": "STATUS",
         "header.guest": "GÄST",
         "header.synth": "SYNTH",
+        "header.vision": "VISION",
+        "header.hardware": "HÅRDVARA",
 
         // Section headers
         "section.neural_network": "NEURAL NETWORK",
@@ -193,6 +195,8 @@ const TRANSLATIONS = {
         "hw.footer_back": "← Tillbaka till AgentFarm",
 
         // Vision page
+        "vision.nav_dashboard": "DASHBOARD",
+        "vision.nav_hardware": "HÅRDVARA",
         "vision.back": "Tillbaka till Dashboard",
         "vision.title": "PIONJÄRANDAN",
         "vision.tagline": "Välkommen till frontlinjen av lokal AI. Tillsammans bygger vi framtidens integritetsskyddade agentplattform - en GPU-cykel i taget.",
@@ -232,6 +236,8 @@ const TRANSLATIONS = {
         "header.status": "STATUS",
         "header.guest": "GUEST",
         "header.synth": "SYNTH",
+        "header.vision": "VISION",
+        "header.hardware": "HARDWARE",
 
         // Section headers
         "section.neural_network": "NEURAL NETWORK",
@@ -414,6 +420,8 @@ const TRANSLATIONS = {
         "hw.footer_back": "← Back to AgentFarm",
 
         // Vision page
+        "vision.nav_dashboard": "DASHBOARD",
+        "vision.nav_hardware": "HARDWARE",
         "vision.back": "Back to Dashboard",
         "vision.title": "THE PIONEER SPIRIT",
         "vision.tagline": "Welcome to the frontline of local AI. Together we build the future's privacy-protected agent platform - one GPU cycle at a time.",
