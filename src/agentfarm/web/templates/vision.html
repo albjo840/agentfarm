@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentFarm :: Vision</title>
+    <link rel="stylesheet" href="/static/css/retro.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* Vision page specific styles */
+        .vision-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .vision-hero {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, rgba(0, 255, 242, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
+            border: 4px solid #000;
+            margin-bottom: 2rem;
+        }
+
+        .vision-hero h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            color: var(--cyan);
+            text-shadow: 0 0 20px rgba(0, 255, 242, 0.5);
+            margin-bottom: 1rem;
+            letter-spacing: 0.2em;
+        }
+
+        .vision-hero .tagline {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .vision-section {
+            background: var(--bg-panel);
+            border: 4px solid #000;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-hard);
+        }
+
+        .vision-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: var(--cyan);
+            border-bottom: 3px solid #000;
+        }
+
+        .vision-section-header .icon {
+            font-size: 1.5rem;
+        }
+
+        .vision-section-header h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: #000;
+            margin: 0;
+        }
+
+        .vision-section-content {
+            padding: 1.5rem;
+        }
+
+        .vision-section-content p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .vision-section-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .highlight-box {
+            background: rgba(0, 255, 242, 0.08);
+            border-left: 4px solid var(--cyan);
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .highlight-box.warning {
+            background: rgba(255, 200, 0, 0.08);
+            border-left-color: var(--yellow);
+        }
+
+        .highlight-box.upgrade {
+            background: rgba(255, 0, 255, 0.08);
+            border-left-color: var(--magenta);
+        }
+
+        .upgrade-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .upgrade-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--border-color);
+            padding: 1.5rem;
+        }
+
+        .upgrade-card.current {
+            border-color: var(--yellow);
+        }
+
+        .upgrade-card.future {
+            border-color: var(--magenta);
+        }
+
+        .upgrade-card h3 {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.9rem;
+            color: var(--cyan);
+            margin-bottom: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        .upgrade-card.current h3 {
+            color: var(--yellow);
+        }
+
+        .upgrade-card.future h3 {
+            color: var(--magenta);
+        }
+
+        .upgrade-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .upgrade-card li {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .upgrade-card li:last-child {
+            border-bottom: none;
+        }
+
+        .upgrade-card li::before {
+            content: '>';
+            color: var(--cyan);
+            margin-right: 0.5rem;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 255, 242, 0.1) 100%);
+            border: 4px solid var(--magenta);
+            margin-top: 2rem;
+        }
+
+        .cta-section h3 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.2rem;
+            color: var(--magenta);
+            margin-bottom: 1rem;
+            letter-spacing: 0.15em;
+        }
+
+        .cta-section p {
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.9rem;
+            letter-spacing: 0.1em;
+            text-decoration: none;
+            border: 3px solid #000;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 4px 4px 0 #000;
+        }
+
+        .cta-btn:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #000;
+        }
+
+        .cta-btn.primary {
+            background: var(--magenta);
+            color: #000;
+        }
+
+        .cta-btn.secondary {
+            background: transparent;
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--cyan);
+            text-decoration: none;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: var(--magenta);
+        }
+
+        .emoji-icon {
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .upgrade-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .vision-hero h1 {
+                font-size: 1.8rem;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="crt-effect"></div>
+
+    <div class="vision-container">
+        <a href="/" class="back-link">
+            <span>&larr;</span>
+            <span data-i18n="vision.back">Tillbaka till Dashboard</span>
+        </a>
+
+        <div class="vision-hero">
+            <h1 data-i18n="vision.title">PIONJARANDAN</h1>
+            <p class="tagline" data-i18n="vision.tagline">
+                Valommen till frontlinjen av lokal AI. Tillsammans bygger vi framtidens
+                integritetsskyddade agentplattform - en GPU-cykel i taget.
+            </p>
+        </div>
+
+        <!-- Section 1: The Vision -->
+        <section class="vision-section">
+            <div class="vision-section-header">
+                <span class="icon">&#9733;</span>
+                <h2 data-i18n="vision.why_local_title">VARFOR LOKALT?</h2>
+            </div>
+            <div class="vision-section-content">
+                <p data-i18n="vision.why_local_p1">
+                    Att kora AI-agenter lokalt ar ett aktivt val for integritet och oberoende.
+                    Din kod, dina dokument och dina ideer lamnar aldrig min "hemma-farm" -
+                    till skillnad fran molntjanster dar din data potentiellt kan anvandas
+                    for att trana framtida modeller.
+                </p>
+                <p data-i18n="vision.why_local_p2">
+                    Men arlignet kraver: lokala modeller ar inte molnjattar. De har sina
+                    begransningar, och det ar viktigt att du forstar dem innan du borjar.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 2: Honest Limitations -->
+        <section class="vision-section">
+            <div class="vision-section-header">
+                <span class="icon">&#9888;</span>
+                <h2 data-i18n="vision.limitations_title">VAD DU KAN FORVANTA DIG</h2>
+            </div>
+            <div class="vision-section-content">
+                <div class="highlight-box warning">
+                    <p data-i18n="vision.limitations_intro">
+                        <strong>Odmjuk transparens:</strong> Just nu kor vi optimerade, kvantiserade
+                        modeller (4-bit) pa en AMD Radeon 7800 XT med 16GB VRAM. Det innebar:
+                    </p>
+                </div>
+                <p data-i18n="vision.limitations_queue">
+                    <strong>&#8227; Koer kan uppsta</strong> - En GPU, manga anvandare. Ibland far du vanta.
+                </p>
+                <p data-i18n="vision.limitations_precision">
+                    <strong>&#8227; Mindre precision</strong> - Agenterna kan vara lite mer "distraherade"
+                    an Claude i molnet. De behover tydligare instruktioner.
+                </p>
+                <p data-i18n="vision.limitations_context">
+                    <strong>&#8227; Kortare minne</strong> - Kontextfonstret ar begransat. Langa dokument
+                    kan bli avkortade.
+                </p>
+                <p data-i18n="vision.limitations_failures">
+                    <strong>&#8227; Processer kan faila</strong> - Ibland gar det inte som planerat.
+                    Det ar en del av resan.
+                </p>
+                <p data-i18n="vision.limitations_prompts">
+                    <strong>&#8227; Prompt-kanslighet</strong> - Dina anpassningar i systemprompter
+                    far inte lika starkt genomslag som hos storre modeller.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 3: What Works Well -->
+        <section class="vision-section">
+            <div class="vision-section-header">
+                <span class="icon">&#10003;</span>
+                <h2 data-i18n="vision.strengths_title">DAR VI LYSER</h2>
+            </div>
+            <div class="vision-section-content">
+                <p data-i18n="vision.strengths_intro">
+                    Lokala modeller ar fantastiska pa specifika uppgifter:
+                </p>
+                <p data-i18n="vision.strengths_structured">
+                    <strong>&#10004; Strukturerad data</strong> - Extrahera information, formatera JSON,
+                    sortera filer. Nar uppgiften ar valdefinerad levererar agenterna.
+                </p>
+                <p data-i18n="vision.strengths_privacy">
+                    <strong>&#10004; Privacy-first</strong> - Kanslg foretagsdata, intern kod,
+                    dokument du aldrig skulle skicka till OpenAI eller Anthropic.
+                </p>
+                <p data-i18n="vision.strengths_iterative">
+                    <strong>&#10004; Iterativa kedjor</strong> - Nar agent A gor en liten sak och
+                    agent B kontrollerar den. Manga sma steg = bra resultat.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 4: The Upgrade Path -->
+        <section class="vision-section">
+            <div class="vision-section-header">
+                <span class="icon">&#9889;</span>
+                <h2 data-i18n="vision.upgrade_title">TILLSAMMANS UPPAT</h2>
+            </div>
+            <div class="vision-section-content">
+                <p data-i18n="vision.upgrade_intro">
+                    Ditt bidrag som Beta Operator gar direkt till att uppgradera farmens "hjarna".
+                    Vi bygger detta tillsammans - fran en entusiastdriven lokal setup till
+                    nagot betydligt kraftfullare.
+                </p>
+
+                <div class="upgrade-comparison">
+                    <div class="upgrade-card current">
+                        <h3>NU: 16GB VRAM</h3>
+                        <ul>
+                            <li>7B-14B modeller (kvantiserade)</li>
+                            <li>~2048 tokens kontext</li>
+                            <li>En agent at gangen</li>
+                            <li>4-bit precision</li>
+                            <li>Koer vid hog belastning</li>
+                        </ul>
+                    </div>
+                    <div class="upgrade-card future">
+                        <h3>MAL: 24GB VRAM</h3>
+                        <ul>
+                            <li>30B-70B modeller mojliga</li>
+                            <li>8192+ tokens kontext</li>
+                            <li>Tva agenter parallellt</li>
+                            <li>8-bit precision (stabilare)</li>
+                            <li>Minimal kotid</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="highlight-box upgrade">
+                    <p data-i18n="vision.upgrade_difference">
+                        <strong>Skillnaden ar enorm:</strong> Att ga fran 7B till 30B+ parametrar
+                        ar dar agenten slutar "gissa" och borjar "forsta" kontext. Med mer VRAM
+                        kan agenterna lasa hela dokument och komma ihag vad som sades i borjan
+                        av konversationen.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: The Journey -->
+        <section class="vision-section">
+            <div class="vision-section-header">
+                <span class="icon">&#9829;</span>
+                <h2 data-i18n="vision.journey_title">EN GEMENSAM RESA</h2>
+            </div>
+            <div class="vision-section-content">
+                <p data-i18n="vision.journey_p1">
+                    Att vara Beta Operator handlar inte bara om att fa tillgang till funktioner -
+                    det handlar om att vara med pa en resa. Din feedback formar produkten.
+                    Ditt talamod med koer och omstarter ar det som gor att vi kan slipa bort kanterna.
+                </p>
+                <p data-i18n="vision.journey_p2">
+                    Avgiften (29 kr) ar symbolisk - den gor att du kanner att du har ratt
+                    att stalla krav, ge feedback och paverka riktningen. Vi ar i detta tillsammans.
+                </p>
+                <p data-i18n="vision.journey_p3">
+                    Tack for att du tror pa visionen om integritetsskyddad, lokal AI.
+                </p>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <div class="cta-section">
+            <h3 data-i18n="vision.cta_title">REDO ATT BORJA?</h3>
+            <p data-i18n="vision.cta_text">
+                Bli en del av pionjarerna som bygger framtidens lokala AI-plattform.
+            </p>
+            <div class="cta-buttons">
+                <a href="/" class="cta-btn primary">
+                    <span class="emoji-icon">&#9889;</span>
+                    <span data-i18n="vision.cta_dashboard">TILL DASHBOARD</span>
+                </a>
+                <a href="/hardware" class="cta-btn secondary">
+                    <span class="emoji-icon">&#9881;</span>
+                    <span data-i18n="vision.cta_hardware">SE HARDVARAN</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js"></script>
+    <script>
+        // Initialize language from localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.i18n) {
+                const savedLang = localStorage.getItem('agentfarm_lang') || 'sv';
+                window.i18n.setLanguage(savedLang);
+            }
+        });
+    </script>
+</body>
+</html>

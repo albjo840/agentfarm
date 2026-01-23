@@ -307,6 +307,12 @@ async def hardware_handler(request: web.Request) -> web.Response:
     return web.FileResponse(hardware_path)
 
 
+async def vision_handler(request: web.Request) -> web.Response:
+    """Serve the vision/mission page."""
+    vision_path = TEMPLATES_DIR / "vision.html"
+    return web.FileResponse(vision_path)
+
+
 async def api_hardware_stats_handler(request: web.Request) -> web.Response:
     """Return real-time GPU stats."""
     if gpu_monitor is None:
@@ -2621,6 +2627,7 @@ def create_app() -> web.Application:
     app.router.add_get('/mobile', mobile_handler)
     app.router.add_get('/m', mobile_handler)  # Short alias
     app.router.add_get('/hardware', hardware_handler)
+    app.router.add_get('/vision', vision_handler)
     app.router.add_get('/api/hardware', api_hardware_stats_handler)
     app.router.add_get('/api/hardware/gpu', api_hardware_gpu_handler)
     app.router.add_get('/api/hardware/performance', api_hardware_performance_handler)
