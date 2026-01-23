@@ -662,6 +662,9 @@ async def create_and_run_project(name: str, prompt: str, device_id: str, agent_f
     import re
     import base64
 
+    # Set workflow owner for privacy filtering EARLY (before any broadcasts)
+    ws_clients.set_workflow_owner(device_id if device_id else None)
+
     logger.info("Creating project: %s with prompt: %s (user: %s)", name, prompt[:100], device_id[:8])
 
     # Check and consume workflow credit
@@ -741,6 +744,9 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
     from agentfarm.orchestrator import Orchestrator
     from agentfarm.tools.file_tools import FileTools
     import uuid
+
+    # Set workflow owner for privacy filtering (only this user sees detailed events)
+    ws_clients.set_workflow_owner(device_id if device_id else None)
 
     # Create correlation ID for this workflow
     correlation_id = str(uuid.uuid4())[:8]
@@ -909,6 +915,10 @@ async def run_multi_provider_workflow(task: str, working_dir: str, device_id: st
             priority=PriorityLevel.HIGH,
             correlation_id=correlation_id,
         ))
+
+    finally:
+        # Clear workflow owner to allow other users to see future events
+        ws_clients.set_workflow_owner(None)
 
 
 async def run_real_workflow(task: str, provider_type: str, working_dir: str, device_id: str = "") -> None:
