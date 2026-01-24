@@ -245,13 +245,33 @@ Guidelines:
         except (json.JSONDecodeError, KeyError):
             pass
 
-        # Fallback: parse from tool outputs
+        # Fallback: extract files_changed from tool outputs
+        import re
+        for output in tool_outputs:
+            # Parse "[Wrote X bytes to path]" or "[Edited path]" or "Created path"
+            wrote_match = re.search(r'\[Wrote \d+ bytes to ([^\]]+)\]', output)
+            edited_match = re.search(r'\[Edited ([^\]]+)\]', output)
+            created_match = re.search(r'Created ([^\s]+)', output)
+            edited_fuzzy = re.search(r'Edited ([^\s]+) \(fuzzy', output)
+
+            if wrote_match:
+                files_changed.append(FileChange(path=wrote_match.group(1), action="create"))
+            elif edited_match:
+                files_changed.append(FileChange(path=edited_match.group(1), action="edit"))
+            elif edited_fuzzy:
+                files_changed.append(FileChange(path=edited_fuzzy.group(1), action="edit"))
+            elif created_match:
+                files_changed.append(FileChange(path=created_match.group(1), action="create"))
+
         return AgentResult(
-            success=len(tool_outputs) > 0,
+            success=len(tool_outputs) > 0 or len(files_changed) > 0,
             output=content,
-            data={"tool_outputs": tool_outputs},
+            data={
+                "tool_outputs": tool_outputs,
+                "files_changed": [fc.model_dump() for fc in files_changed],
+            },
             tokens_used=response.total_tokens,
-            summary_for_next_agent=f"Executed with {len(tool_outputs)} tool calls",
+            summary_for_next_agent=f"Executed with {len(tool_outputs)} tool calls. Files: {[fc.path for fc in files_changed]}",
         )
 
     async def execute_step(
