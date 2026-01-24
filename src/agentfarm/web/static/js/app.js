@@ -229,12 +229,13 @@ function handleServerMessage(data) {
             }
             if (data.success) {
                 addMessage('orchestrator', '✓ Workflow completed successfully.');
-                // Show launch button if we have a project path
-                if (currentProjectPath) {
-                    showLaunchButton(currentProjectPath);
-                }
             } else {
                 addMessage('orchestrator', `✗ Workflow failed: ${data.error || 'Unknown error'}`);
+            }
+            // Always show download button if we have a project path (even on failure)
+            // Users should be able to download whatever files were created
+            if (currentProjectPath) {
+                showLaunchButton(currentProjectPath);
             }
             // Refresh user data to update workflow counter
             loadUserData();

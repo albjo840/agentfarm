@@ -847,12 +847,13 @@ Exempel:
                     if (data.success) {
                         showToast('Workflow klart!', 'success');
                         addLog('Workflow slutfort!', 'success');
-                        if (currentProjectPath) {
-                            showLaunchButton(currentProjectPath);
-                        }
                     } else {
                         showToast('Workflow misslyckades', 'error');
                         addLog(`Fel: ${data.error}`, 'error');
+                    }
+                    // Always show download button (even on failure)
+                    if (currentProjectPath) {
+                        showLaunchButton(currentProjectPath);
                     }
                     break;
 
