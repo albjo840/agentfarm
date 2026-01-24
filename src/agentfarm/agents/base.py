@@ -171,6 +171,15 @@ class RecursionGuard:
         )
 
 
+class TaskType(str):
+    """Task type classification for context-aware prompting."""
+    CODEGEN = "codegen"
+    BUGFIX = "bugfix"
+    REFACTOR = "refactor"
+    MULTISTEP = "multistep"
+    GENERAL = "general"
+
+
 class AgentContext(BaseModel):
     """Minimal context passed to an agent - key for token efficiency."""
 
@@ -178,6 +187,8 @@ class AgentContext(BaseModel):
     relevant_files: list[str] = Field(default_factory=list, description="Files relevant to task")
     previous_step_output: str | None = Field(default=None, description="Output from previous step")
     constraints: list[str] = Field(default_factory=list, description="Any constraints to follow")
+    task_type: str | None = Field(default=None, description="Classified task type (codegen, bugfix, etc.)")
+    task_hints: list[str] = Field(default_factory=list, description="Auto-generated hints based on task type")
 
 
 class AgentResult(BaseModel):
@@ -348,6 +359,10 @@ class BaseAgent(ABC):
 
         if context.constraints:
             parts.append(f"Constraints: {', '.join(context.constraints)}")
+
+        # Include auto-generated task hints (task-type specific guidance)
+        if context.task_hints:
+            parts.append(f"\nTask Guidelines:\n- " + "\n- ".join(context.task_hints))
 
         # Include company context from RAG if available
         if company_context:

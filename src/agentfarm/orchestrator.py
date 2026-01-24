@@ -5,9 +5,120 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Awaitable
 
-from agentfarm.agents.base import AgentContext, RecursionGuard
+from agentfarm.agents.base import AgentContext, RecursionGuard, TaskType
 
 logger = logging.getLogger(__name__)
+
+
+class TaskClassifier:
+    """Classifies tasks and generates context-aware hints.
+
+    This runs automatically and doesn't interfere with user's custom prompts.
+    Hints are injected via AgentContext.task_hints, not system prompts.
+    """
+
+    # Keywords for task type detection
+    CODEGEN_KEYWORDS = [
+        "skapa", "create", "skriv", "write", "implementera", "implement",
+        "bygg", "build", "generera", "generate", "ny funktion", "new function",
+        "ny klass", "new class", "lägg till", "add"
+    ]
+
+    BUGFIX_KEYWORDS = [
+        "fixa", "fix", "bug", "fel", "error", "reparera", "repair",
+        "korrigera", "correct", "fungerar inte", "doesn't work", "broken",
+        "issue", "problem", "crash", "kraschar"
+    ]
+
+    REFACTOR_KEYWORDS = [
+        "refactor", "refaktorera", "extrahera", "extract", "flytta", "move",
+        "dela upp", "split", "förenkla", "simplify", "clean up", "städa",
+        "omstrukturera", "restructure", "rename", "döp om"
+    ]
+
+    MULTISTEP_KEYWORDS = [
+        "projekt", "project", "app", "applikation", "application",
+        "spel", "game", "system", "cli", "web", "api", "full",
+        "komplett", "complete", "flera filer", "multiple files"
+    ]
+
+    # Task-specific hints per category
+    TASK_HINTS = {
+        TaskType.CODEGEN: [
+            "Skapa filer med EXAKT de namn som anges i uppgiften",
+            "Använd write_file för nya filer, inte edit_file",
+            "Inkludera alla nödvändiga imports",
+            "Följ Python-konventioner (snake_case för funktioner)",
+        ],
+        TaskType.BUGFIX: [
+            "Läs HELA filen först innan du gör ändringar",
+            "Gör MINIMALA ändringar - fixa bara buggen",
+            "Behåll existerande kodstil och formatering",
+            "Använd edit_file med exakt matchning av gammal kod",
+        ],
+        TaskType.REFACTOR: [
+            "Behåll exakt samma beteende/output som innan",
+            "Extrahera en sak i taget",
+            "Kör tester efter varje ändring",
+            "Bevara alla existerande funktionssignaturer om möjligt",
+        ],
+        TaskType.MULTISTEP: [
+            "Skapa alla filer i rätt ordning (beroenden först)",
+            "Varje fil ska vara komplett och körbar",
+            "Inkludera main.py eller motsvarande entry point",
+            "Verifiera att alla imports fungerar",
+        ],
+        TaskType.GENERAL: [
+            "Följ existerande kodmönster i projektet",
+            "Använd tydliga variabel- och funktionsnamn",
+        ],
+    }
+
+    @classmethod
+    def classify(cls, task: str) -> str:
+        """Classify task type based on keywords."""
+        task_lower = task.lower()
+
+        # Check for multistep first (most specific)
+        if any(kw in task_lower for kw in cls.MULTISTEP_KEYWORDS):
+            return TaskType.MULTISTEP
+
+        # Then check for specific operations
+        if any(kw in task_lower for kw in cls.BUGFIX_KEYWORDS):
+            return TaskType.BUGFIX
+
+        if any(kw in task_lower for kw in cls.REFACTOR_KEYWORDS):
+            return TaskType.REFACTOR
+
+        if any(kw in task_lower for kw in cls.CODEGEN_KEYWORDS):
+            return TaskType.CODEGEN
+
+        return TaskType.GENERAL
+
+    @classmethod
+    def get_hints(cls, task_type: str) -> list[str]:
+        """Get hints for a task type."""
+        return cls.TASK_HINTS.get(task_type, cls.TASK_HINTS[TaskType.GENERAL])
+
+    @classmethod
+    def enrich_context(cls, context: AgentContext, task: str) -> AgentContext:
+        """Add task classification and hints to context.
+
+        This creates a new context with task_type and task_hints filled in.
+        Does NOT modify system prompts - works alongside user's custom prompts.
+        """
+        task_type = cls.classify(task)
+        hints = cls.get_hints(task_type)
+
+        # Create new context with enriched fields
+        return AgentContext(
+            task_summary=context.task_summary,
+            relevant_files=context.relevant_files,
+            previous_step_output=context.previous_step_output,
+            constraints=context.constraints,
+            task_type=task_type,
+            task_hints=hints,
+        )
 
 # Event callback type
 EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -337,11 +448,15 @@ class Orchestrator:
         await self._emit("workflow_start", {"task": task})
 
         # Build initial minimal context
-        context = AgentContext(
+        base_context = AgentContext(
             task_summary=task,
             relevant_files=context_files or [],
             constraints=constraints or [],
         )
+
+        # Enrich context with task classification and hints (automatic, doesn't affect user prompts)
+        context = TaskClassifier.enrich_context(base_context, task)
+        logger.info("Task classified as: %s", context.task_type)
 
         execution_results: list[ExecutionResult] = []
         verification: VerificationResult | None = None
@@ -851,11 +966,15 @@ class Orchestrator:
 
         await self._emit("workflow_start", {"task": task, "mode": "overlapping"})
 
-        context = AgentContext(
+        base_context = AgentContext(
             task_summary=task,
             relevant_files=context_files or [],
             constraints=constraints or [],
         )
+
+        # Enrich context with task classification and hints
+        context = TaskClassifier.enrich_context(base_context, task)
+        logger.info("Task classified as: %s (overlapping mode)", context.task_type)
 
         # PHASE 1: PLAN (same as normal)
         await self._emit("stage_change", {"stage": "plan", "status": "active"})
