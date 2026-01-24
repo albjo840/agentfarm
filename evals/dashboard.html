@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentFarm Eval Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #111;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            margin-bottom: 15px;
+            color: #00ffff;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff00;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .stat-change {
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        .positive { color: #00ff00; }
+        .negative { color: #ff4444; }
+        canvas {
+            max-height: 300px;
+        }
+        .timeline {
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        .timeline-row {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #222;
+        }
+        .timeline-date { width: 100px; color: #888; }
+        .timeline-bar {
+            flex: 1;
+            height: 20px;
+            background: #1a1a1a;
+            margin: 0 10px;
+            position: relative;
+        }
+        .timeline-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00ffff);
+            transition: width 0.3s;
+        }
+        .timeline-value { width: 60px; text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AgentFarm Eval Dashboard</h1>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="current-score">76.2%</div>
+                <div class="stat-label">Current Score</div>
+                <div class="stat-change positive">+10.6% from baseline</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="tests-passed">7/11</div>
+                <div class="stat-label">Tests Passed</div>
+                <div class="stat-change positive">+1 from baseline</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="best-category">95%</div>
+                <div class="stat-label">Best: Multistep</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="eval-runs">13</div>
+                <div class="stat-label">Total Eval Runs</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Score Progression</h2>
+            <canvas id="scoreChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>📈 Category Performance</h2>
+            <canvas id="categoryChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>📅 Timeline</h2>
+            <div class="timeline" id="timeline"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data from eval results
+        const evalData = [
+            { date: "01-13 21:36", score: 65.6, passed: 6, total: 11 },
+            { date: "01-23 15:54", score: 29.4, passed: 1, total: 2 },
+            { date: "01-23 15:56", score: 35.1, passed: 0, total: 1 },
+            { date: "01-23 15:58", score: 87.5, passed: 1, total: 1 },
+            { date: "01-23 15:59", score: 66.2, passed: 2, total: 3 },
+            { date: "01-23 21:51", score: 19.2, passed: 2, total: 11 },
+            { date: "01-23 22:49", score: 81.5, passed: 3, total: 4 },
+            { date: "01-24 08:37", score: 69.2, passed: 2, total: 4 },
+            { date: "01-24 08:41", score: 75.0, passed: 2, total: 3 },
+            { date: "01-24 08:43", score: 24.4, passed: 0, total: 2 },
+            { date: "01-24 08:50", score: 35.6, passed: 2, total: 2 },
+            { date: "01-24 09:35", score: 87.5, passed: 1, total: 3 },
+            { date: "01-24 09:48", score: 76.2, passed: 7, total: 11 },
+        ];
+
+        const categoryData = {
+            labels: ['Codegen', 'Bugfix', 'Refactor', 'Multistep'],
+            baseline: [50, 33, 68, 94],
+            current: [70, 81, 60, 95]
+        };
+
+        // Score Chart
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'line',
+            data: {
+                labels: evalData.map(d => d.date),
+                datasets: [{
+                    label: 'Score %',
+                    data: evalData.map(d => d.score),
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: { color: '#222' },
+                        ticks: { color: '#888' }
+                    },
+                    x: {
+                        grid: { color: '#222' },
+                        ticks: { color: '#888' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#00ff00' } }
+                }
+            }
+        });
+
+        // Category Chart
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: {
+                labels: categoryData.labels,
+                datasets: [
+                    {
+                        label: 'Baseline (01-13)',
+                        data: categoryData.baseline,
+                        backgroundColor: 'rgba(100, 100, 100, 0.5)',
+                        borderColor: '#666',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Current (01-24)',
+                        data: categoryData.current,
+                        backgroundColor: 'rgba(0, 255, 0, 0.5)',
+                        borderColor: '#00ff00',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: { color: '#222' },
+                        ticks: { color: '#888' }
+                    },
+                    x: {
+                        grid: { color: '#222' },
+                        ticks: { color: '#888' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#00ff00' } }
+                }
+            }
+        });
+
+        // Timeline
+        const timeline = document.getElementById('timeline');
+        evalData.forEach(d => {
+            const row = document.createElement('div');
+            row.className = 'timeline-row';
+            row.innerHTML = `
+                <span class="timeline-date">${d.date}</span>
+                <div class="timeline-bar">
+                    <div class="timeline-fill" style="width: ${d.score}%"></div>
+                </div>
+                <span class="timeline-value">${d.score.toFixed(1)}%</span>
+            `;
+            timeline.appendChild(row);
+        });
+    </script>
+</body>
+</html>
