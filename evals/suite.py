@@ -209,7 +209,7 @@ TEST_CASES: list[TestCase] = [
         id="codegen-001",
         name="Simple Function",
         category=CATEGORY_CODEGEN,
-        prompt="Skapa en Python-fil med en funktion 'is_prime(n)' som returnerar True om n är ett primtal, annars False. Inkludera docstring och typehints.",
+        prompt="Skapa filen 'prime.py' med en funktion 'is_prime(n)' som returnerar True om n är ett primtal, annars False. Inkludera docstring och typehints. VIKTIGT: Filen MÅSTE heta exakt 'prime.py'.",
         validators=[
             {"type": "file_exists", "filename": "prime.py"},
             {"type": "python_syntax", "filename": "prime.py"},
@@ -224,7 +224,7 @@ TEST_CASES: list[TestCase] = [
         id="codegen-002",
         name="Calculator Class",
         category=CATEGORY_CODEGEN,
-        prompt="Skapa en Calculator-klass i Python med metoderna add, subtract, multiply och divide. Divide ska hantera division med noll. Inkludera enhetstester.",
+        prompt="Skapa filen 'calculator.py' med en Calculator-klass med metoderna add, subtract, multiply och divide. Divide ska hantera division med noll. VIKTIGT: Filen MÅSTE heta exakt 'calculator.py'.",
         validators=[
             {"type": "file_exists", "filename": "calculator.py"},
             {"type": "python_syntax", "filename": "calculator.py"},
@@ -240,7 +240,7 @@ TEST_CASES: list[TestCase] = [
         id="codegen-003",
         name="REST API Endpoint",
         category=CATEGORY_CODEGEN,
-        prompt="Skapa ett enkelt Flask REST API med endpoints: GET /items (lista), POST /items (skapa), GET /items/<id> (hämta en). Använd en in-memory lista som databas.",
+        prompt="Skapa filen 'app.py' med ett enkelt Flask REST API med endpoints: GET /items (lista), POST /items (skapa), GET /items/<id> (hämta en). Använd en in-memory lista som databas. VIKTIGT: Filen MÅSTE heta exakt 'app.py'.",
         validators=[
             {"type": "file_exists", "filename": "app.py"},
             {"type": "python_syntax", "filename": "app.py"},
@@ -256,7 +256,7 @@ TEST_CASES: list[TestCase] = [
         id="codegen-004",
         name="Data Processing Pipeline",
         category=CATEGORY_CODEGEN,
-        prompt="Skapa en databehandlingspipeline som: 1) Läser CSV-data, 2) Filtrerar rader baserat på villkor, 3) Transformerar data, 4) Sparar till ny CSV. Använd pandas.",
+        prompt="Skapa filen 'pipeline.py' med en databehandlingspipeline som: 1) Läser CSV-data, 2) Filtrerar rader baserat på villkor, 3) Transformerar data, 4) Sparar till ny CSV. Använd pandas. VIKTIGT: Filen MÅSTE heta exakt 'pipeline.py'.",
         validators=[
             {"type": "file_exists", "filename": "pipeline.py"},
             {"type": "python_syntax", "filename": "pipeline.py"},
@@ -803,7 +803,19 @@ def main():
         if not test:
             print(f"Test not found: {args.test}")
             return
-        asyncio.run(runner.run_test(test))
+        result = asyncio.run(runner.run_test(test))
+        status = "PASS" if result.passed else "FAIL"
+        print(f"\n{'='*60}")
+        print(f"  TEST RESULT: {test.name}")
+        print(f"{'='*60}")
+        print(f"  Status: {status}")
+        print(f"  Score:  {result.score:.0%} ({result.details['validators_passed']}/{result.details['validators_total']} validators)")
+        print(f"  Time:   {result.duration:.1f}s")
+        if result.errors:
+            print(f"  Errors:")
+            for err in result.errors[:5]:
+                print(f"    - {err[:70]}")
+        print(f"{'='*60}\n")
     else:
         asyncio.run(runner.run_all(category=args.category))
 

@@ -23,6 +23,7 @@ class ReviewerAgent(BaseAgent):
     def __init__(self, provider: LLMProvider, working_dir: str = ".") -> None:
         super().__init__(provider)
         self._working_dir = working_dir
+        self._failed_paths: set[str] = set()  # Track paths that don't exist
         self._setup_tools()
 
     @property
@@ -92,7 +93,14 @@ class ReviewerAgent(BaseAgent):
 - warning: Should fix but not blocking
 - info: Nice-to-have improvements
 
-**BE STRICT** - If you find ANY error-level issue, set approved=false"""
+**BE STRICT** - If you find ANY error-level issue, set approved=false
+
+## PATH RULES (CRITICAL):
+- Use ONLY relative paths like "main.py", "src/utils.py"
+- NEVER use absolute paths like /home/... or /tmp/...
+- NEVER use ~ or $HOME
+- If a file doesn't exist after 2 attempts, skip it and continue
+- Don't keep retrying the same file path"""
 
     def _setup_tools(self) -> None:
         """Register tools for the reviewer."""
@@ -177,6 +185,10 @@ class ReviewerAgent(BaseAgent):
         """Read a file for review."""
         from pathlib import Path
 
+        # Check if we already tried this path
+        if path in self._failed_paths:
+            return f"ERROR: Already tried '{path}' - file does not exist. Skip this file."
+
         try:
             # Handle both absolute and relative paths
             file_path = Path(path)
@@ -184,7 +196,16 @@ class ReviewerAgent(BaseAgent):
                 file_path = Path(self._working_dir) / path
 
             if not file_path.exists():
-                return f"ERROR: File not found: {path}"
+                # Reject outside-working-dir paths when file doesn't exist
+                try:
+                    file_path.resolve().relative_to(Path(self._working_dir).resolve())
+                except ValueError:
+                    return f"ERROR: Path '{path}' is outside working directory. Use relative paths like 'main.py'."
+
+                self._failed_paths.add(path)
+                # List available files to help the LLM
+                available = [f.name for f in Path(self._working_dir).iterdir() if f.is_file()][:10]
+                return f"ERROR: File not found: {path}. Available files: {available}"
 
             content = file_path.read_text(encoding="utf-8", errors="replace")
 
@@ -343,12 +364,13 @@ class ReviewerAgent(BaseAgent):
 
                 comments = [
                     ReviewComment(
-                        file=c["file"],
+                        file=c.get("file", "unknown"),
                         line=c.get("line"),
-                        severity=c.get("severity", "info"),
-                        message=c["message"],
+                        severity=c.get("severity") or "info",  # Handle null values
+                        message=c.get("message", "No message"),
                     )
                     for c in data.get("comments", [])
+                    if isinstance(c, dict)  # Skip malformed comments
                 ]
 
                 approved = data.get("approved", False)

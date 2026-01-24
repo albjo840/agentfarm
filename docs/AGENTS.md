@@ -160,19 +160,27 @@ result = await executor.run(context)
 
 **Config:** `default_max_tool_calls = 40`
 
+**Constructor:**
+```python
+def __init__(self, provider: LLMProvider, working_dir: str = ".") -> None:
+    # working_dir krävs för att hitta filer korrekt
+```
+
 **Tools:**
-- `check_syntax` - Validera Python syntax
-- `check_imports` - Verifiera imports
+- `check_syntax` - Validera Python syntax (löser path mot working_dir)
+- `check_imports` - Verifiera imports (löser path mot working_dir)
 - `run_tests` - Kör pytest (parameter: `pattern` för -k filter)
 - `run_linter` - Kör ruff
 - `run_typecheck` - Kör type checking
-- `read_file` - Läs fil för inspektion
+- `read_file` - Läs fil för inspektion (löser path mot working_dir)
 
 ```python
-verifier = VerifierAgent(provider)
+verifier = VerifierAgent(provider, working_dir="/path/to/project")
 result = await verifier.run(context)
 # result.output innehåller VerificationResult
 ```
+
+**OBS:** Orchestrator skickar automatiskt `working_dir` vid initiering.
 
 **Output format (VerificationResult):**
 ```json

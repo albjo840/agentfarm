@@ -223,12 +223,16 @@ class OllamaProvider(LLMProvider):
         5. Code blocks in natural language - extract and wrap in write_file
         """
         import re
+        import logging
+        logger = logging.getLogger(__name__)
 
         if not content:
             return []
 
         original_content = content
         content = content.strip()
+
+        logger.debug("Parsing tool calls from content (%d chars): %s...", len(content), content[:200])
 
         # Strip markdown code blocks if present (for JSON tool calls)
         if content.startswith("```"):
@@ -240,6 +244,25 @@ class OllamaProvider(LLMProvider):
             content = "\n".join(lines).strip()
 
         calls = []
+
+        # NEW: Try to find JSON tool calls inside markdown code fences anywhere in content
+        json_fence_pattern = r'```(?:json)?\s*\n?(\{[^`]+\})\s*\n?```'
+        for match in re.finditer(json_fence_pattern, original_content, re.DOTALL):
+            try:
+                data = json.loads(match.group(1))
+                if "name" in data and "arguments" in data:
+                    args = self._unescape_string_values(data.get("arguments", {}))
+                    calls.append(ToolCall(
+                        id=f"call_fence_{len(calls)}",
+                        name=data["name"],
+                        arguments=args,
+                    ))
+                    logger.debug("Parsed tool call from fence: %s", data["name"])
+            except json.JSONDecodeError:
+                continue
+
+        if calls:
+            return calls
 
         def validate_write_file_content(args: dict) -> dict:
             """Ensure write_file content isn't a nested JSON tool call."""

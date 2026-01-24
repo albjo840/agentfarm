@@ -98,8 +98,12 @@ class RecursionGuard:
             )
 
         # Check for repeated IDENTICAL calls (same agent + exact same task)
-        # Use full task hash to avoid false positives with similar but different steps
-        task_hash = hash(task_summary) if task_summary else 0
+        # Use hashlib.md5 for more unique hashes (Python's hash() can collide)
+        import hashlib
+        if task_summary:
+            task_hash = int(hashlib.md5(task_summary.encode()).hexdigest()[:8], 16)
+        else:
+            task_hash = 0
         recent_calls = self.call_history[-10:]  # Check last 10 calls
         identical_recent = sum(1 for a, t in recent_calls if a == agent_name and t == task_hash)
         # Threshold of 5 for legitimate workflow patterns (steps may be retried)

@@ -1,6 +1,6 @@
 # AgentFarm - Current State
 
-> **Uppdaterad:** 2026-01-23
+> **Uppdaterad:** 2026-01-24
 >
 > Se även: [INDEX.md](./INDEX.md) | [ARCHITECTURE.md](./ARCHITECTURE.md) | [MCP_TESTING.md](./MCP_TESTING.md)
 
@@ -8,18 +8,200 @@
 
 ```
 Branch: master
-Status: Evaluation improvements, agent tool limits & collaboration fixes
+Status: Eval regression fix - 76.2% score achieved
 ```
 
-## Senaste Commits
+## Senaste Eval-resultat
 
 ```
-cc96a76 feat: Add MCP-based testing tools for AgentFarm
-2c27040 fix: Remove AI-style formatting from vision page
-0a55b92 content: Rewrite vision page with improved Swedish copy
-69bdc00 feat: Add i18n support to agent prompts modal
-6d23e1f fix: Add language switcher and proper translations to vision page
+============================================================
+  RESULTS SUMMARY (2026-01-24)
+============================================================
+  Passed: 7/11
+  Score:  160.1/210 (76.2%)
+  Time:   802.0s
+
+  By Category:
+    codegen:   3/4 (70%)
+    bugfix:    1/3 (81%)
+    refactor:  1/2 (60%)
+    multistep: 2/2 (95%)
+============================================================
 ```
+
+## Session 2026-01-24: Eval Regression Fix (76.2% → +25%)
+
+### Problem
+
+Eval score hade sjunkit från ursprungliga 52.9% till 51.4%. Bugfix, refactor och multistep kategorier hade allvarliga regressioner.
+
+### Rotorsaker
+
+1. **Pydantic validation errors**
+   - `ReviewComment.severity` krashade på `null` från LLM
+   - `VerificationResult.lint_issues` hanterade inte `null` korrekt
+
+2. **LLM path hallucination**
+   - Agenter skickade `/home/user/...`, `~/...`, `/tmp/...`
+   - Slösade alla tool calls på icke-existerande filer
+
+3. **Tool call loops**
+   - Verifier/Reviewer försökte samma path om och om igen
+   - Träffade max_tool_calls (40) utan att göra något användbart
+
+### Implementerade Fixar
+
+#### 1. Null-value handling
+```python
+# agents/verifier.py, agents/reviewer.py
+# FÖRE (krasch på null):
+severity=c.get("severity", "info")  # Returnerar None om nyckeln finns men är null
+
+# EFTER:
+severity=c.get("severity") or "info"
+lint_issues = data.get("lint_issues") or []
+```
+
+#### 2. Failed path tracking
+```python
+# Stoppar LLM-loopar
+self._failed_paths: set[str] = set()
+
+async def _read_file(self, path: str) -> str:
+    if path in self._failed_paths:
+        return f"ERROR: Already tried '{path}' - skip this file."
+```
+
+#### 3. Visa tillgängliga filer
+```python
+if not file_path.exists():
+    available = [f.name for f in self._working_dir.iterdir()][:10]
+    return f"ERROR: File not found. Available: {available}"
+```
+
+#### 4. Path validation
+```python
+try:
+    file_path.resolve().relative_to(self._working_dir)
+except ValueError:
+    return "ERROR: Path outside working directory. Use relative paths."
+```
+
+#### 5. Prompt improvements
+```markdown
+## PATH RULES (CRITICAL):
+- Use ONLY relative paths like "main.py", "src/utils.py"
+- NEVER use absolute paths like /home/... or /tmp/...
+- If a file doesn't exist after 2 attempts, skip it
+```
+
+### Resultat
+
+| Kategori | Före | Efter | Förändring |
+|----------|------|-------|------------|
+| codegen | 69.2% | 70% | +1% |
+| bugfix | 75% | 81% | +6% |
+| refactor | 24.4% | 60% | **+36%** |
+| multistep | 94% | 95% | +1% |
+| **Total** | **51.4%** | **76.2%** | **+25%** |
+
+### Uppdaterade Filer
+
+```
+src/agentfarm/
+├── agents/
+│   ├── base.py          # MD5 hash för RecursionGuard
+│   ├── verifier.py      # Null handling, path tracking, validation
+│   └── reviewer.py      # Null handling, path tracking, validation
+├── orchestrator.py      # stop_on_failure=True, fil-verifiering
+├── providers/
+│   └── ollama.py        # JSON fence pattern för tool calls
+└── tools/
+    └── file_tools.py    # Fixad fuzzy matching regex ordning
+
+evals/
+└── suite.py             # --test flaggan skriver ut resultat
+```
+
+---
+
+## Session 2026-01-24 (tidigare): VerifierAgent Working Directory Fix
+
+### Problem
+
+Evalueringsresultaten hade regresserat från **65.6%** (2026-01-13) till **19.2%** (2026-01-23). Huvudproblemet: **filer skapades men hittades inte av VerifierAgent**.
+
+### Rotorsak
+
+VerifierAgent's interna verktyg (`_check_syntax`, `_check_imports`, `_read_file`) använde `Path(path)` utan working directory:
+
+```python
+# FÖRE (bugg):
+async def _check_syntax(self, path: str) -> str:
+    file_path = Path(path)  # Relativ path → kollar i /home/albin/agentfarm
+    if not file_path.exists():  # Fil finns i /tmp/eval_xxx/, hittas ej!
+        return f"ERROR: File not found: {path}"
+```
+
+### Implementerade Fixar
+
+- [x] **VerifierAgent working_dir support** (`agents/verifier.py`)
+  - Ny `working_dir` parameter i constructor
+  - `_check_syntax`, `_check_imports`, `_read_file` löser paths mot working_dir
+  - Bättre felmeddelanden: "looked in {working_dir}"
+
+- [x] **Orchestrator uppdaterad** (`orchestrator.py`)
+  - Skickar `working_dir` till VerifierAgent vid initiering
+  - Injectar `read_file` från FileTools till verifier
+
+- [x] **Explicita filnamn i eval-prompts** (`evals/suite.py`)
+  - Alla codegen-tester specificerar nu exakt filnamn
+  - Exempel: `"VIKTIGT: Filen MÅSTE heta exakt 'prime.py'"`
+
+### Resultat
+
+| Kategori | Före Fix | Efter Fix |
+|----------|----------|-----------|
+| **codegen** | **0/4 (0%)** | **3/4 (81.5%)** |
+| codegen-001 | 0% (File not found) | 80% ✓ |
+| codegen-002 | 0% (File not found) | 100% ✓ |
+| codegen-003 | 0% (File not found) | 50% ✗ |
+| codegen-004 | 0% (File not found) | 100% ✓ |
+
+### Uppdaterade Filer
+
+```
+src/agentfarm/
+├── agents/
+│   └── verifier.py      # working_dir parameter, path resolution
+├── orchestrator.py      # Pass working_dir to VerifierAgent
+└── tools/
+    └── file_tools.py    # (unchanged, already correct)
+
+evals/
+└── suite.py             # Explicit filenames in prompts
+
+docs/
+└── CURRENT_STATE.md     # Denna uppdatering
+```
+
+### Kvarvarande Problem
+
+1. **LLM hallucinerar paths** - Skickar ibland `/Users/username/...` eller `/home/user/...`
+2. **edit_file-matchning** - Content-matching misslyckas när LLM gissar fel
+3. **Flask routes** - codegen-003 saknade korrekta route-dekoratorer
+
+### Testresultat
+
+```bash
+python -m pytest tests/ -v
+# 227 passed, 20 skipped in 1.11s
+
+python -m evals.suite --category codegen
+# 3/4 passed, 81.5% score
+```
+
+---
 
 ## Session 2026-01-23 (del 2): Evaluation Improvements
 

@@ -20,8 +20,11 @@ class VerifierAgent(BaseAgent):
     description = "Verifies code changes through testing and validation"
     default_max_tool_calls = 40  # Verifier needs many tool calls (syntax, imports, tests, lint, typecheck)
 
-    def __init__(self, provider: LLMProvider) -> None:
+    def __init__(self, provider: LLMProvider, working_dir: str = ".") -> None:
         super().__init__(provider)
+        from pathlib import Path
+        self._working_dir = Path(working_dir).resolve()
+        self._failed_paths: set[str] = set()  # Track paths that don't exist
         self._setup_tools()
 
     @property
@@ -62,7 +65,14 @@ After running ALL tools, summarize in JSON:
 - If ANY check fails, set success=false and list all issues
 - Be STRICT - a single failing test means the verification FAILS
 - Report SPECIFIC line numbers and file paths for issues
-- Suggest CONCRETE fixes for each issue found"""
+- Suggest CONCRETE fixes for each issue found
+
+## PATH RULES (CRITICAL):
+- Use ONLY relative paths like "main.py", "src/utils.py"
+- NEVER use absolute paths like /home/... or /tmp/...
+- NEVER use ~ or $HOME
+- If a file doesn't exist after 2 attempts, report it as missing and move on
+- Don't keep retrying the same file path"""
 
     def _setup_tools(self) -> None:
         """Register tools for the verifier."""
@@ -162,10 +172,25 @@ After running ALL tools, summarize in JSON:
         import ast
         from pathlib import Path
 
+        if path in self._failed_paths:
+            return f"ERROR: Already tried '{path}' - skip this file."
+
         try:
             file_path = Path(path)
+            # Resolve relative paths against working directory
+            if not file_path.is_absolute():
+                file_path = self._working_dir / path
+
             if not file_path.exists():
-                return f"ERROR: File not found: {path}"
+                # Only reject outside-working-dir paths when file doesn't exist
+                try:
+                    file_path.resolve().relative_to(self._working_dir)
+                except ValueError:
+                    return f"ERROR: Path '{path}' is outside working directory. Use relative paths like 'main.py'."
+
+                self._failed_paths.add(path)
+                available = [f.name for f in self._working_dir.iterdir() if f.is_file() and f.suffix == ".py"][:10]
+                return f"ERROR: File not found: {path}. Python files: {available}"
 
             if not file_path.suffix == ".py":
                 return f"SKIP: Not a Python file: {path}"
@@ -184,9 +209,23 @@ After running ALL tools, summarize in JSON:
         import ast
         from pathlib import Path
 
+        if path in self._failed_paths:
+            return f"ERROR: Already tried '{path}' - skip this file."
+
         try:
             file_path = Path(path)
+            # Resolve relative paths against working directory
+            if not file_path.is_absolute():
+                file_path = self._working_dir / path
+
             if not file_path.exists():
+                # Reject outside-working-dir paths when file doesn't exist
+                try:
+                    file_path.resolve().relative_to(self._working_dir)
+                except ValueError:
+                    return f"ERROR: Path '{path}' is outside working directory. Use relative paths."
+
+                self._failed_paths.add(path)
                 return f"ERROR: File not found: {path}"
 
             source = file_path.read_text(encoding="utf-8")
@@ -232,10 +271,27 @@ After running ALL tools, summarize in JSON:
         """Read a file for inspection."""
         from pathlib import Path
 
+        # Check if we already tried this path
+        if path in self._failed_paths:
+            return f"ERROR: Already tried '{path}' - file does not exist. Skip this file."
+
         try:
             file_path = Path(path)
+            # Resolve relative paths against working directory
+            if not file_path.is_absolute():
+                file_path = self._working_dir / path
+
             if not file_path.exists():
-                return f"ERROR: File not found: {path}"
+                # Reject outside-working-dir paths when file doesn't exist
+                try:
+                    file_path.resolve().relative_to(self._working_dir)
+                except ValueError:
+                    return f"ERROR: Path '{path}' is outside working directory. Use relative paths like 'main.py'."
+
+                self._failed_paths.add(path)
+                # List available files to help the LLM
+                available = [f.name for f in self._working_dir.iterdir() if f.is_file()][:10]
+                return f"ERROR: File not found: {path}. Available files: {available}"
 
             content = file_path.read_text(encoding="utf-8", errors="replace")
 
@@ -269,11 +325,17 @@ After running ALL tools, summarize in JSON:
                 json_str = content[start:end]
                 data = json.loads(json_str)
 
-                passed = data.get("tests_passed", 0)
-                failed = data.get("tests_failed", 0)
-                skipped = data.get("tests_skipped", 0)
-                lint_issues = data.get("lint_issues", [])
-                type_errors = data.get("type_errors", [])
+                passed = data.get("tests_passed") or 0
+                failed = data.get("tests_failed") or 0
+                skipped = data.get("tests_skipped") or 0
+                lint_issues = data.get("lint_issues") or []
+                type_errors = data.get("type_errors") or []
+
+                # Ensure lists are actually lists (LLM might return strings)
+                if isinstance(lint_issues, str):
+                    lint_issues = [lint_issues] if lint_issues else []
+                if isinstance(type_errors, str):
+                    type_errors = [type_errors] if type_errors else []
 
                 success = failed == 0 and len(type_errors) == 0
 

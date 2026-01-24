@@ -864,6 +864,114 @@ result = await orchestrator.run_workflow_with_overlapping_phases(
 
 ## Changelog
 
+### 2026-01-24: Eval Regression Fix (76.2% score)
+
+#### Problem
+Eval score hade sjunkit till 51.4%. Bugfix, refactor och multistep kategorier failade.
+
+#### Root Causes
+1. **Pydantic validation errors** - `ReviewComment.severity` och `VerificationResult.lint_issues` fick `null` från LLM
+2. **LLM path hallucination** - Agenter försökte läsa `/home/user/...`, `~/...`, `/tmp/...`
+3. **Tool call loops** - Verifier/Reviewer slösade alla tool calls på icke-existerande filer
+
+#### Fixes Implemented
+
+**1. Null-value handling** (`agents/verifier.py`, `agents/reviewer.py`):
+```python
+# BEFORE (crash on null):
+severity=c.get("severity", "info")  # Returns None if key exists but is null
+
+# AFTER (handles null):
+severity=c.get("severity") or "info"  # Falls back to "info" on None
+lint_issues = data.get("lint_issues") or []
+```
+
+**2. Failed path tracking** - Stop LLM loops:
+```python
+self._failed_paths: set[str] = set()
+
+async def _read_file(self, path: str) -> str:
+    if path in self._failed_paths:
+        return f"ERROR: Already tried '{path}' - skip this file."
+```
+
+**3. Show available files** - Help LLM find correct paths:
+```python
+if not file_path.exists():
+    available = [f.name for f in self._working_dir.iterdir()][:10]
+    return f"ERROR: File not found: {path}. Available files: {available}"
+```
+
+**4. Path validation** - Reject hallucinated absolute paths:
+```python
+try:
+    file_path.resolve().relative_to(self._working_dir)
+except ValueError:
+    return f"ERROR: Path outside working directory. Use relative paths."
+```
+
+**5. Prompt improvements** - Added PATH RULES to system prompts:
+```
+## PATH RULES (CRITICAL):
+- Use ONLY relative paths like "main.py", "src/utils.py"
+- NEVER use absolute paths like /home/... or /tmp/...
+- If a file doesn't exist after 2 attempts, skip it
+```
+
+#### Evaluation Results
+| Category | Before | After | Change |
+|----------|--------|-------|--------|
+| codegen | 69.2% | 70% | +1% |
+| bugfix | 75% | 81% | +6% |
+| refactor | 24.4% | 60% | **+36%** |
+| multistep | 94% | 95% | +1% |
+| **Total** | **51.4%** | **76.2%** | **+25%** |
+
+**Tests passed: 7/11** (was 6/11)
+
+#### Files Modified
+| File | Changes |
+|------|---------|
+| `agents/verifier.py` | Null handling, failed path tracking, path validation, prompt rules |
+| `agents/reviewer.py` | Null handling, failed path tracking, path validation, prompt rules |
+| `orchestrator.py` | stop_on_failure=True, file existence verification |
+| `providers/ollama.py` | JSON fence pattern for tool calls |
+| `agents/base.py` | MD5 hash for RecursionGuard |
+| `tools/file_tools.py` | Fixed fuzzy matching regex order |
+| `evals/suite.py` | --test flag now prints results |
+
+---
+
+### 2026-01-24: VerifierAgent Working Directory Fix
+
+#### Bug Fix
+- **VerifierAgent working_dir support** (`agents/verifier.py`):
+  - Added `working_dir` parameter to constructor
+  - `_check_syntax`, `_check_imports`, `_read_file` now resolve paths against working_dir
+  - Fixed: Files created in temp directories were not found by verifier
+
+- **Orchestrator updates** (`orchestrator.py`):
+  - Now passes `working_dir` to VerifierAgent on initialization
+  - Injects `read_file` from FileTools to verifier
+
+- **Eval prompt improvements** (`evals/suite.py`):
+  - Added explicit filenames to codegen prompts
+  - Example: "VIKTIGT: Filen MÅSTE heta exakt 'prime.py'"
+
+#### Evaluation Results
+| Category | Before Fix | After Fix |
+|----------|------------|-----------|
+| codegen | 0/4 (0%) | 3/4 (81.5%) |
+
+#### Files Modified
+| File | Changes |
+|------|---------|
+| `agents/verifier.py` | working_dir parameter, path resolution in tools |
+| `orchestrator.py` | Pass working_dir to VerifierAgent |
+| `evals/suite.py` | Explicit filenames in prompts |
+
+---
+
 ### 2026-01-22: Agent Persistence & Parallelization
 
 #### New Features

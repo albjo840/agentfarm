@@ -78,7 +78,7 @@ class Orchestrator:
             self.provider = provider
             self.planner = PlannerAgent(provider)
             self.executor = ExecutorAgent(provider)
-            self.verifier = VerifierAgent(provider)
+            self.verifier = VerifierAgent(provider, working_dir=working_dir)
             self.reviewer = ReviewerAgent(provider, working_dir=working_dir)
             self.ux_designer = UXDesignerAgent(provider)
 
@@ -125,7 +125,7 @@ class Orchestrator:
         # Initialize agents with their specific providers
         self.planner = PlannerAgent(planner_provider)
         self.executor = ExecutorAgent(executor_provider)
-        self.verifier = VerifierAgent(verifier_provider)
+        self.verifier = VerifierAgent(verifier_provider, working_dir=self.working_dir)
         self.reviewer = ReviewerAgent(reviewer_provider, working_dir=self.working_dir)
         self.ux_designer = UXDesignerAgent(designer_provider)
 
@@ -232,6 +232,8 @@ class Orchestrator:
         self.verifier._tool_handlers["run_tests"] = code_tools.run_tests
         self.verifier._tool_handlers["run_linter"] = code_tools.run_linter
         self.verifier._tool_handlers["run_typecheck"] = code_tools.run_typecheck
+        # Also inject read_file from FileTools for verifier to read files
+        self.verifier._tool_handlers["read_file"] = file_tools.read_file
 
     def inject_tools(
         self,
@@ -526,7 +528,7 @@ class Orchestrator:
             on_step_complete=on_step_complete,
             on_parallel_group=on_parallel_group,
             max_concurrent=4,
-            stop_on_failure=False,  # Continue other parallel steps even if one fails
+            stop_on_failure=True,  # Stop early to catch errors instead of hiding them
         )
 
         # Emit parallel execution start event with analysis
@@ -539,6 +541,20 @@ class Orchestrator:
 
         # Execute all steps with parallelization
         results = await parallel_exec.execute_all(agent_filter="ExecutorAgent")
+
+        # Verify files were actually created/modified
+        from pathlib import Path
+        for result in results:
+            if result.success and result.files_changed:
+                for fc in result.files_changed:
+                    file_path = Path(self.working_dir) / fc.path
+                    if not file_path.exists():
+                        logger.warning(
+                            "File %s was reported as changed but does not exist!",
+                            fc.path
+                        )
+                        result.success = False
+                        result.output = f"{result.output}\n[ERROR] File {fc.path} was not actually created"
 
         logger.info("Execute phase complete: %d results", len(results))
         return results

@@ -62,7 +62,7 @@ class FileTools:
             return f"Created {path}"
 
         if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
+            raise FileNotFoundError(f"File not found: {path} (resolved: {file_path})")
 
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
             content = await f.read()
@@ -148,9 +148,14 @@ class FileTools:
             Tuple of (matched_text, start_index, end_index) or None if not found
         """
         import re
-        # Normalize whitespace in search pattern
-        search_normalized = re.sub(r'\s+', r'\\s+', re.escape(search.strip()))
-        match = re.search(search_normalized, content, re.DOTALL)
+        # 1. Normalize whitespace FIRST (collapse multiple spaces/newlines to single space)
+        search_normalized = re.sub(r'\s+', ' ', search.strip())
+        # 2. Escape special regex characters
+        search_escaped = re.escape(search_normalized)
+        # 3. Replace the escaped single space with flexible whitespace pattern
+        search_pattern = search_escaped.replace(r'\ ', r'\s+')
+
+        match = re.search(search_pattern, content, re.DOTALL)
         if match:
             return match.group(0), match.start(), match.end()
         return None
