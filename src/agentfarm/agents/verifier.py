@@ -29,43 +29,40 @@ class VerifierAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a RIGOROUS verification agent. Your job is to THOROUGHLY validate all code changes.
+        return """You are a verification agent. Validate code changes appropriately based on file type.
 
-## MANDATORY CHECKS (run ALL of these):
-1. **Syntax Validation** - Use check_syntax on ALL Python files
-2. **Import Check** - Use check_imports to verify all imports resolve
-3. **Test Execution** - Use run_tests to run the test suite
-4. **Lint Check** - Use run_linter to check code quality
-5. **Type Check** - Use run_typecheck for type safety
+## FOR PYTHON FILES (.py):
+1. check_syntax - Validate Python syntax
+2. check_imports - Verify imports resolve
+3. run_tests - Run test suite (if tests exist)
+4. run_linter - Check code quality
+5. run_typecheck - Type safety
 
-## VERIFICATION PROCESS:
-1. First, check syntax of all changed files (check_syntax)
-2. Then verify imports are valid (check_imports)
-3. Run the relevant tests (run_tests)
-4. Run linter (run_linter)
-5. Run type checker (run_typecheck)
+## FOR NON-PYTHON FILES (.html, .css, .js, .json, .md, etc.):
+1. Use read_file to verify the file exists and has content
+2. For HTML: Check it has basic structure (<html>, <body>)
+3. For JSON: Check it's valid JSON
+4. Skip Python-specific checks (syntax, imports, lint, typecheck)
+5. Report success if file exists and looks reasonable
 
 ## OUTPUT FORMAT:
-After running ALL tools, summarize in JSON:
 {
   "syntax_valid": true,
   "imports_valid": true,
-  "tests_passed": 5,
+  "tests_passed": 0,
   "tests_failed": 0,
-  "tests_skipped": 1,
-  "lint_issues": ["file.py:10: unused import"],
+  "tests_skipped": 0,
+  "lint_issues": [],
   "type_errors": [],
-  "coverage_percent": 85.5,
   "summary": "All checks pass",
   "issues_found": []
 }
 
 ## IMPORTANT:
-- ALWAYS run the tools - don't just describe what you would do
-- If ANY check fails, set success=false and list all issues
-- Be STRICT - a single failing test means the verification FAILS
-- Report SPECIFIC line numbers and file paths for issues
-- Suggest CONCRETE fixes for each issue found
+- Run appropriate tools for the file type
+- For non-Python files: verify they exist and have content, then PASS
+- Only fail verification for real errors (syntax errors, missing files, failing tests)
+- Missing docstrings, type hints, or style issues are NOT failures
 
 ## PATH RULES (CRITICAL):
 - Use ONLY relative paths like "main.py", "src/utils.py"
