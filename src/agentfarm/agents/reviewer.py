@@ -89,18 +89,23 @@ class ReviewerAgent(BaseAgent):
 }
 
 ## SEVERITY RULES:
-- error: Blocks approval (security issues, bugs, crashes)
-- warning: Should fix but not blocking
-- info: Nice-to-have improvements
+- **error**: Security issues, crashes, data loss - BLOCKS approval
+- **warning**: Missing docstrings, type hints, code style - does NOT block approval
+- **info**: Suggestions and nice-to-haves
 
-**BE STRICT** - If you find ANY error-level issue, set approved=false
+**IMPORTANT**: Set approved=true if no ERROR-level issues. Warnings alone should NOT block approval.
 
 ## PATH RULES (CRITICAL):
 - Use ONLY relative paths like "main.py", "src/utils.py"
 - NEVER use absolute paths like /home/... or /tmp/...
 - NEVER use ~ or $HOME
 - If a file doesn't exist after 2 attempts, skip it and continue
-- Don't keep retrying the same file path"""
+- Don't keep retrying the same file path
+
+## SPECIAL CASES (be lenient):
+- **Games (pygame, arcade)**: print() is OK, game loops don't need docstrings
+- **Scripts**: Missing type hints are warnings, not errors
+- **Prototypes**: Focus on functionality over style - APPROVE if it works"""
 
     def _setup_tools(self) -> None:
         """Register tools for the reviewer."""
