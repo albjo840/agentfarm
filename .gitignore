@@ -62,3 +62,4 @@ Thumbs.db
 .agentfarm.json
 agentfarm.json
 .agentfarm/
+evals/results/
